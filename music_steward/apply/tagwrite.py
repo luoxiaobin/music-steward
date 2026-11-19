@@ -50,6 +50,9 @@ def write_tags(path: str, fields: dict, codec: str):
     f = mutagen.File(path)
     if f is None:
         raise ValueError(f"cannot write tags to {path}")
+    if codec.startswith("pcm_") or type(f).__name__ in ("WAVE", "AIFF"):
+        _write_id3_chunk(f, fields)   # WAV/AIFF carry ID3 frames, not Vorbis-style keys
+        return
     if f.tags is None:
         f.add_tags()
     if codec in ("aac", "alac"):
@@ -97,3 +100,19 @@ def _rebuild_ape(path: str):
             fh.write(after)
             fh.truncate()
     return t
+
+
+def _write_id3_chunk(f, fields: dict):
+    """WAV/AIFF: tags live in an ID3 chunk; set real frames (ID3v2.3, like MP3)."""
+    from mutagen.id3 import TALB, TDRC, TIT2, TPE1, TPE2, TPOS, TRCK, TXXX, UFID  # noqa: F401
+    frames = {"title": TIT2, "artist": TPE1, "album": TALB, "albumartist": TPE2,
+              "track": TRCK, "disc": TPOS, "date": TDRC}
+    if f.tags is None:
+        f.add_tags()
+    for k, v in fields.items():
+        if k in frames:
+            f.tags.setall(frames[k].__name__, [frames[k](encoding=3, text=[v])])
+        elif k in ("mb_trackid", "mb_albumid"):
+            desc = {"mb_trackid": "MusicBrainz Track Id", "mb_albumid": "MusicBrainz Album Id"}[k]
+            f.tags.setall(f"TXXX:{desc}", [TXXX(encoding=3, desc=desc, text=[v])])
+    f.save(v2_version=3)

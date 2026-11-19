@@ -239,3 +239,14 @@ def test_tags_written_to_a_copy_whose_ape_tag_is_corrupt(tmp_path):
     assert str(t["Artist"]) == "孟庭苇" and str(t["Comment"]) == "ripped 1995" and str(t["Genre"]) == "Other"
     assert p.read_bytes().count(b"APETAGEX") == 2 and p.read_bytes().startswith(b"MAC ")   # one tag (header+footer)
     assert len(_raw_apev2(str(p))) == 6
+
+
+def test_tags_written_to_a_wav_copy(tmp_path):
+    """A cue album whose image is WAV (陈松伶 天涯歌女 on the NAS) failed: WAV tags are ID3 frames."""
+    import mutagen
+    from music_steward.apply.tagwrite import write_tags
+    from .conftest import tone
+    p = tone(tmp_path / "天涯歌女.wav", ["-c:a", "pcm_s16le"], secs=1)
+    write_tags(str(p), {"album": "天涯歌女", "albumartist": "陈松伶", "date": 1990, "disc": "1/2"}, "pcm_s16le")
+    t = mutagen.File(str(p)).tags
+    assert str(t["TALB"]) == "天涯歌女" and str(t["TPE2"]) == "陈松伶" and str(t["TPOS"]) == "1/2"

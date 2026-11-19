@@ -34,9 +34,16 @@ def clean(s: str | None, number: int | None = None) -> str | None:
     download-site noise ('.-.', '.专辑', '(APE)') and a repeated track number are dropped."""
     if not s:
         return None
+    from ..tags import repair_latin1
+    fix = repair_latin1(s)            # GBK/Big5 text shown as Latin-1 ('Ãû¸èºìÈþ' -> '名歌红颜')
+    if fix:
+        s = fix["proposal"]
     s = FORMAT_NOTE.sub("", s.strip()).strip(" .")
+    s = re.sub(r"[\s.\-_]*\b(ape|flac|wav|wv|dsd)$", "", s, flags=re.I)   # '…专辑ape', '… flac'
+    s = re.sub(r"(?<=[\u4e00-\u9fff\]】)])(ape|flac)$", "", s, flags=re.I)
     s = re.sub(r"\.-\.", " - ", s)
     s = re.sub(r"[.\s]*(专辑|專輯)$", "", s)
+    s = re.sub(r"^《([^》]+)》$", r"\1", s)
     # '林子祥.陈奕迅' / '].专辑' style separators between CJK or brackets (not 'Op.47', not 'Vol.2')
     s = re.sub(r"(?<=[\u4e00-\u9fff\]】])\.(?=[\u4e00-\u9fff\[【])", " ", s)
     m = re.fullmatch(r"(.*?)\s*[\[【]([^\]】]+)[\]】]", s)
@@ -61,6 +68,22 @@ def split_disc(album: str | None) -> tuple[str | None, int | None]:
     if not m or not album[:m.start()].strip(" -_.·"):
         return album, None
     return album[:m.start()].strip(" -_.·"), int(m.group(1)) or None
+
+
+def strip_artist(album: str | None, artist: str | None) -> tuple[str | None, str | None]:
+    """'蔡琴 - 情歌·豪驾魅音①' as BOTH artist and album -> ('情歌·豪驾魅音①', '蔡琴');
+    '杨曼丽 - 《芊芊君歌》' with artist 杨曼莉 -> '芊芊君歌' (the part before ' - ' names the artist)."""
+    if not album or " - " not in album:
+        return album, artist
+    left, right = (x.strip() for x in album.split(" - ", 1))
+    if artist and artist == album:
+        return clean(right) or album, left
+    from ..chinese import key
+    if artist and (key(artist).casefold() in key(left).casefold() or
+                   key(left).casefold() in key(artist).casefold() or
+                   (len(left) >= 2 and len(artist) >= 2 and left[0] == artist[0] and left[-1] == artist[-1])):
+        return clean(right) or album, artist
+    return album, artist
 
 
 def _year(s) -> int | None:
@@ -156,10 +179,7 @@ def from_cue(con: sqlite3.Connection, u) -> dict:
     s_title, s_perf = clean(sheet.title), clean(sheet.performer)
     album = s_title or folder["album"]
     artist = s_perf or folder["artist"]
-    if album and artist and " - " in album:          # '群星 - 2009流行发烧唱片' -> '2009流行发烧唱片'
-        left, right = album.split(" - ", 1)
-        if artist.casefold() in left.casefold():
-            album = right
+    album, artist = strip_artist(album, artist)      # '群星 - 2009流行发烧唱片' -> '2009流行发烧唱片'
     performers = {clean(t.performer) for t in f.tracks} - {None}
     if not artist and len(performers) == 1:
         artist = performers.pop()
@@ -207,6 +227,7 @@ def from_files(con: sqlite3.Connection, u) -> dict:
             artist, origin["artist"] = folder["artist"], "file names" if suffix else "folder name"
         elif len({tags[f["id"]].get("artist") for f in rows if tags[f["id"]].get("artist")}) > 1:
             artist, origin["artist"] = "Various Artists", "tags (several artists)"
+        album, artist = strip_artist(album, artist)
     else:
         t = tags[rows[0]["id"]]
         artist = t.get("artist") or t.get("albumartist")
