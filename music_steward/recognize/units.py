@@ -27,6 +27,53 @@ def _album_tag(tags_json, issues_json) -> str | None:
     return a.strip() if a and a.strip() else None
 
 
+def _cue_units(con: sqlite3.Connection, root_id: int, subpath: str) -> tuple[list[dict], set[int]]:
+    """Image albums: a cue sheet whose FILE names an audio file in the same folder (the
+    extension may differ: cues often say .wav for an .ape) and lists more than one track."""
+    import os
+    from .. import cue as cuemod
+    from ..paths import nfc
+    root = con.execute("SELECT path FROM root WHERE id=?", (root_id,)).fetchone()["path"]
+    q = "SELECT id, relpath, fs_relpath FROM file WHERE root_id=? AND removed_at IS NULL AND kind='cue'"
+    args: tuple = (root_id,)
+    if subpath:
+        q += " AND relpath >= ? AND relpath < ?"
+        args += (subpath + "/", subpath + "/\uffff")
+    units, used = [], set()
+    for c in con.execute(q, args).fetchall():
+        folder = c["relpath"].rsplit("/", 1)[0] if "/" in c["relpath"] else ""
+        prefix = f"{folder}/" if folder else ""
+        audio = {}
+        for a in con.execute("SELECT id, relpath, duration FROM file WHERE root_id=? AND removed_at IS NULL AND "
+                             "kind='audio' AND probe_status='ok' AND relpath >= ? AND relpath < ?",
+                             (root_id, prefix, prefix + "\uffff")):
+            if "/" not in a["relpath"][len(prefix):]:
+                audio[a["relpath"][len(prefix):]] = a
+        try:
+            sheet = cuemod.parse(os.path.join(root, c["fs_relpath"]))
+        except (OSError, ValueError):
+            continue
+        # an IMAGE cue has few FILE entries and many tracks (1 file / 12 tracks; 2 files / 24 for a
+        # 2-CD image). A per-track cue (one FILE per track file) is not an image album.
+        if len(sheet.files) > max(1, len(sheet.tracks) // 4):
+            continue
+        for f in sheet.files:
+            if len(f.tracks) < 2:
+                continue
+            want = nfc(f.name).casefold()
+            want_stem = os.path.splitext(want)[0]
+            hit = next((a for n, a in audio.items() if n.casefold() == want), None) or \
+                next((a for n, a in audio.items() if os.path.splitext(n.casefold())[0] == want_stem), None) or \
+                (next(iter(audio.values())) if len(audio) == 1 else None)
+            if hit is None or hit["id"] in used:
+                continue
+            used.add(hit["id"])
+            units.append({"folder": folder, "kind": "cue", "label": sheet.title or folder.rsplit("/", 1)[-1],
+                          "key": f"cue:{c['relpath']}:{hit['relpath']}", "file_ids": [hit["id"]],
+                          "cue_file_id": c["id"]})
+    return units, used
+
+
 def plan_units(con: sqlite3.Connection, root_id: int, subpath: str = "") -> list[dict]:
     q = ("SELECT id, relpath, tags_json, tag_issues_json FROM file WHERE root_id=? AND removed_at IS NULL "
          "AND kind='audio' AND probe_status='ok'")
@@ -34,16 +81,19 @@ def plan_units(con: sqlite3.Connection, root_id: int, subpath: str = "") -> list
     if subpath:
         q += " AND (relpath >= ? AND relpath < ?)"
         args += (subpath + "/", subpath + "/￿")
+    cue_units, in_cue = _cue_units(con, root_id, subpath)
     by_folder: dict[str, list] = defaultdict(list)
     merged: set[str] = set()
     for r in con.execute(q + " ORDER BY relpath", args):
+        if r["id"] in in_cue:
+            continue  # the long file of an image album is matched through its cue sheet
         folder = r["relpath"].rsplit("/", 1)[0] if "/" in r["relpath"] else ""
         parent, _, leaf = folder.rpartition("/")
         if DISC_DIR.match(leaf):
             folder = parent  # CD 1 / CD 2 belong to the album folder
             merged.add(folder)
         by_folder[folder].append(r)
-    units = []
+    units = list(cue_units)
 
     def name_of(folder):
         return folder.rsplit("/", 1)[-1] or "(root)"
@@ -69,18 +119,30 @@ def plan_units(con: sqlite3.Connection, root_id: int, subpath: str = "") -> list
     return units
 
 
-def enqueue(con: sqlite3.Connection, root_id: int, units: list[dict], requeue: bool = False) -> dict:
-    """Insert units; existing ones (same key) keep their results unless requeue."""
-    c = {"queued": 0, "already_done": 0, "requeued": 0}
+def enqueue(con: sqlite3.Connection, root_id: int, units: list[dict], requeue: bool = False,
+            scope: str | None = None) -> dict:
+    """Insert units; existing ones (same key) keep their results unless requeue.
+    With scope (the folder that was planned, "" = whole root), units in that folder that the
+    new plan no longer contains are removed -- e.g. a folder now recognised as a cue album --
+    so a file can never sit in two units (and be copied twice)."""
+    c = {"queued": 0, "already_done": 0, "requeued": 0, "removed_stale": 0}
     now = time.time()
+    if scope is not None:
+        keep = {u["key"] for u in units}
+        for row in con.execute("SELECT id, key, folder FROM unit WHERE root_id=?", (root_id,)).fetchall():
+            in_scope = not scope or row["folder"] == scope or row["folder"].startswith(scope + "/")
+            if in_scope and row["key"] not in keep:
+                con.execute("DELETE FROM decision WHERE unit_id=?", (row["id"],))
+                con.execute("DELETE FROM unit WHERE id=?", (row["id"],))
+                c["removed_stale"] += 1
     for u in units:
         row = con.execute("SELECT id, status, file_ids FROM unit WHERE root_id=? AND key=?",
                           (root_id, u["key"])).fetchone()
         ids = json.dumps(sorted(u["file_ids"]))
         if row is None:
-            con.execute("INSERT INTO unit(root_id, folder, label, kind, key, file_ids, status, queued_at) "
-                        "VALUES(?,?,?,?,?,?, 'queued', ?)",
-                        (root_id, u["folder"], u["label"], u["kind"], u["key"], ids, now))
+            con.execute("INSERT INTO unit(root_id, folder, label, kind, key, file_ids, status, queued_at, cue_file_id) "
+                        "VALUES(?,?,?,?,?,?, 'queued', ?, ?)",
+                        (root_id, u["folder"], u["label"], u["kind"], u["key"], ids, now, u.get("cue_file_id")))
             c["queued"] += 1
         elif requeue or row["file_ids"] != ids or row["status"] == "error":
             con.execute("UPDATE unit SET status='queued', file_ids=?, label=?, queued_at=?, error=NULL "

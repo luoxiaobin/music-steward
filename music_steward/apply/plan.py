@@ -35,6 +35,33 @@ def _tags_for(c, t, kind) -> dict:
     }
 
 
+def _cue_items(con, u, c, adir, root_path, items, new_stem_of):
+    """A cue-sheet image album: copy the image (album-level tags) and a rewritten cue sheet
+    (new FILE name, album + track titles from the release, original encoding). No splitting."""
+    from .. import cue as cuemod
+    from .naming import ext_for
+    f = con.execute("SELECT * FROM file WHERE id=?", (json.loads(u["file_ids"])[0],)).fetchone()
+    cf = con.execute("SELECT * FROM file WHERE id=?", (u["cue_file_id"],)).fetchone()
+    stem = safe_component(c["album"], "Album")
+    image_name = stem + ext_for(f["codec"], f["ext"])
+    is_mb = (c.get("source") or "MusicBrainz") == "MusicBrainz"
+    items.append({"unit_id": u["id"], "file_id": f["id"], "kind": "audio",
+                  "src": os.path.join(root_path, f["fs_relpath"]), "dest_rel": f"{adir}/{image_name}",
+                  "codec": f["codec"], "size": f["size"], "mtime": f["mtime_ns"],
+                  "tags": {"album": c["album"], "albumartist": c["artist"], "date": c["year"],
+                           "mb_albumid": c["album_id"] if is_mb else None}})
+    sheet = cuemod.parse(os.path.join(root_path, cf["fs_relpath"]))
+    tracks = {str(t["cue_track"]): {"title": t["title"], "performer": t["artist"] or c["artist"]}
+              for t in con.execute("SELECT * FROM cand_cue_track WHERE candidate_id=?", (c["id"],))}
+    items.append({"unit_id": u["id"], "file_id": cf["id"], "kind": "cue",
+                  "src": os.path.join(root_path, cf["fs_relpath"]), "dest_rel": f"{adir}/{stem}.cue",
+                  "codec": None, "size": cf["size"], "mtime": cf["mtime_ns"],
+                  "tags": {"cue_rewrite": {"files": {fl.name: image_name for fl in sheet.files},
+                                           "album": {"title": c["album"], "performer": c["artist"]},
+                                           "tracks": tracks}}})
+    new_stem_of[f["relpath"].rsplit(".", 1)[0]] = f"{adir}/{stem}"
+
+
 class PlanError(Exception):
     pass
 
@@ -71,10 +98,12 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
         for fid, title in (ov.get("titles") or {}).items():
             if int(fid) in tracks and title:
                 tracks[int(fid)]["title"] = title
-        adir = (album_dir(c["artist"], c["album"], c["year"]) if u["kind"] == "album"
+        adir = (album_dir(c["artist"], c["album"], c["year"]) if u["kind"] in ("album", "cue")
                 else f"{safe_component(c['artist'], 'Unknown Artist')}/Singles")
         new_stem_of = {}
-        for fid in json.loads(u["file_ids"]):
+        if u["kind"] == "cue":
+            _cue_items(con, u, c, adir, root_path, items, new_stem_of)
+        for fid in ([] if u["kind"] == "cue" else json.loads(u["file_ids"])):
             f = con.execute("SELECT * FROM file WHERE id=?", (fid,)).fetchone()
             t = tracks.get(fid)
             if t is None:
@@ -97,7 +126,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                 stem = s["relpath"].rsplit(".", 1)[0]
                 if s["kind"] == "lrc" and stem in new_stem_of:
                     dest_rel = new_stem_of[stem] + ".lrc"
-                elif s["kind"] == "image" and u["kind"] == "album" and COVER.match(s["relpath"].rsplit("/", 1)[-1]):
+                elif s["kind"] == "image" and u["kind"] in ("album", "cue") and COVER.match(s["relpath"].rsplit("/", 1)[-1]):
                     dest_rel = f"{adir}/{safe_component(s['relpath'].rsplit('/', 1)[-1])}"
                 else:
                     continue

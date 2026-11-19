@@ -224,9 +224,9 @@ async function renderUnits(where) {
     const tr = h("tr", { tabindex: "0", "aria-selected": String(S.selectedUnit === u.id),
                          onclick: () => selectUnit(u.id, tr), onkeydown: e => { if (e.key === "Enter") selectUnit(u.id, tr); } },
       h("td", {}, h("div", { class: "strong" }, u.label), h("div", { class: "sub mono" }, (u.folder || ".") + "/")),
-      h("td", {}, u.kind === "track" ? "track" : u.n_files),
+      h("td", {}, u.kind === "track" ? "track" : u.kind === "cue" ? `${u.n_tracks || "?"} (cue)` : u.n_files),
       h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${t.year || "?"}${t.country ? " · " + t.country : ""}`),
-                       h("div", { class: "sub" }, `${t.artist} · distance ${t.distance.toFixed(2)} · fingerprints ${t.fingerprint_agrees}/${u.n_files}`)]
+                       h("div", { class: "sub" }, `${t.artist} · distance ${t.distance.toFixed(2)} · fingerprints ${t.fingerprint_agrees}/${u.n_tracks || u.n_files}`)]
                     : h("span", { class: "muted" }, u.status === "error" ? "error" : u.status === "done" ? "no candidates" : "—")),
       h("td", {}, unitBadge(u)));
     body.append(tr);
@@ -249,8 +249,9 @@ function renderUnitDetail(d) {
   const files = Object.fromEntries(d.files.map(f => [f.id, f]));
   const list = h("fieldset", { style: "border:0;margin:0;padding:0" }, h("legend", { class: "strong", style: "margin-bottom:8px" },
     cands.length ? `Candidate releases (${cands.length})` : "No candidates"));
+  const nT = d.n_tracks || d.n_files;
   for (const c of cands.slice(0, 6)) {
-    const fpShare = d.n_files ? c.fingerprint_agrees / d.n_files : 0;
+    const fpShare = nT ? c.fingerprint_agrees / nT : 0;
     list.append(h("label", { class: "cand" + (c.id === chosen?.id ? " sel" : "") },
       h("input", { type: "radio", name: "cand", checked: c.id === chosen?.id,
                    onchange: () => { S.unitChoice = c.id; renderUnitDetail(d); } }),
@@ -259,14 +260,16 @@ function renderUnitDetail(d) {
           (c.media ? ` · ${c.mediums > 1 ? c.mediums + "×" : ""}${c.media}` : "")),
         h("br"), h("span", { class: "ev" }, `${c.artist} · ${c.label || ""}`), h("br"),
         h("span", { class: "ev" }, `distance ${c.distance.toFixed(2)} · `,
-          h("span", { class: fpShare >= 0.6 ? "ok" : "warn" }, `fingerprints agree ${c.fingerprint_agrees}/${d.n_files}`),
+          h("span", { class: fpShare >= 0.6 ? "ok" : "warn" }, `fingerprints agree ${c.fingerprint_agrees}/${nT}`),
           c.extra_tracks.length ? ` · ${c.extra_tracks.length} release tracks missing locally` : "",
           c.extra_items.length ? ` · ${c.extra_items.length} local files not on this release` : "",
           ` · ${c.source}`))));
   }
   const parts = [
     h("div", {}, h("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" }, h("h2", {}, d.label), unitBadge(d)),
-      h("div", { class: "mono muted", style: "margin-top:6px" }, `${d.folder || "."}/ · ${d.n_files} file${d.n_files > 1 ? "s" : ""} · ${d.kind}`),
+      h("div", { class: "mono muted", style: "margin-top:6px" }, d.kind === "cue"
+        ? `${d.folder || "."}/ · one image file with ${d.n_tracks || "?"} tracks (cue sheet)`
+        : `${d.folder || "."}/ · ${d.n_files} file${d.n_files > 1 ? "s" : ""} · ${d.kind}`),
       d.status === "error" ? h("div", { class: "banner" }, h("strong", {}, "Recognition failed. "), (d.error || "").split("\n")[0]) : null,
       d.notice ? h("div", { class: "banner" }, h("strong", {}, "Matched again. "), d.notice) : null,
       d.acoustid_used === 0 ? h("div", { class: "banner" }, "Matched without fingerprints (no AcoustID key).") : null,
@@ -276,7 +279,7 @@ function renderUnitDetail(d) {
     list];
   if (chosen && chosen.tracks.length) {
     const rows = chosen.tracks.map(t => h("tr", {},
-      h("td", { class: "mono" }, (files[t.file_id]?.relpath || "").split("/").pop()),
+      h("td", { class: "mono" }, t.label || (files[t.file_id]?.relpath || "").split("/").pop()),
       h("td", {}, `${chosen.mediums > 1 ? t.medium + "-" : ""}${t.medium_index ?? t.track_index}. ${t.title}`),
       h("td", { class: t.track_distance > 0.3 ? "warn" : "ok" }, t.track_distance > 0.3 ? `check (${t.track_distance.toFixed(2)})` : "✓")));
     parts.push(h("div", {}, h("h3", {}, "Track mapping"), h("table", { class: "kv" },
@@ -288,7 +291,7 @@ function renderUnitDetail(d) {
   if (accepted && chosen) {
     const inp = (id, val, ph, w) => h("input", { type: "text", id, value: val ?? "", placeholder: ph ?? "",
                                                  style: `font:14px var(--font);min-height:32px;padding:0 8px;border:1px solid var(--btn-line);border-radius:6px;width:${w || "100%"}` });
-    const titles = chosen.tracks.map(t => h("tr", {},
+    const titles = (d.kind === "cue" ? [] : chosen.tracks).map(t => h("tr", {},
       h("td", { class: "mono" }, (files[t.file_id]?.relpath || "").split("/").pop()),
       h("td", {}, inp(`t-${t.file_id}`, ov.titles?.[String(t.file_id)] ?? "", t.title))));
     parts.push(h("details", { open: Object.keys(ov).length ? true : null },
@@ -302,7 +305,7 @@ function renderUnitDetail(d) {
       h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:8px" },
         h("button", { type: "button", class: "btn", onclick: async () => {
           const t = {};
-          for (const tr of chosen.tracks) { const v = document.getElementById(`t-${tr.file_id}`).value; if (v.trim()) t[tr.file_id] = v; }
+          for (const tr of (d.kind === "cue" ? [] : chosen.tracks)) { const v = document.getElementById(`t-${tr.file_id}`).value; if (v.trim()) t[tr.file_id] = v; }
           const r = await post2("/api/edit", { unit_id: d.id, overrides: { album: document.getElementById("e-album").value,
             albumartist: document.getElementById("e-aa").value, year: document.getElementById("e-year").value, titles: t } });
           document.getElementById("editMsg").textContent = r.error || "Saved.";

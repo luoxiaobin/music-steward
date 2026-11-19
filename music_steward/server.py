@@ -211,7 +211,7 @@ class App:
                     from .recognize import queue, units
                     rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
                     sub = nfc(path)
-                    q = units.enqueue(con, rid, units.plan_units(con, rid, sub))
+                    q = units.enqueue(con, rid, units.plan_units(con, rid, sub), scope=sub)
                     ids = queue.pending(con, rid, sub)
                     res = {"status": "complete", **q, **queue.run(self.db_path, ids, progress=prog)}
                 else:

@@ -15,6 +15,21 @@ import traceback
 from .. import db
 
 
+def _match_cue(con, u, audio_path: str, key, search):
+    from .. import cue as cuemod
+    from . import beets_adapter as A
+    c = con.execute("SELECT f.fs_relpath, r.path AS root FROM file f JOIN root r ON r.id=f.root_id WHERE f.id=?",
+                    (u["cue_file_id"],)).fetchone()
+    sheet = cuemod.parse(os.path.join(c["root"], c["fs_relpath"]))
+    audio = con.execute("SELECT duration, audio_offset FROM file WHERE id=?", (json.loads(u["file_ids"])[0],)).fetchone()
+    f = max(sheet.files, key=lambda x: len(x.tracks))
+    cuemod.with_lengths(f, audio["duration"])
+    tracks = [{"number": t.number, "title": t.title, "performer": t.performer, "start": t.start, "length": t.length}
+              for t in f.tracks]
+    return A.match_cue(audio_path, {"title": sheet.title, "performer": sheet.performer, "date": sheet.date},
+                       tracks, key, search, offset=audio["audio_offset"] or 0)
+
+
 def run_unit(db_path: str, unit_id: int) -> int:
     con = db.connect(db_path)
     u = con.execute("SELECT * FROM unit WHERE id=?", (unit_id,)).fetchone()
@@ -30,8 +45,11 @@ def run_unit(db_path: str, unit_id: int) -> int:
         key = os.environ.get("ACOUSTID_API_KEY")
         paths = [path_of[i] for i in sorted(path_of)]
         search = json.loads(u["search_json"]) if u["search_json"] else None
-        res = (A.match_track(paths[0], key, search) if u["kind"] == "track"
-               else A.match_album(paths, key, search))
+        if u["kind"] == "cue":
+            res = _match_cue(con, u, paths[0], key, search)
+        else:
+            res = (A.match_track(paths[0], key, search) if u["kind"] == "track"
+                   else A.match_album(paths, key, search))
         from .results import candidate_for, release_key
         dec = con.execute("SELECT * FROM decision WHERE unit_id=?", (unit_id,)).fetchone()
         kept_key = None
@@ -50,6 +68,12 @@ def run_unit(db_path: str, unit_id: int) -> int:
                  json.dumps(c["extra_tracks"], ensure_ascii=False), c["fingerprint_agrees"],
                  c["n_mapped"])).lastrowid
             for t in c["tracks"]:
+                if "cue_track" in t:
+                    con.execute("INSERT INTO cand_cue_track VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                                (cid, t["cue_track"], t["cue_title"], t["recording_id"], t["release_track_id"],
+                                 t["index"], t["medium"], t["medium_index"], t["title"], t["artist"], t["length"],
+                                 t["track_distance"]))
+                    continue
                 con.execute("INSERT INTO cand_track VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                             (cid, id_of[t["path"]], t["recording_id"], t["release_track_id"], t["index"],
                              t["medium"], t["medium_index"], t["title"], t["artist"], t["length"],
@@ -65,9 +89,9 @@ def run_unit(db_path: str, unit_id: int) -> int:
                 notice = "Your earlier choice is no longer among the candidates; please review again."
         con.execute("UPDATE unit SET notice=? WHERE id=?", (notice, unit_id))
         con.execute("UPDATE unit SET status='done', recommendation=?, acoustid_used=?, files_linked=?, "
-                    "repaired=?, finished_at=? WHERE id=?",
+                    "repaired=?, n_tracks=?, finished_at=? WHERE id=?",
                     (res["recommendation"], int(res["acoustid_used"]), res["files_fingerprint_linked"],
-                     res.get("repaired", 0), time.time(), unit_id))
+                     res.get("repaired", 0), res.get("n_tracks"), time.time(), unit_id))
         con.commit()
         return 0
     except Exception as e:

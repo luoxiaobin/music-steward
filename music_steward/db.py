@@ -109,6 +109,14 @@ CREATE TABLE IF NOT EXISTS cand_track(
     medium_index INTEGER, title TEXT, artist TEXT, length REAL, track_distance REAL,
     PRIMARY KEY(candidate_id, file_id)
 );
+-- track mapping for cue-sheet image albums: many tracks live in ONE audio file
+CREATE TABLE IF NOT EXISTS cand_cue_track(
+    candidate_id INTEGER NOT NULL REFERENCES candidate(id) ON DELETE CASCADE,
+    cue_track INTEGER NOT NULL, cue_title TEXT,
+    recording_id TEXT, release_track_id TEXT, track_index INTEGER, medium INTEGER,
+    medium_index INTEGER, title TEXT, artist TEXT, length REAL, track_distance REAL,
+    PRIMARY KEY(candidate_id, cue_track)
+);
 CREATE TABLE IF NOT EXISTS decision(
     unit_id INTEGER PRIMARY KEY REFERENCES unit(id) ON DELETE CASCADE,
     action TEXT NOT NULL,               -- accept | skip
@@ -147,7 +155,8 @@ CREATE TABLE IF NOT EXISTS dir_note(
 ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "TEXT"),
                  ("scan", "subpath", "TEXT"), ("unit", "repaired", "INTEGER"),
                  ("decision", "release_key", "TEXT"), ("unit", "notice", "TEXT"),
-                 ("unit", "search_json", "TEXT"), ("decision", "overrides_json", "TEXT")]
+                 ("unit", "search_json", "TEXT"), ("decision", "overrides_json", "TEXT"),
+                 ("unit", "cue_file_id", "INTEGER"), ("unit", "n_tracks", "INTEGER")]
 
 
 def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:

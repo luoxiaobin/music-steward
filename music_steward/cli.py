@@ -106,7 +106,7 @@ def cmd_recognize(a):
         for u in us[: a.limit]:
             print(f"{u['kind']:5} {len(u['file_ids']):3} files  {u['label']}  [{u['folder']}]")
         return
-    print(json.dumps(units.enqueue(con, rid, us, requeue=a.requeue)), file=sys.stderr)
+    print(json.dumps(units.enqueue(con, rid, us, requeue=a.requeue, scope=sub)), file=sys.stderr)
     if not os.environ.get("ACOUSTID_API_KEY"):
         print("note: ACOUSTID_API_KEY not set -- matching without fingerprints", file=sys.stderr)
     ids = queue.pending(con, rid, sub)[: a.limit]
@@ -122,7 +122,7 @@ def cmd_results(a):
         top = u["top"]
         line = (f"{u['status']:7} {u['confidence'] or '':12} {u['label'][:40]:40}  ->  "
                 + (f"{top['album'] or ''} / {top['artist']} ({top['year'] or '?'}, {top['country'] or '?'})  "
-                   f"d={top['distance']:.2f} fp={top['fingerprint_agrees']}/{u['n_files']}" if top else
+                   f"d={top['distance']:.2f} fp={top['fingerprint_agrees']}/{u.get('n_tracks') or u['n_files']}" if top else
                    (u.get("error") or "no candidates")))
         print(line)
 

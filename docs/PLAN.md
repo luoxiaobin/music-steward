@@ -54,6 +54,13 @@ Get one album all the way through before widening any step:
 
 Then widen by value: garbled-tag repair before matching → own confidence rule → edit/search/conflicts and the full Plan screen → extra sources for mainland releases → cue-sheet albums, singles rules, Simplified/Traditional key → pywebview window.
 
+12. ✅ Cue-sheet image albums (NAS: ~1,714 — 1,567 APE, 305 FLAC images): cue parsed with encoding
+    detection; one virtual track per cue entry (title + length from INDEX times, fingerprint from its
+    own slice); matched like any album; apply copies the image (album tags) and a rewritten cue
+    (FILE name, album + per-track titles/performers, original encoding; no splitting). Real test:
+    HIFI年代1 · 怀念战友 matched (was "no real match"), applied in 21 s, audio identical, cue still
+    GB18030, track performers improved (姜苏 / 伽菲珈而 instead of the label 柏菲), undone.
+
 ## M2 backlog (original order)
 
 1. ✅ `serve` + read-only inventory browser (three-pane, per the Review & Plan mockups)

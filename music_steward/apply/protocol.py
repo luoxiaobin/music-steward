@@ -173,6 +173,15 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
     if state == "copied":
         if o["kind"] == "audio" and o.get("tags"):
             write_tags(str(temp), o["tags"], o["codec"])
+        if o["kind"] == "cue" and (o.get("tags") or {}).get("cue_rewrite"):
+            from ..cue import rewrite_bytes
+            rw = o["tags"]["cue_rewrite"]
+            data, _enc = rewrite_bytes(temp.read_bytes(), rw.get("files"), rw.get("album"),
+                                       {int(k): v for k, v in (rw.get("tracks") or {}).items()})
+            with open(temp, "wb") as fh:
+                fh.write(data)
+                fh.flush()
+                os.fsync(fh.fileno())
         if o["kind"] == "audio":
             after = audio_hash(str(temp), temp.suffix, codec=o["codec"])[0]
             if after != o.get("src_audio"):

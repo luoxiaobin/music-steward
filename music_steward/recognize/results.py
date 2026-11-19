@@ -45,7 +45,7 @@ def confidence(u: dict, top: dict | None) -> str:
         return u["status"]
     if not top:
         return "no_match"
-    share = (top["fingerprint_agrees"] or 0) / max(1, u["n_files"])
+    share = (top["fingerprint_agrees"] or 0) / max(1, u.get("n_tracks") or u["n_files"])
     if (top["distance"] < READY_DISTANCE and share >= READY_FP_SHARE) or \
             (top["distance"] < READY_DISTANCE_STRONG_FP and share >= STRONG_FP_SHARE):
         return "ready"
@@ -91,10 +91,17 @@ def unit_detail(con: sqlite3.Connection, unit_id: int) -> dict | None:
         c["penalties"] = json.loads(c.pop("penalties_json") or "[]")
         c["extra_tracks"] = json.loads(c.pop("extra_tracks_json") or "[]")
         c["extra_items"] = json.loads(c.pop("extra_items_json") or "[]")
-        c["tracks"] = [dict(t) for t in con.execute(
-            "SELECT * FROM cand_track WHERE candidate_id=? ORDER BY medium, medium_index", (c["id"],))]
+        if u["kind"] == "cue":
+            c["tracks"] = [{**dict(t), "file_id": None, "label": f"{t['cue_track']:02d}. {t['cue_title'] or ''}"}
+                           for t in con.execute("SELECT * FROM cand_cue_track WHERE candidate_id=? "
+                                                "ORDER BY cue_track", (c["id"],))]
+        else:
+            c["tracks"] = [dict(t) for t in con.execute(
+                "SELECT * FROM cand_track WHERE candidate_id=? ORDER BY medium, medium_index", (c["id"],))]
         cands.append(c)
     u["candidates"] = cands
+    if u["kind"] == "cue" and cands:
+        u["n_cue_tracks"] = max(len(c["tracks"]) for c in cands)
     u["confidence"] = confidence(u, cands[0] if cands else None)
     d = con.execute("SELECT * FROM decision WHERE unit_id=?", (unit_id,)).fetchone()
     u["decision"] = dict(d) if d else None

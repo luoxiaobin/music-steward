@@ -196,3 +196,83 @@ def _recordings(item) -> set:
     if not ch or item.path not in ch._matches:
         return set()
     return set(ch._matches[item.path][0])
+
+
+def _segment_wav(src: str, start: float, length: float | None, out: str, offset: int = 0) -> bool:
+    """Decode up to 2 minutes of one cue track to a temp WAV for fingerprinting."""
+    import subprocess
+    dur = min(length or 120.0, 120.0)
+    cmd = ["ffmpeg", "-nostdin", "-v", "error", "-y"]
+    if offset:
+        cmd += ["-skip_initial_bytes", str(offset)]
+    cmd += ["-ss", f"{start:.3f}", "-t", f"{dur:.3f}", "-i", src, "-map", "0:a:0", "-ac", "2", out]
+    return subprocess.run(cmd, capture_output=True).returncode == 0
+
+
+def match_cue(audio_path: str, album: dict, tracks: list[dict], acoustid_key: str | None,
+              search: dict | None = None, offset: int = 0) -> dict:
+    """Match a cue-sheet image album: one long audio file + a cue listing its tracks.
+
+    album:  {"title", "performer", "date"} from the cue
+    tracks: [{"number", "title", "performer", "start", "length"}]
+    Each track becomes an in-memory beets item (cue title + length); when an AcoustID key is
+    available, each track is fingerprinted from its own slice of the image (first 2 minutes).
+    """
+    import shutil as _sh
+    search = search or {}
+    use_chroma = configure(acoustid_key)
+    tmp = tempfile.mkdtemp(prefix="mlt_cue_")
+    try:
+        items, number_of = [], {}
+        for t in tracks:
+            it = Item(title=t.get("title") or "", artist=t.get("performer") or album.get("performer") or "",
+                      album=album.get("title") or "", albumartist=album.get("performer") or "",
+                      track=t["number"], tracktotal=len(tracks), length=t.get("length") or 0.0)
+            seg = os.path.join(tmp, f"t{t['number']:02d}.wav")
+            if use_chroma and _segment_wav(audio_path, t["start"], t.get("length"), seg, offset):
+                it.path = os.fsencode(seg)
+            else:
+                it.path = os.fsencode(os.path.join(tmp, f"virtual-{t['number']:02d}"))
+            number_of[it.path] = t["number"]
+            items.append(it)
+        repaired = _repair(items)   # cue text can be legacy-encoded too (decoded already, rarely garbled)
+        linked = {}
+        if use_chroma:
+            ch = sys.modules["beetsplug.chroma"]
+            for it in items:
+                if os.path.exists(it.path):
+                    ch.acoustid_match(_LOG, it.path)
+            linked = {it.path: it.path in ch._matches for it in items}
+        proposal = tag_album(Source.from_items(items), search_artist=search.get("artist") or None,
+                             search_name=search.get("album") or None, search_ids=search.get("ids") or [])
+        cands = []
+        for rank, c in enumerate(proposal.candidates):
+            info = c.info
+            mapping = []
+            fp = 0
+            for it, ti in c.mapping.items():
+                m = _track(ti, c.distance)
+                m.pop("path")
+                m["cue_track"] = number_of[it.path]
+                m["cue_title"] = it.title
+                mapping.append(m)
+                if linked.get(it.path) and ti.track_id in _recordings(it):
+                    fp += 1
+            cands.append({
+                "rank": rank, "source": info.data_source, "album_id": info.album_id,
+                "album": info.album, "artist": info.artist, "year": info.year, "country": info.country,
+                "label": info.label, "media": info.media, "mediums": info.mediums,
+                "distance": float(c.distance.distance),
+                "penalties": sorted((k, round(float(v), 6)) for k, v in c.distance.items() if v),
+                "extra_items": [], "extra_tracks": [{"title": t.title, "index": t.index, "recording_id": t.track_id}
+                                                    for t in c.extra_tracks],
+                "fingerprint_agrees": fp, "n_mapped": len(mapping), "recording_ids": len(mapping),
+                "tracks": sorted(mapping, key=lambda m: m["cue_track"]),
+            })
+        cands = _rerank(cands, len(items))
+        return {"kind": "cue", "recommendation": proposal.recommendation.name, "acoustid_used": use_chroma,
+                "files_fingerprint_linked": sum(linked.values()), "repaired": repaired, "candidates": cands,
+                "n_tracks": len(items)}
+    finally:
+        _reset()
+        _sh.rmtree(tmp, ignore_errors=True)

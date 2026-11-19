@@ -64,6 +64,7 @@ async function renderPlan(id) {
   const s = p.summary, items = p.items;
   const ok = items.filter(i => i.status === "ok"), blocked = items.filter(i => i.status !== "ok");
   const audio = ok.filter(i => i.kind === "audio"), side = items.filter(i => i.kind !== "audio");
+  const sideLabel = i => i.kind === "lrc" ? "Follows its track" : i.kind === "cue" ? "Rewritten: file name + titles" : "Linked";
   const lastRun = p.runs[p.runs.length - 1];
   const applied = lastRun && !lastRun.undone_at;
   const job = st.scan || {};
@@ -124,7 +125,7 @@ async function renderPlan(id) {
     side.length ? h("div", { class: "card" }, h("h2", { class: "h2" }, "Side files"),
       rows(side, [["File", i => h("td", { class: "mono" }, i.src_rel)],
                   ["Goes to", i => h("td", { class: "mono" }, i.dest_rel)],
-                  ["", i => h("td", {}, i.status === "ok" ? h("span", { class: "badge b-ready" }, i.kind === "lrc" ? "Follows its track" : "Linked")
+                  ["", i => h("td", {}, i.status === "ok" ? h("span", { class: "badge b-ready" }, sideLabel(i))
                                                            : h("span", { class: "badge b-review" }, "Blocked"))]])) : null,
     h("div", { class: "card muted small" }, "Frozen in this plan: source sizes and modification times, tag values, destination paths. " +
       "A source that changes before Apply is skipped and reported. Copies are verified (audio unchanged) before they appear under their final name.")
