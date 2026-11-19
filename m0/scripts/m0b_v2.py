@@ -933,6 +933,10 @@ def main():
     a = ap.parse_args()
 
     dest = Path(a.dest).expanduser().resolve()
+    if not dest.is_dir():
+        # never create folders ourselves: on the NAS that would be a write
+        # next to the collection. The user makes the scratch folder.
+        sys.exit(f"refusing: {dest} does not exist. Create the empty scratch folder first.")
     if dest.exists() and any(dest.iterdir()) and not (dest / MARKER).exists():
         sys.exit(f"refusing: {dest} is not empty and has no {MARKER} marker")
     # wipe only what this script created before
