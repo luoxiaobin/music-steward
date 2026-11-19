@@ -159,6 +159,7 @@ async function treeNode(path, name, count) {
 // ---------------------------------------------------------------- table
 async function refreshCenter() {
   if (!S.rootId) return;
+  document.querySelectorAll(".selbar").forEach(el => el.remove());   // album selection bar: Albums view only
   const d = await api(`/api/files?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}` +
                       (S.filter ? `&filter=${S.filter}` : ""));
   S.files = d.files;
