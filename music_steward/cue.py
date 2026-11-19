@@ -22,7 +22,17 @@ def detect_encoding(raw: bytes) -> str:
     except UnicodeDecodeError:
         pass
     best = from_bytes(raw, cp_isolation=["gb18030", "big5", "shift_jis", "cp1252"]).best()
-    return best.encoding if best else "latin-1"
+    if best:
+        return best.encoding
+    # the detector can give up on short sheets (seen on a rewritten GB18030 cue): most cue
+    # sheets here are GBK/Big5, so try those strictly before falling back to Latin-1
+    for enc in ("gb18030", "big5"):
+        try:
+            raw.decode(enc)
+            return enc
+        except UnicodeDecodeError:
+            pass
+    return "latin-1"
 
 
 @dataclass

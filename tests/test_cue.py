@@ -121,3 +121,9 @@ def test_cue_album_apply_copies_image_and_rewritten_cue_then_undo(image_album, c
     assert tags["ALBUM"] == ["HIFI年代1 · 怀念战友"] and tags["MUSICBRAINZ_ALBUMID"] == ["rel-1"]
     assert (lib / "HIFI/image.cue").read_bytes() == before            # source cue untouched
     assert runner.undo(con, res["run"])["actions"] == {"removed": 3}
+
+
+def test_detection_falls_back_to_gb18030_before_latin1():
+    """charset-normalizer gave up on a short rewritten GB18030 cue; it must not be read as Latin-1."""
+    raw = 'FILE "林子祥创作＋流行歌集.ape" WAVE\r\n  TRACK 01 AUDIO\r\n    INDEX 01 00:00:00\r\n'.encode("gb18030")
+    assert cue.parse_bytes(raw).files[0].name == "林子祥创作＋流行歌集.ape"

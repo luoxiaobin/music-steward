@@ -189,7 +189,7 @@ def from_cue(con: sqlite3.Connection, u) -> dict:
         disc = _disc_of(u["folder"] + "/x", u["folder"])
         disc_from = "folder name" if disc else None
     tracks = [{"cue_track": t.number, "cue_title": t.title,
-               "title": clean(t.title, t.number) or f"Track {t.number}", "artist": clean(t.performer) or artist, "medium": disc or 1, "medium_index": i + 1, "index": i + 1,
+               "title": clean(t.title, t.number) or f"Track {t.number}", "artist": (artist if t.performer and t.performer == sheet.performer else clean(t.performer)) or artist, "medium": disc or 1, "medium_index": i + 1, "index": i + 1,
                "length": t.length} for i, t in enumerate(f.tracks)]
     origin = {"album": "cue sheet" if s_title else "folder name",
               "artist": "cue sheet" if s_perf else ("folder name" if folder["artist"] else None),
