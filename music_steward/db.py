@@ -160,8 +160,20 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
                  ("candidate", "origin_json", "TEXT"), ("candidate", "original_year", "INTEGER")]
 
 
+_READY: set[str] = set()   # databases already set up by this process
+
+
 def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
+    """Open the app database. Schema setup and migrations run once per process and database:
+    the web server opens a connection per request, and running the setup's writes on every
+    one made concurrent requests block each other ("database is locked")."""
     path = Path(path)
+    key = str(path.resolve()) if path.exists() else str(path)
+    if key in _READY:
+        con = sqlite3.connect(path, timeout=30)
+        con.row_factory = sqlite3.Row
+        con.execute("PRAGMA foreign_keys=ON")
+        return con
     if path == DEFAULT_DB:
         migrate_app_dir()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -173,10 +185,12 @@ def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
     for table, col, typ in ADDED_COLUMNS:
         if col not in {r[1] for r in con.execute(f"PRAGMA table_info({table})")}:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
-    # runs recorded before the rename point at journals under the old folder
-    if not OLD_APP_DIR.exists() and APP_DIR.exists():
+    # runs recorded before the rename point at journals under the old folder (only if any do)
+    if not OLD_APP_DIR.exists() and APP_DIR.exists() and con.execute(
+            "SELECT 1 FROM run WHERE journal LIKE ? LIMIT 1", (str(OLD_APP_DIR) + "%",)).fetchone():
         con.execute("UPDATE run SET journal = replace(journal, ?, ?) WHERE journal LIKE ?",
                     (str(OLD_APP_DIR), str(APP_DIR), str(OLD_APP_DIR) + "%"))
     con.execute("INSERT OR IGNORE INTO meta VALUES('schema_version', ?)", (str(SCHEMA_VERSION),))
     con.commit()
+    _READY.add(str(path.resolve()))
     return con

@@ -62,6 +62,7 @@ def test_old_database_gets_new_columns(tmp_path):
         con.execute(f"ALTER TABLE file DROP COLUMN {col}")
     con.commit()
     con.close()
+    db._READY.clear()                           # an old database is opened by a NEW process
     c = db.connect(p)
     cols = {r[1] for r in c.execute("PRAGMA table_info(file)")}
     assert {"audio_offset", "content_note"} <= cols
