@@ -25,7 +25,10 @@ All commands only **read** the collection. They write a single app database (def
 ```bash
 music-steward scan /Volumes/music          # inventory: paths, sizes, ffprobe properties, tags
 music-steward scan /Volumes/music          # again: unchanged files (size + mtime) are skipped
-music-steward hash --root /Volumes/music   # whole-file + audio-stream hashes (resumable; reads every byte)
+music-steward scan "/Volumes/music/音乐Ape" # re-scan just one folder (fast; nothing else is touched)
+music-steward hash "/Volumes/music/音乐Ape" # whole-file + audio hashes for one folder (resumable)
+music-steward recognize "/Volumes/music/音乐Ape"   # match its albums (MusicBrainz, Deezer, Discogs)
+music-steward serve --root /Volumes/music --dest ~/Music/Organized   # web UI: review, plan, apply, undo
 music-steward audit                        # summary of all audit filters
 music-steward audit garbled_tags           # one filter: unreadable, missing_metadata, garbled_tags,
                                             #   estimated_values, exact_duplicates, same_audio, orphan_lrc,
