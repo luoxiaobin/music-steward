@@ -34,7 +34,8 @@ def _root_id(con, path):
 def cmd_scan(a):
     con = db.connect(a.db)
     try:
-        r = scan(con, a.path, workers=a.workers, progress=_progress("reading"))
+        r = scan(con, a.path, workers=a.workers, progress=_progress("reading"),
+                 reprobe_errors=a.reprobe_errors)
     except RootUnavailable as e:
         sys.exit(str(e))
     print(json.dumps({"status": r.status, "abort_reason": r.abort_reason,
@@ -98,6 +99,8 @@ def main(argv=None):
     s.add_argument("path")
     s.add_argument("--workers", type=int, default=8)
     s.add_argument("--hash", action="store_true", help="also hash new/changed audio afterwards")
+    s.add_argument("--reprobe-errors", action="store_true",
+                   help="re-read files recorded as unreadable even if unchanged")
     s.add_argument("--hash-workers", type=int, default=4)
     s.set_defaults(func=cmd_scan)
 

@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS file(
     duration REAL, duration_estimated INTEGER,
     bit_rate INTEGER, bit_rate_estimated INTEGER,
     sample_rate INTEGER, channels INTEGER, bits_per_sample INTEGER,
+    audio_offset INTEGER,               -- bytes skipped before the audio header (APE + ID3 prefix)
+    content_note TEXT,                  -- why an 'audio' file is unreadable, from its content
     -- tags (cache of what is in the file)
     tag_format TEXT, tags_json TEXT, tag_issues_json TEXT,
     -- hashes (filled lazily by the hash pass; cleared when size/mtime change)
@@ -65,6 +67,9 @@ CREATE TABLE IF NOT EXISTS dir_note(
 """
 
 
+ADDED_COLUMNS = [("audio_offset", "INTEGER"), ("content_note", "TEXT")]
+
+
 def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -73,6 +78,10 @@ def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA foreign_keys=ON")
     con.executescript(SCHEMA)
+    have = {r[1] for r in con.execute("PRAGMA table_info(file)")}
+    for col, typ in ADDED_COLUMNS:
+        if col not in have:
+            con.execute(f"ALTER TABLE file ADD COLUMN {col} {typ}")
     con.execute("INSERT OR IGNORE INTO meta VALUES('schema_version', ?)", (str(SCHEMA_VERSION),))
     con.commit()
     return con

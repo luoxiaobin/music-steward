@@ -32,7 +32,12 @@ def audio_hash_method(ext: str) -> str:
 
 def audio_hash(path: str, ext: str, timeout: float = 600) -> tuple[str, str]:
     method = audio_hash_method(ext)
-    cmd = ["ffmpeg", "-nostdin", "-v", "error", "-i", path, "-map", "0:a:0"]
+    from .probe import audio_offset
+    off = audio_offset(path, ext)
+    cmd = ["ffmpeg", "-nostdin", "-v", "error"]
+    if off:
+        cmd += ["-skip_initial_bytes", str(off)]
+    cmd += ["-i", path, "-map", "0:a:0"]
     if method == "packet":
         cmd += ["-c", "copy"]
     cmd += ["-f", "hash", "-hash", "sha256", "-"]

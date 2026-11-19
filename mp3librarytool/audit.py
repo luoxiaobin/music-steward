@@ -20,7 +20,7 @@ def run(con: sqlite3.Connection, name: str, root_id: int | None = None) -> list[
     live = "f.removed_at IS NULL"
     if name == "unreadable":
         return [dict(r) for r in con.execute(
-            f"SELECT relpath, probe_error FROM file f WHERE {live} AND kind='audio' "
+            f"SELECT relpath, content_note, probe_error FROM file f WHERE {live} AND kind='audio' "
             f"AND probe_status='error' {w} ORDER BY relpath", a)]
     if name == "missing_metadata":
         out = []

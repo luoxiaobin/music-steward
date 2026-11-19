@@ -72,12 +72,12 @@ def _analyze(root: str, item: _Found) -> dict:
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     try:
-        p = probe(path)
-        out.update(probe_status="ok", probe_error=None, **p.as_dict())
+        p = probe(path, ext=item.ext)
+        out.update(probe_status="ok", probe_error=None, content_note=None, **p.as_dict())
     except ProbeError as e:
         if not os.path.exists(path):
             raise FileNotFoundError(path)
-        out.update(probe_status="error", probe_error=str(e))
+        out.update(probe_status="error", probe_error=str(e), content_note=e.note)
     except Exception as e:  # timeouts, decode crashes: record, keep going
         out.update(probe_status="error", probe_error=f"{type(e).__name__}: {e}")
     try:
@@ -96,11 +96,12 @@ def _analyze(root: str, item: _Found) -> dict:
 
 PROPS = ("probe_status", "probe_error", "container", "codec", "duration", "duration_estimated",
          "bit_rate", "bit_rate_estimated", "sample_rate", "channels", "bits_per_sample",
+         "audio_offset", "content_note",
          "tag_format", "tags_json", "tag_issues_json")
 
 
 def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=None,
-         _hooks: dict | None = None) -> ScanResult:
+         reprobe_errors: bool = False, _hooks: dict | None = None) -> ScanResult:
     hooks = _hooks or {}
     t0 = time.time()
     root = os.path.abspath(root_path)
@@ -124,7 +125,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
         return ScanResult(scan_id, root_id, "aborted", c, reason, time.time() - t0)
 
     known = {r["relpath"]: r for r in con.execute(
-        "SELECT id, relpath, size, mtime_ns, removed_at FROM file WHERE root_id=?", (root_id,))}
+        "SELECT id, relpath, size, mtime_ns, removed_at, probe_status FROM file WHERE root_id=?", (root_id,))}
 
     # ---- 1. walk (listing only) ------------------------------------------
     found: list[_Found] = []
@@ -180,7 +181,8 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
     todo: list[_Found] = []
     for f in found:
         k = known.get(f.rel)
-        if k and k["removed_at"] is None and k["size"] == f.size and k["mtime_ns"] == f.mtime_ns:
+        retry = reprobe_errors and k is not None and k["probe_status"] == "error"
+        if k and not retry and k["removed_at"] is None and k["size"] == f.size and k["mtime_ns"] == f.mtime_ns:
             seen.add(f.rel)
             c["n_unchanged"] += 1
         else:
