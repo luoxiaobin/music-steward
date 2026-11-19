@@ -106,7 +106,7 @@ async function renderPlan(id) {
                                          (r.undone_at ? " · undone" : ""))],
                     ["", r => h("td", {}, r.undone_at ? "" : [
                       h("button", { type: "button", class: "btn", disabled: busy, onclick: async () => {
-                        if (!confirm("Remove the copies this run created? Files you changed since are kept.")) return;
+                        if (!await ask("Remove the copies this run created? Files you changed since are kept.")) return;
                         await post("/api/undo", { id: r.id }); pollPlan(id); } }, "Undo run"), " ",
                       h("button", { type: "button", class: "btn", disabled: busy, onclick: async () => {
                         await post("/api/resume", { id: r.id }); pollPlan(id); } }, "Resume")])]])) : null,

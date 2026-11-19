@@ -113,3 +113,9 @@ audio{width:100%}
 .selbar .btn{min-height:28px;padding:0 10px}
 .selbar select{font:13px var(--font);min-height:28px;border:1px solid var(--btn-line);border-radius:6px}
 .selcol{width:28px;text-align:center}
+
+.appdialog{border:1px solid var(--btn-line);border-radius:10px;padding:18px 20px;max-width:520px;
+  font:14px var(--font);color:inherit;background:var(--card, #fff);box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.appdialog::backdrop{background:rgba(0,0,0,.3)}
+.appdialog p{white-space:pre-wrap;margin:0 0 14px;line-height:1.45}
+.appdialog .btnrow{display:flex;gap:8px;justify-content:flex-end}

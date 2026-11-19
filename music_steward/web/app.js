@@ -107,7 +107,7 @@ function renderScan(sc) {
       : (sc.total ? `Scanning ${where}: ${sc.done} / ${sc.total} new or changed files read` : `Scanning ${where}: listing folders…`);
     if (sc.kind === "recognize") el.append(" ", h("button", { type: "button", class: "btn", style: "min-height:24px;padding:0 8px",
       onclick: async e => { e.target.disabled = true; e.target.textContent = "Stopping after this album…";
-                            const r = await post2("/api/stop", {}); if (r.error) alert(r.error); } }, "Stop"));
+                            const r = await post2("/api/stop", {}); if (r.error) tell(r.error); } }, "Stop"));
     clearTimeout(S.scanTimer);
     S.scanTimer = setTimeout(async () => { const st = await api("/api/state"); renderScan(st.scan);
                                            if (!st.scan.running) refreshAll(); }, 1500);
@@ -229,10 +229,10 @@ async function renderUnits(where) {
   const nReady = us.filter(u => !u.decision && u.confidence === "ready").length;
   if (nLikely + nReady) note.append(" ", h("button", { type: "button", class: "btn", style: "min-height:28px;padding:0 10px;margin-left:6px",
     onclick: async () => {
-      if (!confirm(`Accept the top candidate for ${nReady} Ready and ${nLikely} Likely albums in this folder? ` +
+      if (!await ask(`Accept the top candidate for ${nReady} Ready and ${nLikely} Likely albums in this folder? ` +
                    "Nothing is copied until you apply a plan; each decision can be undone.")) return;
       const r = await post2("/api/bulk_accept", { root: S.root.path, path: S.path, confidences: ["ready", "likely"] });
-      if (r.error) alert(r.error);
+      if (r.error) tell(r.error);
       await refreshCenter();
     } }, `Accept all Ready + Likely (${nReady + nLikely})`));
   // ---- folder-wide actions on undecided albums ----
@@ -240,12 +240,12 @@ async function renderUnits(where) {
   const nNoLocal = und.filter(u => ["no_match", "weak"].includes(u.confidence) && !u.local).length;
   const nLocal = und.filter(u => u.local).length;
   const nSkip = und.filter(u => ["no_match", "weak"].includes(u.confidence)).length;
-  const bulkBtn = (label, n, ask, body) => n ? h("button", { type: "button", class: "btn",
+  const bulkBtn = (label, n, question, body) => n ? h("button", { type: "button", class: "btn",
     style: "min-height:28px;padding:0 10px;margin-left:6px", onclick: async () => {
-      if (ask && !confirm(ask)) return;
+      if (question && !await ask(question)) return;
       const r = await post2("/api/bulk", { root: S.root.path, path: S.path, ...body });
-      if (r.error) alert(r.error);
-      else if (r.n_failed) alert(`${r.done} done; ${r.n_failed} could not be read:\n` + r.failed.join("\n"));
+      if (r.error) tell(r.error);
+      else if (r.n_failed) tell(`${r.done} done; ${r.n_failed} could not be read:\n` + r.failed.join("\n"));
       await refreshCenter();
     } }, `${label} (${n})`) : null;
   note.append(...[
@@ -267,11 +267,11 @@ async function renderUnits(where) {
   const selBar = h("div", { class: "selbar" });
   const drawBar = () => {
     const n = S.unitSel.size;
-    const act = (label, action, ask) => h("button", { type: "button", class: "btn", disabled: !n, onclick: async () => {
-      if (ask && !confirm(ask.replace("{n}", n))) return;
+    const act = (label, action, question) => h("button", { type: "button", class: "btn", disabled: !n, onclick: async () => {
+      if (question && !await ask(question.replace("{n}", n))) return;
       const r = await post2("/api/bulk", { root: S.root.path, path: S.path, action, unit_ids: [...S.unitSel] });
-      if (r.error) return alert(r.error);
-      if (r.n_failed) alert(`${r.done} done; ${r.n_failed} not done:\n` + r.failed.join("\n"));
+      if (r.error) return tell(r.error);
+      if (r.n_failed) tell(`${r.done} done; ${r.n_failed} not done:\n` + r.failed.join("\n"));
       S.unitSel.clear();
       await refreshCenter();
     } }, label);
@@ -622,9 +622,9 @@ document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click"
 document.getElementById("scanBtn").addEventListener("click", startScan);
 document.getElementById("rescanFolderBtn").addEventListener("click", () => startJob("scan", S.path));
 document.getElementById("hashFolderBtn").addEventListener("click", () => startJob("hash", S.path));
-document.getElementById("recognizeBtn").addEventListener("click", () => {
+document.getElementById("recognizeBtn").addEventListener("click", async () => {
   const where = S.path || "the whole collection";
-  if (!confirm(`Recognize every album in “${where}”?\n\nAlbums already matched are kept; new ones are matched at about ` +
+  if (!await ask(`Recognize every album in “${where}”?\n\nAlbums already matched are kept; new ones are matched at about ` +
                "10 seconds each, so a big folder can take hours. You can stop it at any time.")) return;
   startJob("recognize", S.path);
 });
