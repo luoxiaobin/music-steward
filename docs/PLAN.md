@@ -95,11 +95,19 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
 17. ✅ Folder-wide bulk actions on undecided albums (decisions already made are never touched):
     "Add own info to No match + Weak", "Accept own info" (after scanning the "Own info:" line each
     row now shows), "Skip No match + Weak"; plus the existing "Accept all Ready + Likely".
+18. ✅ Lookup cache (`~/.music-steward/http-cache.sqlite`, `music-steward cache [--clear]`): every
+    web answer (MusicBrainz, Deezer, Discogs, AcoustID) kept 30 days (MLT_CACHE_DAYS), keyed by a
+    hash so keys/tokens are never stored; audio fingerprints kept by file path + size + mtime
+    (+ cue slice), so a known slice is not decoded again. Cache hits skip the services' waits;
+    real requests are throttled (Deezer <= ~6/s, Discogs <= 1/s). Found while profiling: a Discogs
+    joke release "Unicode" (274,000-character track titles) cost 13 s of CPU per album that drew it
+    → comparisons bounded to 300 characters, stored text to 500. Measured on 3 NAS APE albums:
+    cold 10-15 s → fully warm 1.4-1.8 s each, identical candidates and distances.
 
 ## M2 backlog (original order)
 
 1. ✅ `serve` + read-only inventory browser (three-pane, per the Review & Plan mockups)
-2. Recognition queue: ✅ resumable, one process per unit; still to do: lookup cache, checked rate limits for Deezer/Discogs, resumability proven at scale; one worker process per job (ADR-level finding F1)
+2. Recognition queue: ✅ resumable, one process per unit; ✅ lookup + fingerprint cache, Deezer/Discogs throttled; still to do: resumability proven at scale; one worker process per job (ADR-level finding F1)
 3. ✅ Pre-processing before matching: GBK/Big5 tag repair; cue-sheet albums; tag-sanity fallbacks
 4. ✅ Own confidence rule (AcoustID-linked + distance < ~0.15 → Ready); artist agreement for singles (still to do)
 5. ✅ Extra candidate sources for mainland releases (evaluate Discogs, Deezer)

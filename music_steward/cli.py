@@ -158,6 +158,22 @@ def cmd_undo(a):
     print(json.dumps(runner.undo(db.connect(a.db), a.run), indent=2, ensure_ascii=False))
 
 
+def cmd_cache(a):
+    from .recognize import httpcache
+    c = httpcache.Cache()
+    if a.clear:
+        print(f"removed {c.clear()} cached lookups and fingerprints")
+        return 0
+    st = c.stats()
+    import datetime
+    age = (datetime.datetime.fromtimestamp(st["oldest"]).isoformat(" ", "minutes") if st["oldest"] else "-")
+    print(f"{st['path']}\n{st['entries']} cached lookups, {st['bytes'] / 1e6:.1f} MB, oldest {age}"
+          f" (kept {httpcache.ttl_seconds() / 86400:g} days); {st['fingerprints']} audio fingerprints")
+    for host, n in st["by_host"].items():
+        print(f"  {n:6}  {host}")
+    return 0
+
+
 def cmd_serve(a):
     from .server import serve
     serve(a.db, a.root, port=a.port, open_browser=not a.no_browser, dest=a.dest)
@@ -227,6 +243,10 @@ def main(argv=None):
     und = sub.add_parser("undo", help="remove the copies a run created (unchanged ones only)")
     und.add_argument("run", type=int)
     und.set_defaults(func=cmd_undo)
+
+    ca = sub.add_parser("cache", help="web lookup cache used while matching: size, or --clear")
+    ca.add_argument("--clear", action="store_true", help="delete every cached lookup")
+    ca.set_defaults(func=cmd_cache)
 
     sv = sub.add_parser("serve", help="local web UI (127.0.0.1 only, token-protected)")
     sv.add_argument("--root", action="append", required=True, help="a folder the UI may browse (repeatable)")

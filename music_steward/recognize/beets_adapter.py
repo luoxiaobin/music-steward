@@ -99,7 +99,30 @@ def sources() -> list[str]:
     return out
 
 
+MAX_COMPARE = 300   # characters; real titles are far shorter
+
+
+def _bound_string_distance():
+    """Some catalogue entries are junk: Discogs has a joke release "Unicode" whose track titles
+    are 274,000 characters (every code point). beets transliterates both strings on every
+    comparison, so one such candidate made a 21-track album take 13 s of CPU. Compare at most
+    MAX_COMPARE characters; any real title is unaffected."""
+    import importlib
+    D = importlib.import_module("beets.autotag.distance")   # the package re-exports a function of that name
+    if getattr(D._string_dist_basic, "_mlt_bounded", False):
+        return
+    orig = D._string_dist_basic
+
+    def bounded(a: str, b: str) -> float:
+        return orig(a[:MAX_COMPARE], b[:MAX_COMPARE])
+    bounded._mlt_bounded = True
+    D._string_dist_basic = bounded
+
+
 def configure(acoustid_key: str | None, search_limit: int = 5):
+    from . import httpcache
+    httpcache.install()          # web lookups cached on disk; Deezer/Discogs throttled
+    _bound_string_distance()
     _reset()
     use_chroma = bool(acoustid_key)
     srcs = sources()
@@ -150,8 +173,11 @@ def _fingerprint(items, use_chroma) -> dict[str, bool]:
     """Fingerprint each file; returns {path: has a MusicBrainz-linked AcoustID match}."""
     if not use_chroma:
         return {}
+    from . import httpcache
     ch = sys.modules["beetsplug.chroma"]
     for it in items:
+        p = os.fsdecode(it.path)
+        httpcache.fp_keys[p] = httpcache.file_key(p)
         ch.acoustid_match(_LOG, it.path)
     return {os.fsdecode(it.path): it.path in ch._matches for it in items}
 
@@ -254,6 +280,7 @@ def match_cue(audio_path: str, album: dict, tracks: list[dict], acoustid_key: st
     available, each track is fingerprinted from its own slice of the image (first 2 minutes).
     """
     import shutil as _sh
+    from . import httpcache
     search = search or {}
     use_chroma = configure(acoustid_key)
     tmp = tempfile.mkdtemp(prefix="mlt_cue_")
@@ -269,7 +296,11 @@ def match_cue(audio_path: str, album: dict, tracks: list[dict], acoustid_key: st
                       album=album.get("title") or "", albumartist=album.get("performer") or "",
                       track=t["number"], tracktotal=len(tracks), length=t.get("length") or 0.0)
             seg = os.path.join(tmp, f"t{t['number']:02d}.wav")
-            if use_chroma and t["number"] in fp_numbers and _segment_wav(audio_path, t["start"], t.get("length"), seg, offset):
+            fp_key = httpcache.file_key(audio_path, f"{t['start']:.3f}:{t.get('length')}:{offset}")
+            httpcache.fp_keys[seg] = fp_key
+            if use_chroma and t["number"] in fp_numbers and (
+                    httpcache.cached_fingerprint(fp_key) or      # known slice: no need to decode it again
+                    _segment_wav(audio_path, t["start"], t.get("length"), seg, offset)):
                 it.path = os.fsencode(seg)
             else:
                 it.path = os.fsencode(os.path.join(tmp, f"virtual-{t['number']:02d}"))
@@ -280,7 +311,8 @@ def match_cue(audio_path: str, album: dict, tracks: list[dict], acoustid_key: st
         if use_chroma:
             ch = sys.modules["beetsplug.chroma"]
             for it in items:
-                if os.path.exists(it.path):
+                p = os.fsdecode(it.path)
+                if os.path.exists(it.path) or httpcache.cached_fingerprint(httpcache.fp_keys.get(p)):
                     ch.acoustid_match(_LOG, it.path)
             linked = {it.path: it.path in ch._matches for it in items}
         source = Source.from_items(items)

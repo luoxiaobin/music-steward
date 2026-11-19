@@ -30,6 +30,14 @@ def _match_cue(con, u, audio_path: str, key, search):
                        tracks, key, search, offset=audio["audio_offset"] or 0)
 
 
+MAX_TEXT = 500
+
+
+def _short(s):
+    """Junk catalogue entries exist (a Discogs release whose track title is 274,000 characters)."""
+    return s[:MAX_TEXT] + "…" if isinstance(s, str) and len(s) > MAX_TEXT else s
+
+
 def run_unit(db_path: str, unit_id: int) -> int:
     con = db.connect(db_path)
     u = con.execute("SELECT * FROM unit WHERE id=?", (unit_id,)).fetchone()
@@ -58,6 +66,10 @@ def run_unit(db_path: str, unit_id: int) -> int:
             con.execute("UPDATE decision SET candidate_id=NULL WHERE unit_id=?", (unit_id,))
         con.execute("DELETE FROM candidate WHERE unit_id=?", (unit_id,))
         for c in res["candidates"]:
+            for k in ("album", "artist", "label"):
+                c[k] = _short(c.get(k))
+            for t in c["tracks"]:
+                t["title"], t["artist"] = _short(t.get("title")), _short(t.get("artist"))
             cid = con.execute(
                 "INSERT INTO candidate(unit_id, rank, source, album_id, album, artist, year, country, label, "
                 "media, mediums, distance, penalties_json, extra_items_json, extra_tracks_json, "
