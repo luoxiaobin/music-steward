@@ -231,6 +231,27 @@ async function renderUnits(where) {
       if (r.error) alert(r.error);
       await refreshCenter();
     } }, `Accept all Ready + Likely (${nReady + nLikely})`));
+  // ---- folder-wide actions on undecided albums ----
+  const und = us.filter(u => !u.decision && u.status === "done");
+  const nNoLocal = und.filter(u => ["no_match", "weak"].includes(u.confidence) && !u.local).length;
+  const nLocal = und.filter(u => u.local).length;
+  const nSkip = und.filter(u => ["no_match", "weak"].includes(u.confidence)).length;
+  const bulkBtn = (label, n, ask, body) => n ? h("button", { type: "button", class: "btn",
+    style: "min-height:28px;padding:0 10px;margin-left:6px", onclick: async () => {
+      if (ask && !confirm(ask)) return;
+      const r = await post2("/api/bulk", { root: S.root.path, path: S.path, ...body });
+      if (r.error) alert(r.error);
+      else if (r.n_failed) alert(`${r.done} done; ${r.n_failed} could not be read:\n` + r.failed.join("\n"));
+      await refreshCenter();
+    } }, `${label} (${n})`) : null;
+  note.append(...[
+    bulkBtn("Add own info to No match + Weak", nNoLocal, null, { action: "local" }),
+    bulkBtn("Accept own info", nLocal,
+      `Accept the album's own info (cue sheet / tags / names) for ${nLocal} albums? Check the "Own info" lines in the table first. ` +
+      "Nothing is copied until you apply a plan; each decision can be undone, and fields can still be edited.", { action: "accept_local" }),
+    bulkBtn("Skip No match + Weak", nSkip,
+      `Skip ${nSkip} undecided No match / Weak albums in this folder? They stay where they are and are left out of plans. Each skip can be undone.`,
+      { action: "skip", confidences: ["no_match", "weak"] })].filter(Boolean));
   const body = h("tbody");
   for (const u of us) {
     const t = u.top;
@@ -241,7 +262,9 @@ async function renderUnits(where) {
       h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${t.year || "?"}${t.country ? " · " + t.country : ""}`),
                        h("div", { class: "sub" }, `${t.artist} · distance ${t.distance.toFixed(2)} · fingerprints ${t.fingerprint_agrees}/${u.n_tracks || u.n_files}` +
                          (u.evidence && u.evidence.disc_of_set ? ` · disc ${u.evidence.disc} of ${t.mediums}` : ""))]
-                    : h("span", { class: "muted" }, u.status === "error" ? "error" : u.status === "done" ? "no candidates" : "—")),
+                    : h("span", { class: "muted" }, u.status === "error" ? "error" : u.status === "done" ? "no candidates" : "—"),
+                       u.local ? h("div", { class: "sub" }, h("strong", {}, "Own info: "),
+                         `${u.local.album || "?"} · ${u.local.artist || "Unknown Artist"}${u.local.year ? " · " + u.local.year : ""}`) : null),
       h("td", {}, unitBadge(u)));
     body.append(tr);
   }

@@ -128,6 +128,9 @@ def units(con: sqlite3.Connection, root_id: int, folder: str = "") -> list[dict]
         if u["top"]:
             u["evidence"] = evidence(u, u["top"])
             u["top"].pop("_mapped_media")
+        loc = con.execute("SELECT id, album, artist, year FROM candidate WHERE unit_id=? AND source='Local'",
+                          (u["id"],)).fetchone()
+        u["local"] = dict(loc) if loc else None
         d = con.execute("SELECT * FROM decision WHERE unit_id=?", (u["id"],)).fetchone()
         u["decision"] = dict(d) if d else None
         out.append(u)

@@ -92,16 +92,19 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
     value). Own info reads the disc from a trailing "CD2"/"Disc 2"/"(CD 2)" in the album title or
     a "CD 2" folder; Edit fields has "Disc _ of _" and, for cue albums, every track title.
     Two different albums that would share a folder still show as name conflicts, never merge silently.
+17. ✅ Folder-wide bulk actions on undecided albums (decisions already made are never touched):
+    "Add own info to No match + Weak", "Accept own info" (after scanning the "Own info:" line each
+    row now shows), "Skip No match + Weak"; plus the existing "Accept all Ready + Likely".
 
 ## M2 backlog (original order)
 
 1. ✅ `serve` + read-only inventory browser (three-pane, per the Review & Plan mockups)
-2. Recognition queue: rate-limited (MusicBrainz ~1/s, AcoustID 3/s), resumable, cached; one worker process per job (ADR-level finding F1)
-3. Pre-processing before matching: GBK/Big5 tag repair; cue-sheet albums; tag-sanity fallbacks
-4. Own confidence rule (AcoustID-linked + distance < ~0.15 → Ready); artist agreement for singles
-5. Extra candidate sources for mainland releases (evaluate Discogs, Deezer)
-6. Review actions: candidates with evidence, Accept / Edit / Skip / Search again; decisions saved immediately
-7. Destination preview from the naming template; casefold/NFC collision and existing-file conflicts
+2. Recognition queue: ✅ resumable, one process per unit; still to do: lookup cache, checked rate limits for Deezer/Discogs, resumability proven at scale; one worker process per job (ADR-level finding F1)
+3. ✅ Pre-processing before matching: GBK/Big5 tag repair; cue-sheet albums; tag-sanity fallbacks
+4. ✅ Own confidence rule (AcoustID-linked + distance < ~0.15 → Ready); artist agreement for singles (still to do)
+5. ✅ Extra candidate sources for mainland releases (evaluate Discogs, Deezer)
+6. ✅ Review actions: candidates with evidence, Accept / Edit / Skip / Search again; decisions saved immediately
+7. ✅ Destination preview from the naming template; casefold/NFC collision and existing-file conflicts
 8. **Desktop window with pywebview + native folder picker** — [ADR 0001](adr/0001-desktop-shell-pywebview.md)
 
 ## Decisions

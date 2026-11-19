@@ -353,6 +353,47 @@ class App:
         con.commit()
         return {"accepted": n}
 
+    BULK_LOCAL = {"no_match", "weak"}
+    BULK_SKIP = {"no_match", "weak", "needs_review"}
+
+    def bulk(self, con, body) -> dict:
+        """Folder-wide actions on UNDECIDED albums only (decisions already made are never touched):
+          local         add own info (cue sheet / tags / names) to No match + Weak albums
+          accept_local  accept the own info of albums that have it
+          skip          skip albums whose status is in `confidences` (No match / Weak / Needs review)"""
+        from .recognize import local, results
+        action = body.get("action")
+        root = os.path.abspath(body.get("root", ""))
+        if root not in self.roots:
+            return {"error": "not a configured root"}
+        rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
+        wanted = set(body.get("confidences") or [])
+        if action == "skip" and (not wanted or not wanted <= self.BULK_SKIP):
+            return {"error": "bulk skip is only for No match, Weak and Needs review albums"}
+        done, failed = 0, []
+        for u in results.units(con, rid, nfc(body.get("path", ""))):
+            if u["decision"] is not None or u["status"] != "done":
+                continue
+            if action == "local" and u["confidence"] in self.BULK_LOCAL and not u["local"]:
+                try:
+                    local.add(con, u["id"])
+                    done += 1
+                except (OSError, ValueError) as e:
+                    failed.append(f"{u['label']}: {e}")
+            elif action == "accept_local" and u["local"]:
+                con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                            "VALUES(?, 'accept', ?, ?, 'local')", (u["id"], u["local"]["id"], time.time()))
+                con.execute("UPDATE unit SET notice=NULL WHERE id=?", (u["id"],))
+                done += 1
+            elif action == "skip" and u["confidence"] in wanted:
+                con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at) "
+                            "VALUES(?, 'skip', NULL, ?)", (u["id"], time.time()))
+                done += 1
+            elif action not in ("local", "accept_local", "skip"):
+                return {"error": "unknown bulk action"}
+        con.commit()
+        return {"done": done, "failed": failed[:20], "n_failed": len(failed)}
+
     def decide(self, con, body) -> dict:
         """Save a review decision immediately (Accept a candidate, or Skip)."""
         uid, action = _int(body.get("unit_id")), body.get("action")
@@ -491,10 +532,11 @@ def make_handler(app: App, port_ref: dict):
             if u.path in ("/api/apply", "/api/undo", "/api/resume"):
                 kind = u.path.rsplit("/", 1)[1]
                 return self._json(app.start_job(kind, "", str(body.get("id", ""))))
-            if u.path == "/api/bulk_accept":
+            if u.path in ("/api/bulk_accept", "/api/bulk"):
                 con = app.con()
                 try:
-                    return self._json(app.bulk_accept(con, body))
+                    return self._json(app.bulk_accept(con, body) if u.path == "/api/bulk_accept"
+                                      else app.bulk(con, body))
                 finally:
                     con.close()
             if u.path in ("/api/search", "/api/edit", "/api/local"):

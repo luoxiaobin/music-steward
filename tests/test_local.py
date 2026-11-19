@@ -201,3 +201,32 @@ def test_file_albums_set_as_discs_get_disc_prefixed_names(tmp_path, con):
         "Band/The Set/1-01 - Song 10.mp3", "Band/The Set/1-02 - Song 11.mp3",
         "Band/The Set/2-01 - Song 20.mp3", "Band/The Set/2-02 - Song 21.mp3"]
     assert {i["tags"]["disc"] for i in p["items"]} == {"1/2", "2/2"}
+
+
+def test_bulk_own_info_accept_and_skip_touch_only_undecided(two_disc_cues, con, monkeypatch):
+    lib, uids = two_disc_cues
+    # a third album: matched online (Ready) -- bulk own-info actions must leave it alone
+    for i in range(3):
+        tag_id3(tone(lib / "Album A" / f"{i}.mp3", ["-c:a", "libmp3lame"], secs=1, freq=500 + i), f"A{i}", album="Album A")
+    scan(con, lib)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"])
+    ready = con.execute("SELECT id FROM unit WHERE folder='Album A'").fetchone()[0]
+    from music_steward.recognize import beets_adapter
+    monkeypatch.setattr(beets_adapter, "match_album", fake_album)
+    worker.run_unit(con.execute("PRAGMA database_list").fetchone()[2], ready)
+    app = App(con.execute("PRAGMA database_list").fetchone()[2], [str(lib)], None)
+    root = str(lib)
+    # the user already skipped CD2 by hand: bulk actions must not change that
+    app.decide(con, {"unit_id": uids[1], "action": "skip"})
+    assert app.bulk(con, {"root": root, "action": "local"}) == {"done": 1, "failed": [], "n_failed": 0}
+    us = {u["id"]: u for u in results.units(con, 1)}
+    assert us[uids[0]]["local"]["album"] == "经典老歌101" and us[ready]["local"] is None and us[uids[1]]["local"] is None
+    assert app.bulk(con, {"root": root, "action": "local"})["done"] == 0          # idempotent
+    assert app.bulk(con, {"root": root, "action": "accept_local"})["done"] == 1
+    d = con.execute("SELECT * FROM decision WHERE unit_id=?", (uids[0],)).fetchone()
+    assert d["action"] == "accept" and d["release_key"] == "local"
+    assert "error" in app.bulk(con, {"root": root, "action": "skip", "confidences": ["ready"]})
+    assert app.bulk(con, {"root": root, "action": "skip", "confidences": ["no_match", "weak"]})["done"] == 0
+    assert con.execute("SELECT action FROM decision WHERE unit_id=?", (uids[1],)).fetchone()[0] == "skip"
+    assert con.execute("SELECT 1 FROM decision WHERE unit_id=?", (ready,)).fetchone() is None
+    assert "error" in app.bulk(con, {"root": "/elsewhere", "action": "local"})
