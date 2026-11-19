@@ -113,3 +113,14 @@ def test_decisions_are_validated_and_saved(server):
     assert post({"unit_id": 1, "action": "clear"}) == {"ok": True}
     assert c.execute("SELECT count(*) FROM decision").fetchone()[0] == 0
     assert "error" in post({"unit_id": 1, "action": "delete-everything"})
+
+
+def test_plan_api_refuses_destination_inside_root(server, library):
+    app, port = server
+    ck = login(app, port)
+    r = json.loads(req(port, "/api/plan", cookie=ck, method="POST", headers={"X-MLT": "1"},
+                       body=json.dumps({"root": str(library), "path": "", "dest": str(library / "out")}))[2])
+    assert "overlaps the source root" in r["error"]
+    r = json.loads(req(port, "/api/plan", cookie=ck, method="POST", headers={"X-MLT": "1"},
+                       body=json.dumps({"root": str(library), "path": "", "dest": ""}))[2])
+    assert "destination" in r["error"]

@@ -147,3 +147,11 @@ def test_names_are_windows_safe(raw, safe):
 def test_extension_follows_the_real_codec():
     assert naming.track_name("x", 1, 1, 1, "ape", ".mp3").endswith(".ape")
     assert naming.track_name("x", 3, 2, 2, "flac", ".flac") == "2-03 - x.flac"
+
+
+@pytest.mark.parametrize("where", ["inside", "same", "parent"])
+def test_destination_may_not_overlap_the_collection(accepted, con, where):
+    lib, _ = accepted
+    dest = {"inside": lib / "Organized", "same": lib, "parent": lib.parent}[where]
+    with pytest.raises(plan.PlanError):
+        plan.build(con, str(dest), 1)

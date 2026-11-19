@@ -16,10 +16,10 @@
   </div>
   <button type="button" class="btn" id="scanBtn">Scan</button>
   <button type="button" class="btn" id="recognizeBtn" title="Match the albums in the selected folder">Recognize folder</button>
-  <button type="button" class="btn btn-primary" disabled title="Arrives in M3 (plans)">Review plan →</button>
+  <button type="button" class="btn btn-primary" id="planBtn">Review plan →</button>
 </header>
 
-<div class="layout">
+<div class="layout" id="reviewPage">
   <nav class="panel left" aria-label="Sources and filters">
     <section>
       <h2 class="ph">Sources</h2>
@@ -56,6 +56,8 @@
     <p class="muted">Select a file or album to see its details.</p>
   </aside>
 </div>
+<div id="planPage" class="plan-page" hidden></div>
 <script src="/static/app.js"></script>
+<script src="/static/plan.js"></script>
 </body>
 </html>

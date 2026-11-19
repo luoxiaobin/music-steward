@@ -131,7 +131,10 @@ def cmd_plan(a):
     from .apply import plan
     con = db.connect(a.db)
     rid, sub = _target(con, a.path)
-    pid = plan.build(con, a.dest, rid, sub)
+    try:
+        pid = plan.build(con, a.dest, rid, sub)
+    except plan.PlanError as e:
+        sys.exit(str(e))
     p = plan.load(con, pid)
     print(json.dumps({"plan": pid, "dest": p["dest_root"], **p["summary"]}, indent=2))
     for it in p["items"][: a.limit]:
@@ -157,7 +160,7 @@ def cmd_undo(a):
 
 def cmd_serve(a):
     from .server import serve
-    serve(a.db, a.root, port=a.port, open_browser=not a.no_browser)
+    serve(a.db, a.root, port=a.port, open_browser=not a.no_browser, dest=a.dest)
 
 
 def main(argv=None):
@@ -229,6 +232,7 @@ def main(argv=None):
     sv.add_argument("--root", action="append", required=True, help="a folder the UI may browse (repeatable)")
     sv.add_argument("--port", type=int, default=0, help="default: a random free port")
     sv.add_argument("--no-browser", action="store_true")
+    sv.add_argument("--dest", help="default destination folder for organized copies (outside every root)")
     sv.set_defaults(func=cmd_serve)
 
     a = ap.parse_args(argv)

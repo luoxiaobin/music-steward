@@ -33,8 +33,24 @@ def _tags_for(c, t, kind) -> dict:
     }
 
 
+class PlanError(Exception):
+    pass
+
+
+def check_destination(con: sqlite3.Connection, dest: Path):
+    """The destination must never be inside a source root: sources are read-only."""
+    if not dest.is_absolute():
+        raise PlanError("destination must be an absolute path")
+    d = os.path.realpath(dest)
+    for (r,) in con.execute("SELECT path FROM root"):
+        rr = os.path.realpath(r)
+        if d == rr or d.startswith(rr.rstrip("/") + "/") or rr.startswith(d.rstrip("/") + "/"):
+            raise PlanError(f"destination overlaps the source root {r}; choose a folder outside your collection")
+
+
 def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = "") -> int:
     dest = Path(dest_root).expanduser().resolve()
+    check_destination(con, dest)
     q = ("SELECT u.*, d.candidate_id FROM unit u JOIN decision d ON d.unit_id=u.id "
          "WHERE d.action='accept' AND u.root_id=?")
     args: tuple = (root_id,)

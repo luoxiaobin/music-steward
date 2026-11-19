@@ -29,8 +29,14 @@ Get one album all the way through before widening any step:
    (劉德華, 林子祥 with garbled tags, Phil Collins 2×CD) → 53 copies in 10 s, sources byte-identical,
    林子祥 tags repaired to Unicode from MusicBrainz, audio identical 17/17
 
+5. ✅ Garbled GBK/Big5 tags repaired in memory before matching (林子祥: distance 0.49 → 0.17)
+6. ✅ Plan screen in the UI (mockup "Review plan"): destination chooser, summary cards, blocked items,
+   tag and path changes, side files, runs with Apply / Undo run / Resume; destination may never
+   overlap a source root. Tested in the browser: apply 36 files, undo, sources unchanged.
+
 Found while testing, to do: identical cover images in CD 1/CD 2 collide on one name (blocked, not
-overwritten) — keep one when identical; plan screen in the UI (CLI only so far).
+overwritten) — keep one when identical. Re-recognizing a folder clears its decisions (by design;
+consider keeping a decision when the same release is still a candidate).
 
 Then widen by value: garbled-tag repair before matching → own confidence rule → edit/search/conflicts and the full Plan screen → extra sources for mainland releases → cue-sheet albums, singles rules, Simplified/Traditional key → pywebview window.
 

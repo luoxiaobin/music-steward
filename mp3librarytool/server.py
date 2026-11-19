@@ -34,7 +34,8 @@ BROWSER_PLAYABLE = set(AUDIO_MIME)
 
 
 class App:
-    def __init__(self, db_path: str, roots: list[str]):
+    def __init__(self, db_path: str, roots: list[str], dest: str | None = None):
+        self.dest = os.path.abspath(os.path.expanduser(dest)) if dest else None
         self.db_path = db_path
         self.roots = [os.path.abspath(r) for r in roots]
         self.token = secrets.token_urlsafe(24)
@@ -166,13 +167,19 @@ class App:
 
     def start_job(self, kind: str, root: str, path: str = "") -> dict:
         """Background scan or hash of a root or one of its sub-folders. One job at a time."""
+        if kind in ("apply", "undo", "resume"):
+            root = self.roots[0]
+            if not str(path).isdigit():
+                return {"error": "bad id"}
         root = os.path.abspath(root)
         if root not in self.roots:
             return {"error": "not a configured root"}
-        if path and (".." in path.split("/") or path.startswith("/")):
+        if kind in ("apply", "undo", "resume"):
+            pass
+        elif path and (".." in path.split("/") or path.startswith("/")):
             return {"error": "bad path"}
-        target = os.path.join(root, path) if path else root
-        if not os.path.realpath(target).startswith(os.path.realpath(root)):
+        target = os.path.join(root, str(path)) if path else root
+        if kind not in ("apply", "undo", "resume") and not os.path.realpath(target).startswith(os.path.realpath(root)):
             return {"error": "bad path"}
         with self._lock:
             if self.scan_state.get("running"):
@@ -189,6 +196,14 @@ class App:
                 if kind == "scan":
                     r = scan(con, target, progress=prog)
                     res = {"status": r.status, **r.counts, "abort_reason": r.abort_reason}
+                elif kind in ("apply", "undo", "resume"):
+                    from .apply import runner
+                    n = int(path)
+                    res = {"status": "complete", **(runner.apply(con, n, progress=prog) if kind == "apply"
+                                                    else runner.undo(con, n) if kind == "undo"
+                                                    else runner.resume(con, n))}
+                    if res.get("error"):
+                        res["status"], res["abort_reason"] = "error", res["error"]
                 elif kind == "recognize":
                     from .recognize import queue, units
                     rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
@@ -209,6 +224,42 @@ class App:
                 con.close()
         threading.Thread(target=work, daemon=True).start()
         return {"started": True}
+
+    def make_plan(self, con, body) -> dict:
+        from .apply import plan
+        root = os.path.abspath(body.get("root", ""))
+        if root not in self.roots:
+            return {"error": "not a configured root"}
+        dest = (body.get("dest") or self.dest or "").strip()
+        if not dest:
+            return {"error": "choose a destination folder first"}
+        row = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()
+        try:
+            pid = plan.build(con, os.path.expanduser(dest), row["id"], nfc(body.get("path", "")))
+        except plan.PlanError as e:
+            return {"error": str(e)}
+        return {"plan_id": pid}
+
+    def plan_view(self, con, plan_id) -> dict | None:
+        from .apply import plan
+        if not con.execute("SELECT 1 FROM plan WHERE id=?", (plan_id,)).fetchone():
+            return None
+        p = plan.load(con, plan_id)
+        for it in p["items"]:
+            f = con.execute("SELECT tags_json, tag_issues_json, relpath FROM file WHERE id=?", (it["file_id"],)).fetchone()
+            it["current_tags"] = json.loads(f["tags_json"] or "{}") if f else {}
+            it["src_rel"] = f["relpath"] if f else it["src"]
+        probe_dir = Path(p["dest_root"])
+        while not probe_dir.exists() and probe_dir != probe_dir.parent:
+            probe_dir = probe_dir.parent
+        try:
+            import shutil
+            p["dest_free"] = shutil.disk_usage(probe_dir).free
+        except OSError:
+            p["dest_free"] = None
+        for r in p["runs"]:
+            r["summary"] = json.loads(r.pop("summary_json") or "{}")
+        return p
 
     def decide(self, con, body) -> dict:
         """Save a review decision immediately (Accept a candidate, or Skip)."""
@@ -287,7 +338,7 @@ def make_handler(app: App, port_ref: dict):
                 if u.path == "/api/state":
                     roots = app.roots_info(con)
                     rid = _int(q.get("root_id")) or next((r["root_id"] for r in roots if r["root_id"]), None)
-                    return self._json({"roots": roots, "root_id": rid,
+                    return self._json({"roots": roots, "root_id": rid, "dest": app.dest,
                                        "summary": app.summary(con, rid) if rid else None,
                                        "scan": app.scan_state})
                 if u.path == "/api/folders":
@@ -300,6 +351,13 @@ def make_handler(app: App, port_ref: dict):
                 if u.path == "/api/units":
                     from .recognize import results
                     return self._json(results.units(con, _int(q["root_id"]), q.get("path", "")))
+                if u.path == "/api/plans":
+                    return self._json([dict(r) for r in con.execute(
+                        "SELECT id, created_at, dest_root, scope, summary_json FROM plan ORDER BY id DESC LIMIT 20")])
+                m = re.fullmatch(r"/api/plan/(\d+)", u.path)
+                if m:
+                    d = app.plan_view(con, int(m.group(1)))
+                    return self._json(d) if d else self._json({"error": "not found"}, 404)
                 m = re.fullmatch(r"/api/unit/(\d+)", u.path)
                 if m:
                     from .recognize import results
@@ -327,6 +385,15 @@ def make_handler(app: App, port_ref: dict):
             u = urlparse(self.path)
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}")
+            if u.path == "/api/plan":
+                con = app.con()
+                try:
+                    return self._json(app.make_plan(con, body))
+                finally:
+                    con.close()
+            if u.path in ("/api/apply", "/api/undo", "/api/resume"):
+                kind = u.path.rsplit("/", 1)[1]
+                return self._json(app.start_job(kind, "", str(body.get("id", ""))))
             if u.path == "/api/decision":
                 con = app.con()
                 try:
@@ -399,8 +466,8 @@ def _int(x):
         return None
 
 
-def serve(db_path: str, roots: list[str], port: int = 0, open_browser: bool = True):
-    app = App(db_path, roots)
+def serve(db_path: str, roots: list[str], port: int = 0, open_browser: bool = True, dest: str | None = None):
+    app = App(db_path, roots, dest)
     port_ref = {"port": port}
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app, port_ref))
     port_ref["port"] = httpd.server_address[1]
