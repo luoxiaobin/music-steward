@@ -22,10 +22,15 @@ Living plan. Sources: the Architecture Assessment and M0 Experiments specs (Nov 
 
 Get one album all the way through before widening any step:
 
-1. Minimal matching queue: "Recognize" a folder → album units → candidates with evidence in the DB; resumable; each unit matched in its own worker process
-2. Minimal review: pick a candidate → Accept / Skip
-3. Minimal plan + apply to a **local destination folder** (try-out), verify, journal, Undo run — M0 protocol
-4. Test on 劉德華 (clean HK), 林子祥 (garbled tags), Phil Collins (2 CDs)
+1. ✅ Matching queue: "Recognize folder" → units (albums; CD 1/CD 2 merged; singles folders split) → candidates with evidence; resumable; one worker process per unit
+2. ✅ Review: candidates with evidence (incl. fingerprints agreeing), track mapping, Accept / Skip / Undo decision
+3. ✅ Plan + apply + resume + undo to a local folder (M0 protocol in the app; method probed per destination)
+4. ✅ Real test (2026-11-19, local sample): 24 units recognized in 3 m 40 s, 0 errors; 3 accepted
+   (劉德華, 林子祥 with garbled tags, Phil Collins 2×CD) → 53 copies in 10 s, sources byte-identical,
+   林子祥 tags repaired to Unicode from MusicBrainz, audio identical 17/17
+
+Found while testing, to do: identical cover images in CD 1/CD 2 collide on one name (blocked, not
+overwritten) — keep one when identical; plan screen in the UI (CLI only so far).
 
 Then widen by value: garbled-tag repair before matching → own confidence rule → edit/search/conflicts and the full Plan screen → extra sources for mainland releases → cue-sheet albums, singles rules, Simplified/Traditional key → pywebview window.
 
