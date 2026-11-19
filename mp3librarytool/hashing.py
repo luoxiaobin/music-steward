@@ -12,6 +12,7 @@ import hashlib
 import subprocess
 
 PCM_EXTS = {".ape", ".wv", ".tta"}  # demuxers where trailing tags leak into packets
+PCM_CODECS = {"ape", "wavpack", "tta"}
 
 
 class HashError(Exception):
@@ -26,12 +27,15 @@ def file_sha256(path: str) -> str:
     return h.hexdigest()
 
 
-def audio_hash_method(ext: str) -> str:
+def audio_hash_method(ext: str, codec: str | None = None) -> str:
+    """Decided by the real codec when known (APE named .mp3 exists), else the extension."""
+    if codec:
+        return "pcm" if codec in PCM_CODECS else "packet"
     return "pcm" if ext.lower() in PCM_EXTS else "packet"
 
 
-def audio_hash(path: str, ext: str, timeout: float = 600) -> tuple[str, str]:
-    method = audio_hash_method(ext)
+def audio_hash(path: str, ext: str, timeout: float = 600, codec: str | None = None) -> tuple[str, str]:
+    method = audio_hash_method(ext, codec)
     from .probe import audio_offset
     off = audio_offset(path, ext)
     cmd = ["ffmpeg", "-nostdin", "-v", "error"]

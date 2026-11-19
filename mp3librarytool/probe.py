@@ -49,17 +49,25 @@ PREFIX_SEARCH = 8 << 20  # some taggers prepend ID3v2 (with artwork) before the 
 
 
 def audio_offset(path: str, ext: str) -> int:
-    """Bytes to skip before the real audio header. Non-zero only for APE files with a
-    tag (usually ID3v2) stuck on the front, which ffmpeg's APE demuxer rejects."""
-    if ext.lower() != ".ape":
-        return 0
+    """Bytes to skip before the real audio header: non-zero only for Monkey's Audio
+    with a tag (usually ID3v2) stuck on the front, which ffmpeg's APE demuxer rejects.
+    Content decides, not the extension: the NAS has APE audio named .mp3."""
     with open(path, "rb") as fh:
-        head = fh.read(4)
-        if head == APE_MAGIC or head[:3] != b"ID3":
+        head = fh.read(10)
+        if head[:4] == APE_MAGIC or head[:3] != b"ID3" or len(head) < 10:
             return 0
-        fh.seek(0)
-        i = fh.read(PREFIX_SEARCH).find(APE_MAGIC)
-    return max(i, 0)
+        # exact end of the ID3v2 tag (syncsafe size, +10 header, +10 if footer flag)
+        size = (head[6] << 21) | (head[7] << 14) | (head[8] << 7) | head[9]
+        end = 10 + size + (10 if head[5] & 0x10 else 0)
+        fh.seek(end)
+        after = fh.read(64 * 1024)
+        pad = len(after) - len(after.lstrip(b"\x00"))   # some taggers zero-pad beyond the tag
+        if after[pad:pad + 4] == APE_MAGIC:
+            return end + pad
+        if ext.lower() == ".ape":                     # .ape: allow junk between tag and header
+            fh.seek(0)
+            return max(fh.read(PREFIX_SEARCH).find(APE_MAGIC), 0)
+    return 0
 
 
 def sniff(path: str) -> str | None:

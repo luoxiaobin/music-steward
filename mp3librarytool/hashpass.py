@@ -14,8 +14,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from .hashing import HashError, audio_hash, file_sha256
 
 
-def pending(con: sqlite3.Connection, root_id: int | None = None):
-    q = ("SELECT f.id, f.fs_relpath, f.ext, f.size, f.mtime_ns, r.path AS root FROM file f "
+def pending(con: sqlite3.Connection, root_id: int | None = None, subpath: str = ""):
+    q = ("SELECT f.id, f.fs_relpath, f.ext, f.codec, f.size, f.mtime_ns, r.path AS root FROM file f "
          "JOIN root r ON r.id=f.root_id WHERE f.removed_at IS NULL AND f.kind='audio' "
          "AND f.probe_status='ok' AND (f.file_sha256 IS NULL OR f.hashed_size<>f.size "
          "OR f.hashed_mtime_ns<>f.mtime_ns) AND f.hash_error IS NULL")
@@ -23,6 +23,9 @@ def pending(con: sqlite3.Connection, root_id: int | None = None):
     if root_id is not None:
         q += " AND f.root_id=?"
         args = (root_id,)
+    if subpath:
+        q += " AND f.relpath >= ? AND f.relpath < ?"
+        args = (*args, subpath + "/", subpath + "/\uffff")
     return con.execute(q + " ORDER BY f.id", args).fetchall()
 
 
@@ -32,7 +35,7 @@ def _one(row) -> dict:
     if st.st_size != row["size"] or st.st_mtime_ns != row["mtime_ns"]:
         return {"skip": "changed since scan (re-scan first)"}
     sha = file_sha256(path)
-    ah, method = audio_hash(path, row["ext"])
+    ah, method = audio_hash(path, row["ext"], codec=row["codec"])
     st2 = os.stat(path)
     if st2.st_size != st.st_size or st2.st_mtime_ns != st.st_mtime_ns:
         return {"skip": "changed while hashing"}
@@ -40,8 +43,8 @@ def _one(row) -> dict:
 
 
 def run(con: sqlite3.Connection, root_id: int | None = None, workers: int = 4,
-        limit: int | None = None, progress=None) -> dict:
-    rows = pending(con, root_id)
+        limit: int | None = None, progress=None, subpath: str = "") -> dict:
+    rows = pending(con, root_id, subpath)
     if limit:
         rows = rows[:limit]
     c = {"hashed": 0, "skipped": 0, "errors": 0, "bytes": 0}
@@ -70,5 +73,5 @@ def run(con: sqlite3.Connection, root_id: int | None = None, workers: int = 4,
                     progress(i, len(rows))
     con.commit()
     c["seconds"] = round(time.time() - t0, 1)
-    c["remaining"] = len(pending(con, root_id))
+    c["remaining"] = len(pending(con, root_id, subpath))
     return c

@@ -7,14 +7,14 @@ const S = { rootId: null, path: "", filter: null, view: "folders", files: [], se
 
 const FILTER_LABELS = {
   garbled_tags: "Text decoding issues", missing_metadata: "Missing metadata",
-  unreadable: "Unreadable", estimated_values: "Estimated duration / bitrate",
+  unreadable: "Unreadable", wrong_extension: "Wrong extension", estimated_values: "Estimated duration / bitrate",
   exact_duplicates: "Exact duplicates", same_audio: "Same audio, different tags",
   cue_sheets: "Cue sheets", orphan_lrc: "Lyrics without a track",
   dirs_named_like_file: "Folders named like files", unlistable_dirs: "Folders not readable",
   removed: "Removed since last scan",
 };
 // filters that select audio files (others are informational lists)
-const FILE_FILTERS = new Set(["garbled_tags", "missing_metadata", "unreadable", "estimated_values",
+const FILE_FILTERS = new Set(["garbled_tags", "missing_metadata", "unreadable", "wrong_extension", "estimated_values",
                               "exact_duplicates", "same_audio"]);
 
 function h(tag, attrs = {}, ...kids) {
@@ -94,26 +94,32 @@ function renderFilters() {
 }
 function renderScan(sc) {
   const el = document.getElementById("scanNote"), btn = document.getElementById("scanBtn");
-  btn.disabled = !!(sc && sc.running) || !S.root || !S.root.available;
+  const busy = !!(sc && sc.running) || !S.root || !S.root.available;
+  for (const b of [btn, document.getElementById("rescanFolderBtn"), document.getElementById("hashFolderBtn")]) b.disabled = busy;
   if (sc && sc.running) {
-    el.textContent = sc.total ? `Scanning: ${sc.done} / ${sc.total} new or changed files read` : "Scanning: listing folders…";
+    const where = sc.path ? `“${sc.path}”` : "whole root";
+    el.textContent = sc.kind === "hash"
+      ? (sc.total ? `Hashing ${where}: ${sc.done} / ${sc.total} files` : `Hashing ${where}: starting…`)
+      : (sc.total ? `Scanning ${where}: ${sc.done} / ${sc.total} new or changed files read` : `Scanning ${where}: listing folders…`);
     clearTimeout(S.scanTimer);
     S.scanTimer = setTimeout(async () => { const st = await api("/api/state"); renderScan(st.scan);
                                            if (!st.scan.running) refreshAll(); }, 1500);
   } else if (sc && sc.result) {
-    const r = sc.result;
-    el.textContent = r.status === "complete"
-      ? `Last scan: ${r.n_new} new, ${r.n_changed} changed, ${r.n_unchanged} unchanged, ${r.n_removed} removed`
-      : `Scan ${r.status}: ${r.abort_reason || ""}`;
+    const r = sc.result, where = sc.path ? ` of “${sc.path}”` : "";
+    el.textContent = r.status !== "complete" ? `${sc.kind === "hash" ? "Hash" : "Scan"}${where} ${r.status}: ${r.abort_reason || ""}`
+      : sc.kind === "hash" ? `Hashed${where}: ${r.hashed} files (${fmtSize(r.bytes)}) in ${r.seconds}s, ${r.errors} errors`
+      : `Scan${where}: ${r.n_new} new, ${r.n_changed} changed, ${r.n_unchanged} unchanged, ${r.n_removed} removed`;
   } else el.textContent = "";
 }
-async function startScan() {
+async function startJob(kind, path) {
   if (!S.root) return;
-  await api("/api/scan", { method: "POST", headers: { "Content-Type": "application/json", "X-MLT": "1" },
-                           body: JSON.stringify({ root: S.root.path }) });
+  const r = await api(`/api/${kind}`, { method: "POST", headers: { "Content-Type": "application/json", "X-MLT": "1" },
+                                        body: JSON.stringify({ root: S.root.path, path: path || "" }) });
+  if (r.error) { document.getElementById("scanNote").textContent = r.error; return; }
   const st = await api("/api/state");
   renderScan(st.scan);
 }
+const startScan = () => startJob("scan", "");
 
 // ---------------------------------------------------------------- tree
 async function renderTree() {
@@ -147,6 +153,10 @@ async function refreshCenter() {
   const d = await api(`/api/files?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}` +
                       (S.filter ? `&filter=${S.filter}` : ""));
   S.files = d.files;
+  const fs = await api(`/api/folders?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}`);
+  document.getElementById("folderStats").textContent =
+    `${fs.audio.toLocaleString()} audio · ${fs.audio ? Math.round(100 * fs.hashed / fs.audio) : 0}% hashed`;
+  document.getElementById("hashFolderBtn").textContent = fs.hashed >= fs.audio && fs.audio ? "Hashed ✓" : "Hash folder";
   const where = S.path || (S.root && S.root.path) || "";
   const fl = S.filter ? ` · ${FILTER_LABELS[S.filter]}` : "";
   document.getElementById("tableNote").textContent =
@@ -306,4 +316,6 @@ document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click"
   await refreshCenter();
 }));
 document.getElementById("scanBtn").addEventListener("click", startScan);
+document.getElementById("rescanFolderBtn").addEventListener("click", () => startJob("scan", S.path));
+document.getElementById("hashFolderBtn").addEventListener("click", () => startJob("hash", S.path));
 refreshAll().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });

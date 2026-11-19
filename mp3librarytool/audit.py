@@ -6,7 +6,13 @@ import os
 import sqlite3
 from collections import defaultdict
 
-FILTERS = ("unreadable", "missing_metadata", "garbled_tags", "estimated_values",
+# what each extension should contain; anything else is reported as wrong_extension
+EXPECTED_CODECS = {".mp3": {"mp3", "mp2", "mp1"}, ".mp2": {"mp2"}, ".flac": {"flac"}, ".ape": {"ape"},
+                   ".m4a": {"aac", "alac"}, ".mp4": {"aac", "alac"}, ".aac": {"aac"},
+                   ".wma": {"wmav1", "wmav2", "wmapro", "wmalossless"}, ".ogg": {"vorbis", "opus", "flac"},
+                   ".opus": {"opus"}, ".wv": {"wavpack"}, ".tta": {"tta"}}
+
+FILTERS = ("unreadable", "wrong_extension", "missing_metadata", "garbled_tags", "estimated_values",
            "exact_duplicates", "same_audio", "orphan_lrc", "cue_sheets",
            "dirs_named_like_file", "unlistable_dirs", "removed")
 
@@ -22,6 +28,16 @@ def run(con: sqlite3.Connection, name: str, root_id: int | None = None) -> list[
         return [dict(r) for r in con.execute(
             f"SELECT relpath, content_note, probe_error FROM file f WHERE {live} AND kind='audio' "
             f"AND probe_status='error' {w} ORDER BY relpath", a)]
+    if name == "wrong_extension":
+        out = []
+        for r in con.execute(f"SELECT relpath, ext, codec, content_note FROM file f WHERE {live} "
+                             f"AND kind='audio' {w} ORDER BY relpath", a):
+            exp = EXPECTED_CODECS.get(r["ext"])
+            if r["codec"] and exp and r["codec"] not in exp:
+                out.append({"relpath": r["relpath"], "ext": r["ext"], "content": r["codec"]})
+            elif r["content_note"] and ("not an audio file" in r["content_note"]):
+                out.append({"relpath": r["relpath"], "ext": r["ext"], "content": r["content_note"]})
+        return out
     if name == "missing_metadata":
         out = []
         for r in con.execute(f"SELECT relpath, tags_json FROM file f WHERE {live} AND kind='audio' "

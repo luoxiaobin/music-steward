@@ -10,7 +10,7 @@ from . import audit, db, hashpass
 from .hashing import HashError, audio_hash, file_sha256
 from .paths import ext_of, nfc
 from .probe import ProbeError, probe
-from .scanner import RootUnavailable, scan
+from .scanner import RootUnavailable, resolve, scan
 from .tags import read_tags
 
 
@@ -43,12 +43,17 @@ def cmd_scan(a):
     if r.status != "complete":
         sys.exit(2)
     if a.hash:
-        cmd_hash(argparse.Namespace(db=a.db, root=a.path, workers=a.hash_workers, limit=None))
+        cmd_hash(argparse.Namespace(db=a.db, path=a.path, root=None, workers=a.hash_workers, limit=None))
 
 
 def cmd_hash(a):
     con = db.connect(a.db)
-    print(json.dumps(hashpass.run(con, _root_id(con, a.root), workers=a.workers, limit=a.limit,
+    target = a.path or a.root
+    root_id, sub = None, ""
+    if target:
+        root, sub = resolve(con, target)
+        root_id = _root_id(con, root)
+    print(json.dumps(hashpass.run(con, root_id, workers=a.workers, limit=a.limit, subpath=nfc(sub),
                                   progress=_progress("hashing")), indent=2))
 
 
@@ -95,7 +100,8 @@ def main(argv=None):
     ap.add_argument("--db", default=str(db.DEFAULT_DB), help="app database (default %(default)s)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    s = sub.add_parser("scan", help="inventory a folder (read-only)")
+    s = sub.add_parser("scan", help="inventory a folder (read-only); a folder inside a known root "
+                       "re-scans just that sub-folder")
     s.add_argument("path")
     s.add_argument("--workers", type=int, default=8)
     s.add_argument("--hash", action="store_true", help="also hash new/changed audio afterwards")
@@ -105,7 +111,9 @@ def main(argv=None):
     s.set_defaults(func=cmd_scan)
 
     h = sub.add_parser("hash", help="compute missing whole-file and audio hashes (resumable)")
-    h.add_argument("--root")
+    h.add_argument("path", nargs="?", help="folder to hash (a root or any folder inside one); "
+                   "default: everything not yet hashed")
+    h.add_argument("--root", help=argparse.SUPPRESS)
     h.add_argument("--workers", type=int, default=4)
     h.add_argument("--limit", type=int)
     h.set_defaults(func=cmd_hash)

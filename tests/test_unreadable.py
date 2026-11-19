@@ -77,3 +77,24 @@ def test_reprobe_errors_retries_unchanged_unreadable_files(library, con, monkeyp
     assert seen == []
     scan(con, library, reprobe_errors=True)
     assert seen == ["Broken/corrupt.mp3"]
+
+
+@pytest.mark.skipif(not APE_SAMPLE, reason="set MLT_APE_SAMPLE to an .ape file to run")
+def test_ape_named_mp3_is_read_hashed_as_pcm_and_flagged(tmp_path):
+    from mp3librarytool import hashpass
+    lib = tmp_path / "lib"
+    lib.mkdir()
+    p = _id3_prefixed_ape(tmp_path)
+    (lib / "actually ape.mp3").write_bytes(p.read_bytes())
+    c = db.connect(tmp_path / "w.sqlite")
+    scan(c, lib)
+    row = c.execute("SELECT codec, audio_offset FROM file").fetchone()
+    assert row["codec"] == "ape" and row["audio_offset"] > 0
+    assert [r["relpath"] for r in audit.run(c, "wrong_extension")] == ["actually ape.mp3"]
+    hashpass.run(c)
+    m, h = c.execute("SELECT audio_hash_method, audio_hash FROM file").fetchone()
+    assert m == "pcm" and h == audio_hash(APE_SAMPLE, ".ape")[0]
+
+
+def test_normal_mp3_with_id3_is_not_given_an_offset(library):
+    assert audio_offset(str(library / "Clean Album" / "01 - one.mp3"), ".mp3") == 0

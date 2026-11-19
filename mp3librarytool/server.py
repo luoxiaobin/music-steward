@@ -84,7 +84,12 @@ class App:
                 counts[d] = counts.get(d, 0) + 1
             else:
                 direct += 1
-        return {"path": path, "direct_audio": direct,
+        hashed = con.execute(
+            "SELECT count(*) FROM file WHERE root_id=? AND removed_at IS NULL AND kind='audio' "
+            "AND file_sha256 IS NOT NULL" + (" AND relpath >= ? AND relpath < ?" if prefix else ""),
+            args).fetchone()[0]
+        return {"path": path, "direct_audio": direct, "audio": direct + sum(counts.values()),
+                "hashed": hashed,
                 "folders": [{"name": k, "path": prefix + k, "audio": v}
                             for k, v in sorted(counts.items())]}
 
@@ -159,23 +164,36 @@ class App:
             return None
         return p
 
-    def start_scan(self, root: str) -> dict:
+    def start_job(self, kind: str, root: str, path: str = "") -> dict:
+        """Background scan or hash of a root or one of its sub-folders. One job at a time."""
+        root = os.path.abspath(root)
+        if root not in self.roots:
+            return {"error": "not a configured root"}
+        if path and (".." in path.split("/") or path.startswith("/")):
+            return {"error": "bad path"}
+        target = os.path.join(root, path) if path else root
+        if not os.path.realpath(target).startswith(os.path.realpath(root)):
+            return {"error": "bad path"}
         with self._lock:
             if self.scan_state.get("running"):
-                return {"error": "a scan is already running"}
-            if os.path.abspath(root) not in self.roots:
-                return {"error": "not a configured root"}
-            self.scan_state = {"running": True, "root": root, "done": 0, "total": None,
-                               "started": time.time()}
+                return {"error": f"a {self.scan_state.get('kind')} is already running"}
+            self.scan_state = {"running": True, "kind": kind, "root": root, "path": path,
+                               "done": 0, "total": None, "started": time.time()}
+
+        def prog(done, total):
+            self.scan_state.update(done=done, total=total)
 
         def work():
             con = self.con()
             try:
-                def prog(done, total):
-                    self.scan_state.update(done=done, total=total)
-                r = scan(con, root, progress=prog)
-                self.scan_state.update(running=False, result={"status": r.status, **r.counts,
-                                                              "abort_reason": r.abort_reason})
+                if kind == "scan":
+                    r = scan(con, target, progress=prog)
+                    res = {"status": r.status, **r.counts, "abort_reason": r.abort_reason}
+                else:
+                    from . import hashpass
+                    rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
+                    res = {"status": "complete", **hashpass.run(con, rid, subpath=nfc(path), progress=prog)}
+                self.scan_state.update(running=False, result=res, finished=time.time())
             except RootUnavailable as e:
                 self.scan_state.update(running=False, result={"status": "aborted", "abort_reason": str(e)})
             except Exception as e:  # pragma: no cover
@@ -184,6 +202,9 @@ class App:
                 con.close()
         threading.Thread(target=work, daemon=True).start()
         return {"started": True}
+
+    def start_scan(self, root: str, path: str = "") -> dict:  # kept for callers/tests
+        return self.start_job("scan", root, path)
 
 
 def make_handler(app: App, port_ref: dict):
@@ -274,8 +295,9 @@ def make_handler(app: App, port_ref: dict):
             u = urlparse(self.path)
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}")
-            if u.path == "/api/scan":
-                return self._json(app.start_scan(body.get("root", "")))
+            if u.path in ("/api/scan", "/api/hash"):
+                kind = u.path.rsplit("/", 1)[1]
+                return self._json(app.start_job(kind, body.get("root", ""), body.get("path", "")))
             return self._json({"error": "no such endpoint"}, 404)
 
         def _static(self, name):

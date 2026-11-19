@@ -100,19 +100,37 @@ PROPS = ("probe_status", "probe_error", "container", "codec", "duration", "durat
          "tag_format", "tags_json", "tag_issues_json")
 
 
+def resolve(con: sqlite3.Connection, path: str) -> tuple[str, str]:
+    """(root, subpath): a path inside an already-known root is scanned as a sub-folder
+    of that root, so its files keep their identity and nothing else is touched."""
+    p = os.path.abspath(path)
+    best = None
+    for (r,) in con.execute("SELECT path FROM root"):
+        if nfc(p) == r or nfc(p).startswith(r.rstrip("/") + "/"):
+            if best is None or len(r) > len(best):
+                best = r
+    if best is None or nfc(p) == best:
+        return p, ""
+    sub = p[len(best.rstrip("/")) + 1:] if nfc(p[:len(best)]) == best else os.path.relpath(p, best)
+    return best, sub.strip("/")
+
+
 def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=None,
          reprobe_errors: bool = False, _hooks: dict | None = None) -> ScanResult:
+    """Scan root_path. If it lies inside a known root, only that sub-folder is scanned
+    and only files under it can be marked removed."""
     hooks = _hooks or {}
     t0 = time.time()
-    root = os.path.abspath(root_path)
-    if not _root_ok(root):
-        raise RootUnavailable(f"root not available: {root}")
+    root, sub = resolve(con, root_path)
+    if not _root_ok(root) or (sub and not os.path.isdir(os.path.join(root, sub))):
+        raise RootUnavailable(f"not available: {os.path.join(root, sub)}")
     root_id = _ensure_root(con, root)
+    subkey = nfc(sub)
     # a previous scan killed mid-way (Ctrl-C, crash) never reached 'complete'
     con.execute("UPDATE scan SET status='interrupted', finished_at=? WHERE root_id=? AND status='running'",
                 (t0, root_id))
-    scan_id = con.execute("INSERT INTO scan(root_id, started_at, status) VALUES(?,?, 'running')",
-                          (root_id, t0)).lastrowid
+    scan_id = con.execute("INSERT INTO scan(root_id, started_at, status, subpath) VALUES(?,?, 'running', ?)",
+                          (root_id, t0, subkey)).lastrowid
     con.commit()
     c = dict(n_files=0, n_new=0, n_changed=0, n_unchanged=0, n_removed=0, n_vanished=0,
              n_probe_errors=0, n_dir_errors=0)
@@ -124,13 +142,17 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
         con.commit()
         return ScanResult(scan_id, root_id, "aborted", c, reason, time.time() - t0)
 
+    def in_scope(rel: str) -> bool:
+        return not subkey or rel.startswith(subkey + "/")
+
     known = {r["relpath"]: r for r in con.execute(
-        "SELECT id, relpath, size, mtime_ns, removed_at, probe_status FROM file WHERE root_id=?", (root_id,))}
+        "SELECT id, relpath, size, mtime_ns, removed_at, probe_status FROM file WHERE root_id=?", (root_id,))
+        if in_scope(r["relpath"])}
 
     # ---- 1. walk (listing only) ------------------------------------------
     found: list[_Found] = []
     failed_dirs: list[str] = []
-    stack = [""]
+    stack = [sub]
     while stack:
         d = stack.pop()
         try:
@@ -259,7 +281,11 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
     now = time.time()
     con.executemany("UPDATE file SET removed_at=? WHERE id=?", [(now, i) for i in gone])
     c["n_removed"] = len(gone)
-    con.execute("DELETE FROM dir_note WHERE root_id=? AND last_scan<>?", (root_id, scan_id))
+    for (rel,) in con.execute("SELECT relpath FROM dir_note WHERE root_id=? AND last_scan<>?",
+                              (root_id, scan_id)).fetchall():
+        if rel == subkey or in_scope(rel):
+            con.execute("DELETE FROM dir_note WHERE root_id=? AND relpath=? AND last_scan<>?",
+                        (root_id, rel, scan_id))
     c["n_files"] = len(seen)
     con.execute("UPDATE scan SET status='complete', finished_at=?, " +
                 ", ".join(f"{k}=?" for k in c) + " WHERE id=?",

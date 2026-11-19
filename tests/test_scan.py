@@ -243,3 +243,41 @@ def test_stale_running_scan_is_marked_interrupted(library, con):
     con.commit()
     scan(con, library)
     assert con.execute("SELECT status FROM scan WHERE id=1").fetchone()[0] == "interrupted"
+
+
+def test_subfolder_scan_touches_only_that_folder(library, con):
+    scan(con, library)
+    (library / "Untagged" / "x.flac").unlink()          # outside the sub-folder
+    (library / "Dupes" / "copy.mp3").unlink()           # inside it
+    r = scan(con, library / "Dupes")
+    assert r.status == "complete"
+    roots = [x["path"] for x in con.execute("SELECT path FROM root")]
+    assert len(roots) == 1                              # no second root created
+    assert [x["relpath"] for x in audit.run(con, "removed")] == ["Dupes/copy.mp3"]
+    assert r.counts["n_files"] == 1                     # only Dupes/retagged.mp3 remains in scope
+    sub = con.execute("SELECT subpath FROM scan ORDER BY id DESC LIMIT 1").fetchone()[0]
+    assert sub == "Dupes"
+
+
+def test_subfolder_scan_finds_new_files_there(library, con):
+    scan(con, library)
+    shutil.copy2(library / "Untagged" / "x.flac", library / "Dupes" / "new.flac")
+    r = scan(con, library / "Dupes")
+    assert r.counts["n_new"] == 1 and "Dupes/new.flac" in files(con)
+
+
+def test_hash_only_a_subfolder(library, con):
+    scan(con, library)
+    c = hashpass.run(con, subpath="Dupes")
+    assert c["hashed"] == 2 and c["remaining"] == 0
+    hashed = {r["relpath"] for r in con.execute("SELECT relpath FROM file WHERE file_sha256 IS NOT NULL")}
+    assert hashed == {"Dupes/copy.mp3", "Dupes/retagged.mp3"}
+
+
+def test_cli_hash_accepts_a_folder_path(library, tmp_path, capsys):
+    from mp3librarytool import cli
+    dbp = str(tmp_path / "cli.sqlite")
+    cli.main(["--db", dbp, "scan", str(library)])
+    cli.main(["--db", dbp, "hash", str(library / "Dupes")])
+    out = capsys.readouterr().out
+    assert '"hashed": 2' in out

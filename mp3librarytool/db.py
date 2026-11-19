@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS scan(
     root_id INTEGER NOT NULL REFERENCES root(id),
     started_at REAL NOT NULL,
     finished_at REAL,
-    status TEXT NOT NULL,               -- running | complete | aborted
+    status TEXT NOT NULL,               -- running | complete | aborted | interrupted
+    subpath TEXT,                       -- '' = whole root, else the sub-folder scanned
     abort_reason TEXT,
     n_files INTEGER DEFAULT 0, n_new INTEGER DEFAULT 0, n_changed INTEGER DEFAULT 0,
     n_unchanged INTEGER DEFAULT 0, n_removed INTEGER DEFAULT 0, n_vanished INTEGER DEFAULT 0,
@@ -67,7 +68,8 @@ CREATE TABLE IF NOT EXISTS dir_note(
 """
 
 
-ADDED_COLUMNS = [("audio_offset", "INTEGER"), ("content_note", "TEXT")]
+ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "TEXT"),
+                 ("scan", "subpath", "TEXT")]
 
 
 def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
@@ -78,10 +80,9 @@ def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA foreign_keys=ON")
     con.executescript(SCHEMA)
-    have = {r[1] for r in con.execute("PRAGMA table_info(file)")}
-    for col, typ in ADDED_COLUMNS:
-        if col not in have:
-            con.execute(f"ALTER TABLE file ADD COLUMN {col} {typ}")
+    for table, col, typ in ADDED_COLUMNS:
+        if col not in {r[1] for r in con.execute(f"PRAGMA table_info({table})")}:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
     con.execute("INSERT OR IGNORE INTO meta VALUES('schema_version', ?)", (str(SCHEMA_VERSION),))
     con.commit()
     return con

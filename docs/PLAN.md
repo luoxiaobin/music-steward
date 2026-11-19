@@ -13,7 +13,7 @@ Living plan. Sources: the Architecture Assessment and M0 Experiments specs (Nov 
 | | Delivers | Status |
 |---|---|---|
 | **M0** Experiments | beets as a library; safe copy/tag on the NAS | ✅ done — `m0/EVIDENCE_REPORT.md` |
-| **M1** Inventory and audit | `scan` / `hash` / `audit` / `inspect`; incremental, crash-safe, read-only | 🔄 code done; full NAS scan + re-scan check in progress |
+| **M1** Inventory and audit | `scan` / `hash` / `audit` / `inspect`; incremental, crash-safe, read-only; folder-level scan and hash | ✅ done — full NAS inventory in the app DB |
 | **M2** Recognition and review | background matching queue; review UI; destination preview; conflicts; **desktop window (pywebview)** | 🔄 read-only UI done |
 | **M3** Apply, verify, recover | saved plans; copy → tag → verify → publish; journal; resume; undo | protocol proven in M0 |
 | **M4** Apple export | FLAC/APE → ALAC tree for iPhone; MP3 copied | later |
@@ -36,7 +36,25 @@ Living plan. Sources: the Architecture Assessment and M0 Experiments specs (Nov 
 | 2026-11-18 | NAS publish method: `claim_rename` (O_EXCL placeholder, then rename); local disk keeps `RENAME_EXCL` | `m0/EVIDENCE_REPORT.md` §6.7 |
 | 2026-11-18 | Desktop shell: pywebview at the end of M2; not Electron | [ADR 0001](adr/0001-desktop-shell-pywebview.md) |
 | 2026-11-18 | License GPL-3.0-or-later | `LICENSE` |
+| 2026-11-18 | **No whole-NAS hashing.** Hash per selected folder (CLI `hash <folder>`, UI "Hash folder"); re-scan per folder too | this file |
 
-## Scale (measured)
+## Scale (measured on the NAS, 2026-11-18)
 
-* NAS share: **~157,000 files** (assessment assumed ~2,000) — targets in the assessment must be re-set once the M1 NAS scan completes.
+| | |
+|---|---|
+| Files / audio files | 156,763 / 142,148 |
+| Audio size | ~3.0 TB |
+| Codecs | MP3 71k · FLAC 66k · APE 2.8k · WMA 1.1k · MP2 0.7k · DTS 86 · WAV 46 |
+| Garbled (legacy-encoded) tags | 43,488 files — mostly MP3 (42k of 72k) |
+| Missing title / artist / album | 34,609 |
+| Folders named like files · cue sheets · lyrics | 3,464 · 2,483 · 3,964 |
+| Unreadable | 21 (was 227: 206 APE files with an ID3 prefix or a `.mp3` name recovered) |
+| Wrong extension | 89 (58 `.ape` that are MP2, 22 `.mp3` that are APE, 6 VCD videos, …) |
+
+| Operation | Measured | Assessment target | Consequence |
+|---|---|---|---|
+| First full scan (header reads) | 75 min @ ~46 files/s, 24 workers | < 15 min | one-off; acceptable |
+| Re-scan of whole share, nothing changed | **13.4 min** (listing ~10k folders over SMB) | < 1 min | **re-scan per folder** instead |
+| Re-scan of one large folder (音乐Ape, 6.9k files) | 75 s | — | the normal workflow |
+| Hashing everything | ~3 TB ⇒ ≥ 8–9 h over gigabit | — | **per folder only** (decision above) |
+| Recognition of everything | MusicBrainz ~1 req/s ⇒ days | < 1 h | recognize per selection; long jobs resumable |
