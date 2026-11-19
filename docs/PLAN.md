@@ -138,6 +138,8 @@ Cyrillic) on demand → Apple export (M4) → native phone apps only if a store 
 
 | Date | Decision | Record |
 |---|---|---|
+| 2026-11-19 | **Names in the copies are written in Simplified Chinese** (artist, album artist, album; also cue track performers), so one artist never lands in two folders (鄧麗君 / 邓丽君). Track titles keep their spelling; the user's own edits are kept as typed. `MLT_SCRIPT=traditional|keep` changes it | this file |
+| 2026-11-19 | **Original release year** for folder names and tags (MusicBrainz first release, Discogs master), else the matched release's year; an edited year wins | this file |
 | 2026-11-18 | NAS publish method: `claim_rename` (O_EXCL placeholder, then rename); local disk keeps `RENAME_EXCL` | `m0/EVIDENCE_REPORT.md` §6.7 |
 | 2026-11-18 | Desktop shell: pywebview at the end of M2; not Electron | [ADR 0001](adr/0001-desktop-shell-pywebview.md) |
 | 2026-11-18 | License GPL-3.0-or-later | `LICENSE` |

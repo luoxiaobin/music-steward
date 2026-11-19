@@ -232,6 +232,7 @@ def match_album(paths: list[str], acoustid_key: str | None, search: dict | None 
         cands.append({
             "rank": rank, "source": info.data_source, "album_id": info.album_id,
             "album": info.album, "artist": info.artist, "year": info.year, "country": info.country,
+                "original_year": getattr(info, "original_year", None),
             "label": info.label, "media": info.media, "mediums": info.mediums,
             "distance": float(c.distance.distance),
             "penalties": sorted((k, round(float(v), 6)) for k, v in c.distance.items() if v),
@@ -364,6 +365,7 @@ def match_cue(audio_path: str, album: dict, tracks: list[dict], acoustid_key: st
             cands.append({
                 "rank": rank, "source": info.data_source, "album_id": info.album_id,
                 "album": info.album, "artist": info.artist, "year": info.year, "country": info.country,
+                "original_year": getattr(info, "original_year", None),
                 "label": info.label, "media": info.media, "mediums": info.mediums,
                 "distance": float(c.distance.distance),
                 "penalties": sorted((k, round(float(v), 6)) for k, v in c.distance.items() if v),

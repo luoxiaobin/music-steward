@@ -73,12 +73,12 @@ def run_unit(db_path: str, unit_id: int) -> int:
             cid = con.execute(
                 "INSERT INTO candidate(unit_id, rank, source, album_id, album, artist, year, country, label, "
                 "media, mediums, distance, penalties_json, extra_items_json, extra_tracks_json, "
-                "fingerprint_agrees, n_mapped) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "fingerprint_agrees, n_mapped, original_year) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (unit_id, c["rank"], c["source"], c["album_id"], c["album"], c["artist"], c["year"],
                  c["country"], c["label"], c["media"], c["mediums"], c["distance"],
                  json.dumps(c["penalties"]), json.dumps([id_of.get(p) for p in c["extra_items"]]),
                  json.dumps(c["extra_tracks"], ensure_ascii=False), c["fingerprint_agrees"],
-                 c["n_mapped"])).lastrowid
+                 c["n_mapped"], c.get("original_year"))).lastrowid
             for t in c["tracks"]:
                 if "cue_track" in t:
                     con.execute("INSERT INTO cand_cue_track VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",

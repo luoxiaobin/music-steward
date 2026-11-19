@@ -259,7 +259,7 @@ async function renderUnits(where) {
                          onclick: () => selectUnit(u.id, tr), onkeydown: e => { if (e.key === "Enter") selectUnit(u.id, tr); } },
       h("td", {}, h("div", { class: "strong" }, u.label), h("div", { class: "sub mono" }, (u.folder || ".") + "/")),
       h("td", {}, u.kind === "track" ? "track" : u.kind === "cue" ? `${u.n_tracks || "?"} (cue)` : u.n_files),
-      h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${t.year || "?"}${t.country ? " · " + t.country : ""}`),
+      h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${yearText(t)}${t.country ? " · " + t.country : ""}`),
                        h("div", { class: "sub" }, `${t.artist} · distance ${t.distance.toFixed(2)} · fingerprints ${t.fingerprint_agrees}/${u.n_tracks || u.n_files}` +
                          (u.evidence && u.evidence.disc_of_set ? ` · disc ${u.evidence.disc} of ${t.mediums}` : ""))]
                     : h("span", { class: "muted" }, u.status === "error" ? "error" : u.status === "done" ? "no candidates" : "—"),
@@ -280,6 +280,8 @@ async function selectUnit(id, tr) {
   S.unitChoice = sel;
   renderUnitDetail(d);
 }
+const effYear = c => (c.original_year && (!c.year || c.original_year < c.year)) ? c.original_year : c.year;
+const yearText = c => effYear(c) && effYear(c) !== c.year ? `${effYear(c)} (this release ${c.year})` : (c.year || "?");
 const online = cands => cands.filter(c => c.source !== "Local");
 function renderUnitDetail(d) {
   const cands = d.candidates;
@@ -306,7 +308,7 @@ function renderUnitDetail(d) {
       h("input", { type: "radio", name: "cand", checked: c.id === chosen?.id,
                    onchange: () => { S.unitChoice = c.id; renderUnitDetail(d); } }),
       h("span", { style: "flex:1" },
-        h("span", { class: "strong" }, `${c.album || c.tracks[0]?.title || "?"} · ${c.year || "?"}${c.country ? " · " + c.country : ""}` +
+        h("span", { class: "strong" }, `${c.album || c.tracks[0]?.title || "?"} · ${yearText(c)}${c.country ? " · " + c.country : ""}` +
           (c.media ? ` · ${c.mediums > 1 ? c.mediums + "×" : ""}${c.media}` : "")),
         h("br"), h("span", { class: "ev" }, `${c.artist} · ${c.label || ""}`), h("br"),
         h("span", { class: "ev" }, `distance ${c.distance.toFixed(2)} · `,
@@ -357,7 +359,7 @@ function renderUnitDetail(d) {
       h("table", { class: "kv" }, h("tbody", {},
         h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-album" }, "Album")), h("td", {}, inp("e-album", ov.album, chosen.album))),
         h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-aa" }, "Album artist")), h("td", {}, inp("e-aa", ov.albumartist, chosen.artist))),
-        h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-year" }, "Year")), h("td", {}, inp("e-year", ov.year, chosen.year, "8em"))),
+        h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-year" }, "Year")), h("td", {}, inp("e-year", ov.year, effYear(chosen), "8em"))),
         h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-disc" }, "Disc")),
           h("td", {}, inp("e-disc", ov.disc, media.length === 1 ? media[0] : "", "5em"), " of ",
             inp("e-discs", ov.discs, chosen.mediums > 1 ? chosen.mediums : "", "5em"),

@@ -54,7 +54,7 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
                            "mb_albumid": c["album_id"] if is_mb else None}})
     sheet = cuemod.parse(os.path.join(root_path, cf["fs_relpath"]))
     tracks = {str(t["cue_track"]): {"title": (cue_titles or {}).get(str(t["cue_track"])) or t["title"],
-                                    "performer": t["artist"] or c["artist"]}
+                                    "performer": _script(t["artist"], c.get("_script", "keep")) or c["artist"]}
               for t in con.execute("SELECT * FROM cand_cue_track WHERE candidate_id=?", (c["id"],))}
     items.append({"unit_id": u["id"], "file_id": cf["id"], "kind": "cue",
                   "src": os.path.join(root_path, cf["fs_relpath"]), "dest_rel": f"{adir}/{stem}.cue",
@@ -63,6 +63,20 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
                                            "album": {"title": c["album"], "performer": c["artist"]},
                                            "tracks": tracks}}})
     new_stem_of[f["relpath"].rsplit(".", 1)[0]] = f"{adir}/{stem}"
+
+
+def script_rule() -> str:
+    """How names are written in the copies (user decision 2026-11-19: Simplified, so one artist
+    never ends up in two folders, 鄧麗君 / 邓丽君). MLT_SCRIPT=traditional|keep to change it."""
+    v = os.environ.get("MLT_SCRIPT", "simplified").lower()
+    return v if v in ("simplified", "traditional", "keep") else "simplified"
+
+
+def _script(s, rule):
+    if not s or rule == "keep":
+        return s
+    from ..chinese import to_simplified, to_traditional
+    return to_simplified(s) if rule == "simplified" else to_traditional(s)
 
 
 class PlanError(Exception):
@@ -95,6 +109,14 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
         c = dict(con.execute("SELECT * FROM candidate WHERE id=?", (u["candidate_id"],)).fetchone())
         tracks = {t["file_id"]: dict(t) for t in con.execute("SELECT * FROM cand_track WHERE candidate_id=?", (c["id"],))}
         ov = json.loads(u["overrides_json"] or "{}")
+        # the album's first release year, not a reissue's (user decision 2026-11-19)
+        if c.get("original_year") and (not c["year"] or c["original_year"] < c["year"]):
+            c["year"] = c["original_year"]
+        rule = script_rule()   # catalogue/own-info names only; the user's own edits stay as typed
+        c["album"], c["artist"] = _script(c["album"], rule), _script(c["artist"], rule)
+        c["_script"] = rule
+        for t in tracks.values():
+            t["artist"] = _script(t["artist"], rule)
         for k_from, k_to in (("album", "album"), ("albumartist", "artist"), ("year", "year")):
             if ov.get(k_from) not in (None, ""):
                 c[k_to] = int(ov[k_from]) if k_from == "year" else ov[k_from]
@@ -177,7 +199,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                "duplicate_images_skipped": dropped,
                "blocked": sum(i["status"] != "ok" for i in items),
                "bytes": sum(i["size"] for i in items if i["status"] == "ok"),
-               "albums": len({i["unit_id"] for i in items})}
+               "albums": len({i["unit_id"] for i in items}), "script": script_rule()}
     pid = con.execute("INSERT INTO plan(created_at, dest_root, root_id, scope, summary_json) VALUES(?,?,?,?,?)",
                       (time.time(), str(dest), root_id, scope, json.dumps(summary))).lastrowid
     con.executemany("INSERT INTO plan_item VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",

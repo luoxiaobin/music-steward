@@ -157,7 +157,7 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
                  ("decision", "release_key", "TEXT"), ("unit", "notice", "TEXT"),
                  ("unit", "search_json", "TEXT"), ("decision", "overrides_json", "TEXT"),
                  ("unit", "cue_file_id", "INTEGER"), ("unit", "n_tracks", "INTEGER"),
-                 ("candidate", "origin_json", "TEXT")]
+                 ("candidate", "origin_json", "TEXT"), ("candidate", "original_year", "INTEGER")]
 
 
 def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:

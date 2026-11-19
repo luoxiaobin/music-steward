@@ -52,8 +52,9 @@ def test_untagged_album_from_file_and_folder_names(untagged, con, tmp_path):
     con.commit()
     p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
     audio = sorted(i["dest_rel"] for i in p["items"] if i["kind"] == "audio")
-    assert audio == ["林子祥/誰能明白我 (1985)/01 - 誰能明白我.mp3", "林子祥/誰能明白我 (1985)/02 - 莫再悲.mp3",
-                     "林子祥/誰能明白我 (1985)/03 - 敢愛敢做.mp3"]
+    # names in Simplified (the user's rule); track titles as found
+    assert audio == ["林子祥/谁能明白我 (1985)/01 - 誰能明白我.mp3", "林子祥/谁能明白我 (1985)/02 - 莫再悲.mp3",
+                     "林子祥/谁能明白我 (1985)/03 - 敢愛敢做.mp3"]
     assert all(i["tags"]["mb_albumid"] is None and i["tags"]["mb_trackid"] is None for i in p["items"])
 
 

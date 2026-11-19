@@ -60,3 +60,37 @@ def test_edits_change_plan_tags_and_paths(accepted, con):
     assert it["tags"]["title"] == "夜航 (Live)" and it["tags"]["album"] == "夜航 (重制版)" and it["tags"]["date"] == 2011
     other = next(i for f, i in by_file.items() if f != fid)
     assert other["tags"]["title"] == "序曲"                 # untouched track keeps the release title
+
+
+def test_original_year_is_used_and_an_edit_still_wins(accepted, con):
+    lib, dest = accepted
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    cid = con.execute("SELECT candidate_id FROM decision WHERE unit_id=?", (uid,)).fetchone()[0]
+    year = con.execute("SELECT year FROM candidate WHERE id=?", (cid,)).fetchone()[0]
+    con.execute("UPDATE candidate SET original_year=? WHERE id=?", (year - 20, cid))   # matched a reissue
+    con.commit()
+    p = plan.load(con, plan.build(con, str(dest), 1))
+    it = next(i for i in p["items"] if i["kind"] == "audio")
+    assert f"({year - 20})" in it["dest_rel"] and it["tags"]["date"] == year - 20
+    con.execute("UPDATE decision SET overrides_json=? WHERE unit_id=?", (json.dumps({"year": 1999}), uid))
+    con.commit()
+    p = plan.load(con, plan.build(con, str(dest) + "2", 1))
+    assert "(1999)" in next(i for i in p["items"] if i["kind"] == "audio")["dest_rel"]
+
+
+def test_names_written_in_simplified_unless_the_user_typed_them(accepted, con, monkeypatch):
+    lib, dest = accepted
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    cid = con.execute("SELECT candidate_id FROM decision WHERE unit_id=?", (uid,)).fetchone()[0]
+    con.execute("UPDATE candidate SET artist='鄧麗君', album='勢不兩立' WHERE id=?", (cid,))
+    con.commit()
+    it = next(i for i in plan.load(con, plan.build(con, str(dest), 1))["items"] if i["kind"] == "audio")
+    assert it["dest_rel"].startswith("邓丽君/势不两立") and it["tags"]["albumartist"] == "邓丽君"
+    monkeypatch.setenv("MLT_SCRIPT", "keep")
+    it = next(i for i in plan.load(con, plan.build(con, str(dest) + "2", 1))["items"] if i["kind"] == "audio")
+    assert it["dest_rel"].startswith("鄧麗君/勢不兩立")
+    monkeypatch.delenv("MLT_SCRIPT")
+    con.execute("UPDATE decision SET overrides_json=? WHERE unit_id=?", (json.dumps({"albumartist": "鄧麗君"}), uid))
+    con.commit()
+    it = next(i for i in plan.load(con, plan.build(con, str(dest) + "3", 1))["items"] if i["kind"] == "audio")
+    assert it["dest_rel"].startswith("鄧麗君/势不两立")         # typed by the user: kept as typed
