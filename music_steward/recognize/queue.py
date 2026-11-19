@@ -33,7 +33,7 @@ def run(db_path: str, unit_ids: list[int], progress=None, stop: threading.Event 
         if stop is not None and stop.is_set():
             break
         try:
-            r = subprocess.run([sys.executable, "-I", "-m", "mp3librarytool.recognize.worker",
+            r = subprocess.run([sys.executable, "-I", "-m", "music_steward.recognize.worker",
                                 "--db", str(db_path), "--unit", str(uid)],
                                capture_output=True, timeout=UNIT_TIMEOUT)
             c["done" if r.returncode == 0 else "errors"] += 1

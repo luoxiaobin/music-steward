@@ -5,7 +5,27 @@ import os
 import sqlite3
 from pathlib import Path
 
-DEFAULT_DB = Path(os.environ.get("MLT_DB", Path.home() / ".mp3librarytool" / "library.sqlite"))
+APP_DIR = Path.home() / ".music-steward"
+OLD_APP_DIR = Path.home() / ".mp3librarytool"   # name until 2026-11-19
+DEFAULT_DB = Path(os.environ.get("MLT_DB", APP_DIR / "library.sqlite"))
+
+
+def migrate_app_dir() -> bool:
+    """Move ~/.mp3librarytool to ~/.music-steward once, and rewrite the journal paths that
+    past runs recorded, so Undo / Resume of old runs keep working."""
+    if not OLD_APP_DIR.exists() or APP_DIR.exists():
+        return False
+    OLD_APP_DIR.rename(APP_DIR)
+    dbp = APP_DIR / "library.sqlite"
+    if dbp.exists():
+        con = sqlite3.connect(dbp)
+        try:
+            con.execute("UPDATE run SET journal = replace(journal, ?, ?)", (str(OLD_APP_DIR), str(APP_DIR)))
+            con.commit()
+        except sqlite3.OperationalError:
+            pass  # no run table yet
+        con.close()
+    return True
 
 SCHEMA_VERSION = 1
 SCHEMA = """
@@ -132,6 +152,8 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
 
 def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
     path = Path(path)
+    if path == DEFAULT_DB:
+        migrate_app_dir()
     path.parent.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(path, timeout=30)
     con.row_factory = sqlite3.Row
@@ -141,6 +163,10 @@ def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
     for table, col, typ in ADDED_COLUMNS:
         if col not in {r[1] for r in con.execute(f"PRAGMA table_info({table})")}:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+    # runs recorded before the rename point at journals under the old folder
+    if not OLD_APP_DIR.exists() and APP_DIR.exists():
+        con.execute("UPDATE run SET journal = replace(journal, ?, ?) WHERE journal LIKE ?",
+                    (str(OLD_APP_DIR), str(APP_DIR), str(OLD_APP_DIR) + "%"))
     con.execute("INSERT OR IGNORE INTO meta VALUES('schema_version', ?)", (str(SCHEMA_VERSION),))
     con.commit()
     return con

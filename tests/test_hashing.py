@@ -3,7 +3,7 @@ import shutil
 
 import pytest
 
-from mp3librarytool.hashing import audio_hash, audio_hash_method
+from music_steward.hashing import audio_hash, audio_hash_method
 
 from .conftest import APE_SAMPLE, needs_ffmpeg, tone
 

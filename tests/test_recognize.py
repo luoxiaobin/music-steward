@@ -4,8 +4,8 @@ import shutil
 
 import pytest
 
-from mp3librarytool.recognize import results, units, worker
-from mp3librarytool.scanner import scan
+from music_steward.recognize import results, units, worker
+from music_steward.scanner import scan
 
 from .conftest import needs_ffmpeg, tag_id3, tone
 
@@ -73,7 +73,7 @@ def fake_album(paths, key, search=None):
 def test_worker_persists_candidates_and_mapping(music, con, tmp_path, monkeypatch):
     scan(con, music)
     units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"])
-    from mp3librarytool.recognize import beets_adapter
+    from music_steward.recognize import beets_adapter
     monkeypatch.setattr(beets_adapter, "match_album", fake_album)
     uid = con.execute("SELECT id FROM unit").fetchone()[0]
     dbp = con.execute("PRAGMA database_list").fetchone()[2]
@@ -87,7 +87,7 @@ def test_worker_persists_candidates_and_mapping(music, con, tmp_path, monkeypatc
 def test_worker_records_errors(music, con, monkeypatch):
     scan(con, music)
     units.enqueue(con, 1, units.plan_units(con, 1)[:1])
-    from mp3librarytool.recognize import beets_adapter
+    from music_steward.recognize import beets_adapter
 
     def boom(paths, key, search=None):
         raise RuntimeError("musicbrainz is down")
@@ -109,7 +109,7 @@ def test_confidence_rule(dist, fp, n, expect):
 
 
 def test_garbled_tags_are_repaired_in_memory_only(tmp_path):
-    from mp3librarytool.recognize import beets_adapter as A
+    from music_steward.recognize import beets_adapter as A
     from beets.library import Item
     p = tone(tmp_path / "g.mp3", ["-c:a", "libmp3lame"], secs=1)
     tag_id3(p, "人海中一個你".encode("gbk").decode("latin-1"), artist="林子祥".encode("gbk").decode("latin-1"),
@@ -122,7 +122,7 @@ def test_garbled_tags_are_repaired_in_memory_only(tmp_path):
 
 
 def test_clean_tags_are_not_touched(tmp_path):
-    from mp3librarytool.recognize import beets_adapter as A
+    from music_steward.recognize import beets_adapter as A
     from beets.library import Item
     p = tone(tmp_path / "c.mp3", ["-c:a", "libmp3lame"], secs=1)
     tag_id3(p, "Motörhead", artist="Björk")
@@ -131,7 +131,7 @@ def test_clean_tags_are_not_touched(tmp_path):
 
 
 def _accept_top(con, uid):
-    from mp3librarytool.recognize.results import release_key
+    from music_steward.recognize.results import release_key
     cid = con.execute("SELECT id FROM candidate WHERE unit_id=? AND rank=0", (uid,)).fetchone()[0]
     con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
                 "VALUES(?, 'accept', ?, 0, ?)", (uid, cid, release_key(con, cid)))
@@ -141,7 +141,7 @@ def _accept_top(con, uid):
 def test_accept_survives_rematch_when_release_still_there(music, con, monkeypatch):
     scan(con, music)
     units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"])
-    from mp3librarytool.recognize import beets_adapter
+    from music_steward.recognize import beets_adapter
     monkeypatch.setattr(beets_adapter, "match_album", fake_album)
     uid = con.execute("SELECT id FROM unit").fetchone()[0]
     dbp = con.execute("PRAGMA database_list").fetchone()[2]
@@ -165,7 +165,7 @@ def test_accept_survives_rematch_when_release_still_there(music, con, monkeypatc
 def test_accept_dropped_with_notice_when_release_gone(music, con, monkeypatch):
     scan(con, music)
     units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"])
-    from mp3librarytool.recognize import beets_adapter
+    from music_steward.recognize import beets_adapter
     monkeypatch.setattr(beets_adapter, "match_album", fake_album)
     uid = con.execute("SELECT id FROM unit").fetchone()[0]
     dbp = con.execute("PRAGMA database_list").fetchone()[2]
@@ -187,7 +187,7 @@ def test_accept_dropped_with_notice_when_release_gone(music, con, monkeypatch):
 def test_skip_survives_rematch(music, con, monkeypatch):
     scan(con, music)
     units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"])
-    from mp3librarytool.recognize import beets_adapter
+    from music_steward.recognize import beets_adapter
     monkeypatch.setattr(beets_adapter, "match_album", fake_album)
     uid = con.execute("SELECT id FROM unit").fetchone()[0]
     dbp = con.execute("PRAGMA database_list").fetchone()[2]
@@ -200,7 +200,7 @@ def test_skip_survives_rematch(music, con, monkeypatch):
 
 
 def test_fingerprint_confirmed_candidate_wins_a_distance_tie():
-    from mp3librarytool.recognize.beets_adapter import _rerank
+    from music_steward.recognize.beets_adapter import _rerank
     cands = [{"rank": 0, "source": "Discogs", "distance": 0.170, "fingerprint_agrees": 0},
              {"rank": 1, "source": "MusicBrainz", "distance": 0.172, "fingerprint_agrees": 25},
              {"rank": 2, "source": "MusicBrainz", "distance": 0.60, "fingerprint_agrees": 25}]

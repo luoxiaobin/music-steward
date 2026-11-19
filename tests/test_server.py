@@ -6,8 +6,8 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from mp3librarytool.scanner import scan
-from mp3librarytool.server import App, make_handler
+from music_steward.scanner import scan
+from music_steward.server import App, make_handler
 
 from .conftest import needs_ffmpeg
 
@@ -17,7 +17,7 @@ pytestmark = needs_ffmpeg
 @pytest.fixture
 def server(library, tmp_path):
     dbp = tmp_path / "srv.sqlite"
-    from mp3librarytool import db
+    from music_steward import db
     c = db.connect(dbp)
     scan(c, library)
     c.close()
@@ -95,7 +95,7 @@ def test_static_cannot_escape_web_dir(server):
 def test_decisions_are_validated_and_saved(server):
     app, port = server
     ck = login(app, port)
-    from mp3librarytool import db as dbm
+    from music_steward import db as dbm
     c = dbm.connect(app.db_path)
     c.execute("INSERT INTO unit(root_id, folder, label, kind, key, file_ids, status) "
               "VALUES(1,'Clean Album','Album','album','album:Clean Album','[1]','done')")
@@ -129,7 +129,7 @@ def test_plan_api_refuses_destination_inside_root(server, library):
 def test_edit_requires_accept_and_validates(server):
     app, port = server
     ck = login(app, port)
-    from mp3librarytool import db as dbm
+    from music_steward import db as dbm
     c = dbm.connect(app.db_path)
     c.execute("INSERT INTO unit(root_id, folder, label, kind, key, file_ids, status) "
               "VALUES(1,'A','A','album','album:A','[1,2]','done')")

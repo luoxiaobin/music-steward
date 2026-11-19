@@ -7,10 +7,10 @@ import subprocess
 
 import pytest
 
-from mp3librarytool import audit, db
-from mp3librarytool.hashing import audio_hash
-from mp3librarytool.probe import ProbeError, audio_offset, probe
-from mp3librarytool.scanner import scan
+from music_steward import audit, db
+from music_steward.hashing import audio_hash
+from music_steward.probe import ProbeError, audio_offset, probe
+from music_steward.scanner import scan
 
 from .conftest import APE_SAMPLE, needs_ffmpeg
 
@@ -69,7 +69,7 @@ def test_old_database_gets_new_columns(tmp_path):
 
 def test_reprobe_errors_retries_unchanged_unreadable_files(library, con, monkeypatch):
     scan(con, library)
-    from mp3librarytool import scanner as sm
+    from music_steward import scanner as sm
     seen = []
     real = sm._analyze
     monkeypatch.setattr(sm, "_analyze", lambda root, item: seen.append(item.rel) or real(root, item))
@@ -81,7 +81,7 @@ def test_reprobe_errors_retries_unchanged_unreadable_files(library, con, monkeyp
 
 @pytest.mark.skipif(not APE_SAMPLE, reason="set MLT_APE_SAMPLE to an .ape file to run")
 def test_ape_named_mp3_is_read_hashed_as_pcm_and_flagged(tmp_path):
-    from mp3librarytool import hashpass
+    from music_steward import hashpass
     lib = tmp_path / "lib"
     lib.mkdir()
     p = _id3_prefixed_ape(tmp_path)

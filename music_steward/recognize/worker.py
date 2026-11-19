@@ -1,4 +1,4 @@
-"""Match ONE unit in a fresh process: python -m mp3librarytool.recognize.worker --db X --unit N
+"""Match ONE unit in a fresh process: python -m music_steward.recognize.worker --db X --unit N
 
 A new process per unit is the strongest isolation from beets' process-global state
 (M0 finding F1). Writes results straight into the app DB.

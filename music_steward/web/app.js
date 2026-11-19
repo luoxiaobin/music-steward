@@ -1,4 +1,4 @@
-// MP3LibraryTool UI — read-only inventory browser (M1/M2 groundwork).
+// Music Steward UI — read-only inventory browser (M1/M2 groundwork).
 // All DOM is built with textContent; nothing from the collection is ever parsed as HTML.
 "use strict";
 
@@ -431,7 +431,7 @@ async function selectFile(f, tr) {
     d.file_sha256 ? h("table", { class: "kv" }, h("tbody", {},
       h("tr", {}, h("td", { class: "muted" }, "File"), h("td", { class: "mono" }, d.file_sha256.slice(0, 16) + "…")),
       h("tr", {}, h("td", { class: "muted" }, `Audio (${d.audio_hash_method})`), h("td", { class: "mono" }, d.audio_hash.slice(0, 16) + "…"))))
-    : h("p", { class: "muted small" }, d.hash_error ? "Hash error: " + d.hash_error : "Not hashed yet (run `mp3librarytool hash`)."),
+    : h("p", { class: "muted small" }, d.hash_error ? "Hash error: " + d.hash_error : "Not hashed yet (run `music-steward hash` or use Hash folder)."),
     d.same_audio.length ? h("p", { class: "small" }, h("span", { class: "badge b-rel" }, "Same audio"), " also at: ",
                             d.same_audio.join(", ")) : null));
   if (d.side_files.length) parts.push(h("div", {}, h("h3", {}, "Side files in this folder"),
@@ -471,7 +471,7 @@ async function showInfoList(k) {
   const d = await api(`/api/state?root_id=${S.rootId}`);
   document.getElementById("details").replaceChildren(h("h2", {}, FILTER_LABELS[k]),
     h("p", { class: "muted small" }, `${(d.summary.filters[k] || 0).toLocaleString()} items. Run ` ,
-      h("code", {}, `mp3librarytool audit ${k}`), " for the full list."));
+      h("code", {}, `music-steward audit ${k}`), " for the full list."));
 }
 async function refreshAll() { await loadState(); await renderTree(); await refreshCenter(); }
 

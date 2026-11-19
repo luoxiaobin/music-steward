@@ -331,7 +331,7 @@ class App:
 
 def make_handler(app: App, port_ref: dict):
     class H(BaseHTTPRequestHandler):
-        server_version = "MP3LibraryTool"
+        server_version = "MusicSteward"
 
         def log_message(self, fmt, *args):  # quiet
             pass
@@ -375,7 +375,7 @@ def make_handler(app: App, port_ref: dict):
                     "Set-Cookie": f"mlt_session={app.session}; HttpOnly; SameSite=Strict; Path=/"})
             if not self._authed():
                 return self._send(HTTPStatus.UNAUTHORIZED,
-                                  b"Open the URL printed by `mp3librarytool serve`.", "text/plain")
+                                  b"Open the URL printed by `music-steward serve`.", "text/plain")
             if u.path in ("/", "/index.html"):
                 return self._static("index.html")
             if u.path.startswith("/static/"):
@@ -526,7 +526,7 @@ def serve(db_path: str, roots: list[str], port: int = 0, open_browser: bool = Tr
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app, port_ref))
     port_ref["port"] = httpd.server_address[1]
     url = f"http://127.0.0.1:{port_ref['port']}/?token={app.token}"
-    print(f"MP3LibraryTool is running at:\n  {url}\n(Ctrl-C to stop)", flush=True)
+    print(f"Music Steward is running at:\n  {url}\n(Ctrl-C to stop)", flush=True)
     if open_browser:
         import webbrowser
         webbrowser.open(url)

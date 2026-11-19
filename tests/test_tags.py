@@ -1,6 +1,6 @@
 import pytest
 
-from mp3librarytool.tags import repair_latin1
+from music_steward.tags import repair_latin1
 
 
 @pytest.mark.parametrize("real", ["夜航", "郑绪岚", "人海中一個你", "器名", "免"])

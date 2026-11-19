@@ -1,9 +1,11 @@
-# MP3LibraryTool
+# Music Steward
 
-Organize a large music collection (MP3, FLAC, APE, …) safely: **scan → recognize → review → plan → apply**.
+*Formerly MP3LibraryTool.*
+
+A careful steward for a large music collection (MP3, FLAC, APE, …): organize it safely: **scan → recognize → review → plan → apply**.
 Sources are never modified; changes are written only to organized copies, from a saved plan, with a journal for crash recovery and undo.
 
-Status: **M1 — inventory and audit.** M0 experiments and their evidence report are in [`m0/`](m0/EVIDENCE_REPORT.md).
+Status: **inventory, recognition, review, plan and apply work end to end** (see `docs/PLAN.md`). M0 experiments and their evidence report are in [`m0/`](m0/EVIDENCE_REPORT.md).
 
 ## Install
 
@@ -16,17 +18,19 @@ python3.12 -m venv .venv
 
 ## Use
 
-All commands only **read** the collection. They write a single app database (default `~/.mp3librarytool/library.sqlite`, override with `--db` or `MLT_DB`).
+The command is `music-steward` (short alias `steward`; the old `mp3librarytool` still works for now).
+
+All commands only **read** the collection. They write a single app database (default `~/.music-steward/library.sqlite`, override with `--db` or `MLT_DB`).
 
 ```bash
-mp3librarytool scan /Volumes/music          # inventory: paths, sizes, ffprobe properties, tags
-mp3librarytool scan /Volumes/music          # again: unchanged files (size + mtime) are skipped
-mp3librarytool hash --root /Volumes/music   # whole-file + audio-stream hashes (resumable; reads every byte)
-mp3librarytool audit                        # summary of all audit filters
-mp3librarytool audit garbled_tags           # one filter: unreadable, missing_metadata, garbled_tags,
+music-steward scan /Volumes/music          # inventory: paths, sizes, ffprobe properties, tags
+music-steward scan /Volumes/music          # again: unchanged files (size + mtime) are skipped
+music-steward hash --root /Volumes/music   # whole-file + audio-stream hashes (resumable; reads every byte)
+music-steward audit                        # summary of all audit filters
+music-steward audit garbled_tags           # one filter: unreadable, missing_metadata, garbled_tags,
                                             #   estimated_values, exact_duplicates, same_audio, orphan_lrc,
                                             #   cue_sheets, dirs_named_like_file, unlistable_dirs, removed
-mp3librarytool inspect "song.mp3" --hash    # one file, no database
+music-steward inspect "song.mp3" --hash    # one file, no database
 ```
 
 ### What the scan guarantees

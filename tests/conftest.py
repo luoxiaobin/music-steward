@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from mp3librarytool import db as dbmod
+from music_steward import db as dbmod
 
 needs_ffmpeg = pytest.mark.skipif(shutil.which("ffmpeg") is None, reason="ffmpeg not installed")
 # There is no free APE encoder on Homebrew; point this at any .ape you own to run APE tests.

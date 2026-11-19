@@ -88,7 +88,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                           "size": f["size"], "mtime": f["mtime_ns"]})
         # side files that live next to the unit's audio
         folders = {f.rsplit("/", 1)[0] if "/" in f else "" for f in new_stem_of}
-        for folder in folders:
+        for folder in sorted(folders):  # deterministic: CD 1 before CD 2
             prefix = f"{folder}/" if folder else ""
             for s in con.execute("SELECT * FROM file WHERE root_id=? AND removed_at IS NULL AND kind IN ('lrc','image') "
                                  "AND relpath >= ? AND relpath < ?", (root_id, prefix, prefix + "￿")):

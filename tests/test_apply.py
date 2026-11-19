@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from mp3librarytool.apply import naming, plan, runner
-from mp3librarytool.apply import protocol
-from mp3librarytool.hashing import audio_hash
-from mp3librarytool.recognize import units
-from mp3librarytool.scanner import scan
+from music_steward.apply import naming, plan, runner
+from music_steward.apply import protocol
+from music_steward.hashing import audio_hash
+from music_steward.recognize import units
+from music_steward.scanner import scan
 
 from .conftest import needs_ffmpeg, tag_id3, tone
 
@@ -204,7 +204,7 @@ def test_non_musicbrainz_release_never_writes_musicbrainz_ids(accepted, con):
 
 
 def test_sources_follow_environment(monkeypatch):
-    from mp3librarytool.recognize import beets_adapter as A
+    from music_steward.recognize import beets_adapter as A
     monkeypatch.delenv("DISCOGS_TOKEN", raising=False)
     monkeypatch.delenv("MLT_SOURCES", raising=False)
     assert A.sources() == ["musicbrainz", "deezer"]

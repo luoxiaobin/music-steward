@@ -5,9 +5,9 @@ import unicodedata
 
 import pytest
 
-from mp3librarytool import audit, hashpass
-from mp3librarytool import scanner as scanmod
-from mp3librarytool.scanner import RootUnavailable, scan
+from music_steward import audit, hashpass
+from music_steward import scanner as scanmod
+from music_steward.scanner import RootUnavailable, scan
 
 from .conftest import files, needs_ffmpeg
 
@@ -275,7 +275,7 @@ def test_hash_only_a_subfolder(library, con):
 
 
 def test_cli_hash_accepts_a_folder_path(library, tmp_path, capsys):
-    from mp3librarytool import cli
+    from music_steward import cli
     dbp = str(tmp_path / "cli.sqlite")
     cli.main(["--db", dbp, "scan", str(library)])
     cli.main(["--db", dbp, "hash", str(library / "Dupes")])

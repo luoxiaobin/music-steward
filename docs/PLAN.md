@@ -1,4 +1,6 @@
-# MP3LibraryTool — Plan
+# Music Steward — Plan
+
+*Formerly MP3LibraryTool (renamed 2026-11-19).*
 
 Living plan. Sources: the Architecture Assessment and M0 Experiments specs (Nov 18, 2026), `m0/EVIDENCE_REPORT.md`, and the decisions below.
 
@@ -70,6 +72,7 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
 | 2026-11-18 | NAS publish method: `claim_rename` (O_EXCL placeholder, then rename); local disk keeps `RENAME_EXCL` | `m0/EVIDENCE_REPORT.md` §6.7 |
 | 2026-11-18 | Desktop shell: pywebview at the end of M2; not Electron | [ADR 0001](adr/0001-desktop-shell-pywebview.md) |
 | 2026-11-18 | License GPL-3.0-or-later | `LICENSE` |
+| 2026-11-19 | **Renamed to Music Steward** (package `music_steward`, command `music-steward` / `steward`; `music-steward` free on PyPI; `steward` alone is taken). Data folder `~/.music-steward`, migrated automatically | this file |
 | 2026-11-19 | Thin end-to-end slice first; first apply destination is a **local folder** (NAS later) | this file |
 | 2026-11-18 | **No whole-NAS hashing.** Hash per selected folder (CLI `hash <folder>`, UI "Hash folder"); re-scan per folder too | this file |
 

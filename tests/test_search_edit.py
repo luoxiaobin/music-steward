@@ -3,9 +3,9 @@ import json
 
 import pytest
 
-from mp3librarytool.apply import plan
-from mp3librarytool.recognize import search, units, worker
-from mp3librarytool.scanner import scan
+from music_steward.apply import plan
+from music_steward.recognize import search, units, worker
+from music_steward.scanner import scan
 
 from .conftest import needs_ffmpeg
 from .test_apply import accepted  # noqa: F401  (fixture)
@@ -35,7 +35,7 @@ def test_worker_passes_the_search_to_the_matcher(music, con, monkeypatch):
     con.execute("UPDATE unit SET search_json=? WHERE id=?", (json.dumps({"artist": "X", "album": "Y"}), uid))
     con.commit()
     seen = {}
-    from mp3librarytool.recognize import beets_adapter
+    from music_steward.recognize import beets_adapter
 
     def spy(paths, key, s=None):
         seen["search"] = s

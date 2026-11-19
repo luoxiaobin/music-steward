@@ -6,7 +6,7 @@
 
 ## Context
 
-MP3LibraryTool is a single-user app. Its engine is Python: the inventory scanner, beets (in-process, for matching), mutagen (tags), and the apply journal. The UI is a local web app served by that same Python process (`mp3librarytool serve`), opened in a browser tab, written in plain HTML/CSS/JS.
+Music Steward (formerly MP3LibraryTool) is a single-user app. Its engine is Python: the inventory scanner, beets (in-process, for matching), mutagen (tags), and the apply journal. The UI is a local web app served by that same Python process (`music-steward serve`), opened in a browser tab, written in plain HTML/CSS/JS.
 
 A browser tab is not ideal for a single-user desktop tool: no dock icon, no native folder picker (we rely on configured roots), and a one-time token to protect the localhost server. It must run on the Mac mini and on Windows.
 

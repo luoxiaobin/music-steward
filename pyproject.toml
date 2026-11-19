@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mp3librarytool"
+name = "music-steward"
 version = "0.1.0"
 description = "Organize a large music collection safely: scan, recognize, review, plan, apply."
 readme = "README.md"
@@ -12,7 +12,7 @@ license = "GPL-3.0-or-later"
 dependencies = [
     "mutagen==1.48.1",
     "charset-normalizer==3.5.2",
-    "beets==2.14.1",          # matching (in-process, behind mp3librarytool/recognize/beets_adapter.py)
+    "beets==2.14.1",          # matching (in-process, behind music_steward/recognize/beets_adapter.py)
     "pyacoustid==1.3.1",
     "python3-discogs-client==2.10",  # Discogs candidates (used only when DISCOGS_TOKEN is set)
 ]
@@ -21,13 +21,15 @@ dependencies = [
 dev = ["pytest"]
 
 [project.scripts]
-mp3librarytool = "mp3librarytool.cli:main"
+music-steward = "music_steward.cli:main"
+steward = "music_steward.cli:main"
+mp3librarytool = "music_steward.cli:main"   # old name, kept as an alias for now
 
 [tool.setuptools]
-packages = ["mp3librarytool"]
+packages = ["music_steward", "music_steward.recognize", "music_steward.apply"]
 
 [tool.setuptools.package-data]
-mp3librarytool = ["web/*"]
+music_steward = ["web/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

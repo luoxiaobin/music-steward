@@ -164,7 +164,7 @@ def cmd_serve(a):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="mp3librarytool")
+    ap = argparse.ArgumentParser(prog="music-steward")
     ap.add_argument("--db", default=str(db.DEFAULT_DB), help="app database (default %(default)s)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
