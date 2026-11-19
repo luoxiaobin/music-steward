@@ -1,0 +1,797 @@
+{
+  "dest": "/Users/<user>/Projects/MP3LibraryTool/m0/scratch/dest_local",
+  "label": "local",
+  "publish_probe": {
+    "fs": "/ (/dev/disk3s5)",
+    "hardlink_new": "ok",
+    "hardlink_shares_inode": true,
+    "hardlink_nlink": 2,
+    "hardlink_onto_existing": "refused EEXIST",
+    "existing_untouched_after_link": true,
+    "renamex_excl_new": "ok",
+    "renamex_preserves_inode": true,
+    "renamex_excl_onto_existing": "refused EEXIST",
+    "existing_untouched_after_renamex": true,
+    "plain_rename_overwrites": true,
+    "o_excl_onto_existing": "refused EEXIST",
+    "inode_stable_across_stat": true,
+    "chosen_method": "renamex_excl"
+  },
+  "sources": [
+    "01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac",
+    "01 - Phil Collins - Tearing and breaking.mp3",
+    "Moon River.flac"
+  ],
+  "crash_injection": {
+    "after_intent": {
+      "crashed": true,
+      "files_after_crash": [
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "mid_copy": {
+      "crashed": true,
+      "files_after_crash": [
+        ".01 - 01 - Phil Collins - Tearing and breaking.mlt-be186f-op1.tmp.mp3",
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": true,
+          "action": "discarded temp, restart op from intent"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "after_copy": {
+      "crashed": true,
+      "files_after_crash": [
+        ".01 - 01 - Phil Collins - Tearing and breaking.mlt-c80135-op1.tmp.mp3",
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "copied",
+          "final_exists": false,
+          "temp_exists": true,
+          "action": "discarded temp, restart op from intent"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "after_tag": {
+      "crashed": true,
+      "files_after_crash": [
+        ".01 - 01 - Phil Collins - Tearing and breaking.mlt-42de9e-op1.tmp.mp3",
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "tagged",
+          "final_exists": false,
+          "temp_exists": true,
+          "action": "temp intact -> resume at publish"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "after_link_before_unlink": {
+      "skipped": "only applies to link_unlink (method=renamex_excl)"
+    },
+    "after_publish_syscall": {
+      "crashed": true,
+      "files_after_crash": [
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac",
+        "01 - 01 - Phil Collins - Tearing and breaking.mp3"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "tagged",
+          "final_exists": true,
+          "temp_exists": false,
+          "action": "final is ours (same inode + sha) -> mark published"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "after_published_journal": {
+      "crashed": true,
+      "files_after_crash": [
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac",
+        "01 - 01 - Phil Collins - Tearing and breaking.mp3"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "published",
+          "final_exists": true,
+          "temp_exists": false,
+          "action": "published -> commit"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    }
+  },
+  "crash_injection_link_unlink": {
+    "after_intent": {
+      "crashed": true,
+      "files_after_crash": [
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "mid_copy": {
+      "crashed": true,
+      "files_after_crash": [
+        ".01 - 01 - Phil Collins - Tearing and breaking.mlt-1da240-op1.tmp.mp3",
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": true,
+          "action": "discarded temp, restart op from intent"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "after_copy": {
+      "crashed": true,
+      "files_after_crash": [
+        ".01 - 01 - Phil Collins - Tearing and breaking.mlt-6d4199-op1.tmp.mp3",
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "copied",
+          "final_exists": false,
+          "temp_exists": true,
+          "action": "discarded temp, restart op from intent"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "after_tag": {
+      "crashed": true,
+      "files_after_crash": [
+        ".01 - 01 - Phil Collins - Tearing and breaking.mlt-28b56c-op1.tmp.mp3",
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "tagged",
+          "final_exists": false,
+          "temp_exists": true,
+          "action": "temp intact -> resume at publish"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "after_link_before_unlink": {
+      "crashed": true,
+      "files_after_crash": [
+        ".01 - 01 - Phil Collins - Tearing and breaking.mlt-82a063-op1.tmp.mp3",
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac",
+        "01 - 01 - Phil Collins - Tearing and breaking.mp3"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "tagged",
+          "final_exists": true,
+          "temp_exists": true,
+          "action": "final is ours (same inode + sha) -> mark published"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "after_publish_syscall": {
+      "crashed": true,
+      "files_after_crash": [
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac",
+        "01 - 01 - Phil Collins - Tearing and breaking.mp3"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "tagged",
+          "final_exists": true,
+          "temp_exists": false,
+          "action": "final is ours (same inode + sha) -> mark published"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    },
+    "after_published_journal": {
+      "crashed": true,
+      "files_after_crash": [
+        "00 - 01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).flac",
+        "01 - 01 - Phil Collins - Tearing and breaking.mp3"
+      ],
+      "recovery_decisions": [
+        {
+          "op": "op1",
+          "last_state": "published",
+          "final_exists": true,
+          "temp_exists": false,
+          "action": "published -> commit"
+        },
+        {
+          "op": "op2",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": false,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "op0": "committed",
+        "op1": "committed",
+        "op2": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "all_created": true,
+      "pass": true
+    }
+  },
+  "awkward": {
+    "destination_appears_midrun": {
+      "state": "conflict",
+      "ownership": "not_ours",
+      "intruder_untouched": true,
+      "no_temp_left": true,
+      "pass": true
+    },
+    "source_changes_during_copy": {
+      "state": "aborted_source_changed",
+      "nothing_published": true,
+      "no_temp_left": true,
+      "pass": true
+    },
+    "share_drop_mid_copy": {
+      "simulated": true,
+      "child_exit": 57,
+      "files_after_drop": [
+        ".01. 紫菱州歌 (郑绪岚 - 情系红楼梦) (8级别).mlt-23bfe0-c.tmp.flac"
+      ],
+      "recovery": [
+        {
+          "op": "c",
+          "last_state": "intent",
+          "final_exists": false,
+          "temp_exists": true,
+          "action": "discarded temp, restart op from intent"
+        }
+      ],
+      "every_op_terminal": true,
+      "terminal_states": {
+        "c": "committed"
+      },
+      "no_temp_files": true,
+      "temp_files": [],
+      "created_finals_exist": true,
+      "no_half_written_final": true,
+      "no_duplicate_names": true,
+      "pass": true
+    },
+    "identical_already_exists": {
+      "state": "already_existed",
+      "ownership": "already_existed",
+      "undo": [
+        {
+          "op": "d",
+          "ownership": "already_existed",
+          "final_exists": true,
+          "action": "not ours -> untouched",
+          "preexisting_untouched": true
+        }
+      ],
+      "still_there_after_undo": true,
+      "pass": true
+    },
+    "output_edited_before_undo": {
+      "undo": [
+        {
+          "op": "e0",
+          "ownership": "created",
+          "final_exists": true,
+          "action": "REFUSED: modified since publish, left alone"
+        },
+        {
+          "op": "e1",
+          "ownership": "created",
+          "final_exists": true,
+          "action": "removed"
+        }
+      ],
+      "edited_file_kept": true,
+      "unedited_file_removed": true,
+      "detected_by": "full-file sha256 + inode recorded at publish (tag-only edits keep audio hash equal, so audio hash alone would MISS this)",
+      "audio_hash_equal_despite_edit": true,
+      "pass": true
+    }
+  },
+  "undo_after_crash": {
+    "ownership_before_undo": {
+      "x0": "created",
+      "x1": "already_existed"
+    },
+    "undo": [
+      {
+        "op": "x0",
+        "ownership": "created",
+        "final_exists": true,
+        "action": "removed"
+      },
+      {
+        "op": "x1",
+        "ownership": "already_existed",
+        "final_exists": true,
+        "action": "not ours -> untouched",
+        "preexisting_untouched": true
+      }
+    ],
+    "created_removed": true,
+    "preexisting_kept": true,
+    "pass": true
+  },
+  "tag_preservation": {
+    ".mp3": {
+      "mutagen_minimal": {
+        "n_fields_before": 16,
+        "n_fields_after": 16,
+        "notes": [],
+        "dropped": [],
+        "added": [],
+        "changed": [
+          "TIT2"
+        ],
+        "unexpected_changes": {},
+        "title_after": {
+          "text": [
+            "Edited Title 已编辑"
+          ]
+        },
+        "audio_unchanged": true,
+        "pass": true
+      },
+      "beets_mediafile": {
+        "n_fields_before": 16,
+        "n_fields_after": 16,
+        "notes": [],
+        "dropped": [],
+        "added": [],
+        "changed": [
+          "TIT2"
+        ],
+        "unexpected_changes": {},
+        "title_after": {
+          "text": [
+            "Edited Title 已编辑"
+          ]
+        },
+        "audio_unchanged": true,
+        "pass": true
+      }
+    },
+    ".flac": {
+      "mutagen_minimal": {
+        "n_fields_before": 15,
+        "n_fields_after": 15,
+        "notes": [],
+        "dropped": [],
+        "added": [],
+        "changed": [
+          "VC:TITLE"
+        ],
+        "unexpected_changes": {},
+        "title_after": [
+          "Edited Title 已编辑"
+        ],
+        "audio_unchanged": true,
+        "pass": true
+      },
+      "beets_mediafile": {
+        "n_fields_before": 15,
+        "n_fields_after": 15,
+        "notes": [],
+        "dropped": [],
+        "added": [],
+        "changed": [
+          "VC:TITLE"
+        ],
+        "unexpected_changes": {},
+        "title_after": [
+          "Edited Title 已编辑"
+        ],
+        "audio_unchanged": true,
+        "pass": true
+      }
+    },
+    ".ape": {
+      "mutagen_minimal": {
+        "n_fields_before": 13,
+        "n_fields_after": 13,
+        "notes": [],
+        "dropped": [],
+        "added": [],
+        "changed": [
+          "APE:title"
+        ],
+        "unexpected_changes": {},
+        "title_after": {
+          "kind": "APETextValue",
+          "values": [
+            "Edited Title 已编辑"
+          ]
+        },
+        "audio_unchanged": true,
+        "pass": true
+      },
+      "beets_mediafile": {
+        "n_fields_before": 13,
+        "n_fields_after": 13,
+        "notes": [
+          "APE key spelling changed: ['Title'] -> ['TITLE'] (case-insensitive per APEv2 spec)"
+        ],
+        "dropped": [],
+        "added": [],
+        "changed": [
+          "APE:title",
+          "_ape_key_spelling"
+        ],
+        "unexpected_changes": {},
+        "title_after": {
+          "kind": "APETextValue",
+          "values": [
+            "Edited Title 已编辑"
+          ]
+        },
+        "audio_unchanged": true,
+        "pass": true
+      }
+    }
+  },
+  "audio_verification": {
+    ".mp3": {
+      "deterministic": true,
+      "unchanged_after_tag_edit": true,
+      "file_sha_changed_after_tag_edit": true,
+      "audio_edit": "re-encode at volume 0.99",
+      "detects_audio_edit": true,
+      "pass": true
+    },
+    ".flac": {
+      "deterministic": true,
+      "unchanged_after_tag_edit": true,
+      "file_sha_changed_after_tag_edit": true,
+      "audio_edit": "re-encode at volume 0.99",
+      "detects_audio_edit": true,
+      "flac_streaminfo_md5_present": true,
+      "pass": true
+    },
+    ".ape": {
+      "deterministic": true,
+      "unchanged_after_tag_edit": true,
+      "file_sha_changed_after_tag_edit": true,
+      "audio_edit": "one byte flipped mid-file (no APE encoder available)",
+      "detects_audio_edit": true,
+      "decode_result_after_flip": "decoded, different PCM",
+      "pass": true
+    }
+  },
+  "side_files": {
+    "cue_real_gbk": {
+      "encoding_detected": "gb18030",
+      "refs_before": [
+        "伽菲珈而&姜苏.-.[HIFI年代1.-.怀念战友].专辑.(ape).ape"
+      ],
+      "refs_after": [
+        "柏菲 - HIFI年代 - 怀念战友.ape"
+      ],
+      "refs_resolve": true,
+      "still_gbk_encoded": true,
+      "naive_utf8_read_is_mojibake": true
+    },
+    "lrc_follows_rename": {
+      "lrc_at_new_stem": true,
+      "lrc_content_unchanged": true,
+      "no_lrc_at_old_stem": true
+    },
+    "cue_rewrite_prepublish": {
+      "encoding_detected": "utf-8",
+      "refs_before": [
+        "01 - old name.mp3"
+      ],
+      "refs_after": [
+        "01 - New Title.mp3"
+      ],
+      "refs_resolve": true
+    },
+    "pass": true
+  },
+  "summary": {
+    "publish_method": "renamex_excl",
+    "crash_injection_all_pass": true,
+    "crash_injection_link_unlink_all_pass": true,
+    "awkward.destination_appears_midrun": true,
+    "awkward.source_changes_during_copy": true,
+    "awkward.share_drop_mid_copy": true,
+    "awkward.identical_already_exists": true,
+    "awkward.output_edited_before_undo": true,
+    "undo_after_crash": true,
+    "tags.mp3.mutagen_minimal": true,
+    "tags.mp3.beets_mediafile": true,
+    "tags.flac.mutagen_minimal": true,
+    "tags.flac.beets_mediafile": true,
+    "tags.ape.mutagen_minimal": true,
+    "tags.ape.beets_mediafile": true,
+    "audio_hash.mp3": true,
+    "audio_hash.flac": true,
+    "audio_hash.ape": true,
+    "side_files": true
+  },
+  "elapsed_s": 130.6
+}
