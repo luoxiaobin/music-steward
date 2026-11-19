@@ -29,6 +29,18 @@ from ..tags import repair_latin1  # noqa: E402
 
 BEETS_DEFAULT_APP_KEY = "1vOwZtEn"
 REPAIR_FIELDS = ("title", "artist", "album", "albumartist")
+# Ranking: beets sorts by distance only. Fingerprints can confirm MusicBrainz recordings
+# only, so a Discogs/Deezer copy of the same release ties on distance but shows 0 agreement.
+# Rank by distance minus a small bonus for the share of fingerprints that agree.
+FP_RANK_BONUS = 0.05
+
+
+def _rerank(cands: list[dict], n_files: int) -> list[dict]:
+    key = lambda c: c["distance"] - FP_RANK_BONUS * (c["fingerprint_agrees"] / max(1, n_files))
+    cands = sorted(cands, key=key)
+    for i, c in enumerate(cands):
+        c["rank"] = i
+    return cands
 
 
 def _repair(items) -> int:
@@ -146,6 +158,7 @@ def match_album(paths: list[str], acoustid_key: str | None, search: dict | None 
             "fingerprint_agrees": n_fp, "n_mapped": len(mapping), "recording_ids": len(rec_ids),
             "tracks": mapping,
         })
+    cands = _rerank(cands, len(items))
     _reset()
     return {"kind": "album", "recommendation": proposal.recommendation.name, "acoustid_used": use_chroma,
             "files_fingerprint_linked": sum(linked.values()), "repaired": repaired, "candidates": cands}
@@ -172,6 +185,7 @@ def match_track(path: str, acoustid_key: str | None, search: dict | None = None)
             "n_mapped": 1, "recording_ids": 1,
             "tracks": [{**_track(ti, None, path), "track_distance": float(c.distance.distance)}],
         })
+    cands = _rerank(cands, 1)
     _reset()
     return {"kind": "track", "recommendation": proposal.recommendation.name, "acoustid_used": use_chroma,
             "files_fingerprint_linked": sum(linked.values()), "repaired": repaired, "candidates": cands}

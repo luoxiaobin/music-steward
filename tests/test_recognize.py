@@ -197,3 +197,13 @@ def test_skip_survives_rematch(music, con, monkeypatch):
     units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"], requeue=True)
     worker.run_unit(dbp, uid)
     assert results.unit_detail(con, uid)["decision"]["action"] == "skip"
+
+
+def test_fingerprint_confirmed_candidate_wins_a_distance_tie():
+    from mp3librarytool.recognize.beets_adapter import _rerank
+    cands = [{"rank": 0, "source": "Discogs", "distance": 0.170, "fingerprint_agrees": 0},
+             {"rank": 1, "source": "MusicBrainz", "distance": 0.172, "fingerprint_agrees": 25},
+             {"rank": 2, "source": "MusicBrainz", "distance": 0.60, "fingerprint_agrees": 25}]
+    out = _rerank(cands, 25)
+    assert [c["source"] for c in out][:2] == ["MusicBrainz", "Discogs"] and [c["rank"] for c in out] == [0, 1, 2]
+    assert out[2]["distance"] == 0.60     # a bonus never lifts a far-off release above a close one

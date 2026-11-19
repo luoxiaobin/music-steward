@@ -45,7 +45,10 @@ Get one album all the way through before widening any step:
 11. ✅ Extra sources: Deezer on by default (no key); Discogs automatically when DISCOGS_TOKEN is set.
     MusicBrainz ids are only written for MusicBrainz releases. Measured on the sample with Deezer:
     1 of 24 improved (张也 万事如意: right singer instead of 龚玥), 0 worse; Deezer has the mainland
-    artists but not these exact albums. Discogs: pending the user's token.
+    artists but not these exact albums. Discogs (with token), measured on the sample: 39 of 179
+    candidates; 彩虹之上 → 蔡幸娟 (plausibly right), 童丽 Endless Love only via Search again, 郑绪岚 not
+    found; a Discogs copy of Phil Collins' release tied on distance and pushed it out of Ready →
+    fixed by ranking fingerprint-confirmed candidates first on near-ties.
 
 Then widen by value: garbled-tag repair before matching → own confidence rule → edit/search/conflicts and the full Plan screen → extra sources for mainland releases → cue-sheet albums, singles rules, Simplified/Traditional key → pywebview window.
 
