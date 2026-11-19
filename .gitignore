@@ -22,3 +22,8 @@ m0/scratch/
 
 # Collection listing from the read-only NAS scan (personal; kept local)
 m0/results/nas_scan_summary.json
+
+# Python
+.venv/
+*.egg-info/
+.pytest_cache/

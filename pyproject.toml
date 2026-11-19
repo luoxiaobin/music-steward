@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mp3librarytool"
+version = "0.1.0"
+description = "Organize a large music collection safely: scan, recognize, review, plan, apply."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "GPL-3.0-or-later"
+dependencies = [
+    "mutagen==1.48.1",
+    "charset-normalizer==3.5.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+mp3librarytool = "mp3librarytool.cli:main"
+
+[tool.setuptools]
+packages = ["mp3librarytool"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
