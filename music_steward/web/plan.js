@@ -62,7 +62,8 @@ async function renderPlan(id) {
   const p = await api(`/api/plan/${id}`);
   const st = await api("/api/state");
   const s = p.summary, items = p.items;
-  const ok = items.filter(i => i.status === "ok"), blocked = items.filter(i => i.status !== "ok");
+  const ok = items.filter(i => i.status === "ok"), blocked = items.filter(i => !["ok", "duplicate_source"].includes(i.status));
+  const dups = items.filter(i => i.status === "duplicate_source");
   const audio = ok.filter(i => i.kind === "audio"), side = items.filter(i => i.kind !== "audio");
   const sideLabel = i => i.kind === "lrc" ? "Follows its track" : i.kind === "cue" ? "Rewritten: file name + titles" : "Linked";
   const lastRun = p.runs[p.runs.length - 1];
@@ -73,7 +74,8 @@ async function renderPlan(id) {
                         : h("span", { class: "badge b-unid" }, "Draft");
   const applyBtn = h("button", { type: "button", class: "btn btn-primary", disabled: busy || !ok.length || applied,
     onclick: async () => { await post("/api/apply", { id }); pollPlan(id); } },
-    `Apply · copy ${ok.length} files` + (blocked.length ? ` (${blocked.length} blocked are skipped)` : ""));
+    `Apply · copy ${ok.length} files` + (blocked.length ? ` (${blocked.length} blocked are skipped)` : "") +
+    (dups.length ? ` · ${s.duplicate_albums_skipped || ""} duplicate album(s) copied once` : ""));
   const rows = (list, cols) => h("table", {}, h("thead", {}, h("tr", {}, cols.map(c => h("th", {}, c[0])))),
     h("tbody", {}, list.map(i => h("tr", {}, cols.map(c => c[1](i))))));
   const diffs = audio.flatMap(i => tagDiff(i).map(d => ({ ...d, file: i.src_rel })));

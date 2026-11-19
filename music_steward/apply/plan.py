@@ -50,11 +50,13 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
                   "src": os.path.join(root_path, f["fs_relpath"]), "dest_rel": f"{adir}/{image_name}",
                   "codec": f["codec"], "size": f["size"], "mtime": f["mtime_ns"],
                   "tags": {"album": c["album"], "albumartist": c["artist"], "date": c["year"],
+                           "title": c["album"],   # not a leftover first-track title from the source
                            "disc": f"{c['_disc']}/{c['mediums']}" if multi else None,
                            "mb_albumid": c["album_id"] if is_mb else None}})
     sheet = cuemod.parse(os.path.join(root_path, cf["fs_relpath"]))
     tracks = {str(t["cue_track"]): {"title": (cue_titles or {}).get(str(t["cue_track"])) or t["title"],
-                                    "performer": _script(t["artist"], c.get("_script", "keep")) or c["artist"]}
+                                    "performer": _script(c["artist"] if t["artist"] and t["artist"] == c.get("_artist_from")
+                                                         else t["artist"], c.get("_script", "keep")) or c["artist"]}
               for t in con.execute("SELECT * FROM cand_cue_track WHERE candidate_id=?", (c["id"],))}
     items.append({"unit_id": u["id"], "file_id": cf["id"], "kind": "cue",
                   "src": os.path.join(root_path, cf["fs_relpath"]), "dest_rel": f"{adir}/{stem}.cue",
@@ -86,6 +88,42 @@ def _script(s, rule):
         return s
     from ..chinese import to_simplified, to_traditional
     return to_simplified(s) if rule == "simplified" else to_traditional(s)
+
+
+_UNKNOWN_ARTIST = {"[unknown]", "unknown", "unknown artist", "[anonymous]", "anonymous", "none", "-"}
+
+
+def _own_artist(con, u) -> str | None:
+    """The artist the album's own cue sheet / tags / folder name gives (None if none or unusable)."""
+    from ..recognize import local
+    try:
+        a = local.describe(con, u["id"])["artist"]
+    except (OSError, ValueError, KeyError):
+        return None
+    return None if not a or a.casefold() in ("various artists", "various", "群星", "未知艺术家") else a
+
+
+def _prefer_own_artist(con, u, c, tracks) -> None:
+    """One artist, one name (user review 2026-11-19: 林子祥's albums went to '林子祥' and, from
+    Discogs, to 'George Lam'). When the catalogue artist is junk ('[unknown]', 'Yu Hon Mei =')
+    or written only in Latin letters while the album's own info names the artist in Chinese,
+    use the album's own name -- for the folder, the tags and the per-track performers."""
+    import re
+    from ..chinese import has_cjk
+    cat = re.sub(r"\s*=\s*$", "", (c["artist"] or "").strip()) or None
+    junk = not cat or cat.casefold() in _UNKNOWN_ARTIST
+    if not junk and has_cjk(cat):
+        c["artist"] = cat
+        return
+    own = _own_artist(con, u)
+    if own and (junk or (has_cjk(own) and cat.casefold() not in ("various artists", "various"))):
+        for t in tracks.values():
+            if not t.get("artist") or t["artist"] == c["artist"]:
+                t["artist"] = own
+        c["_artist_from"] = c["artist"]
+        c["artist"] = own
+    else:
+        c["artist"] = cat
 
 
 class PlanError(Exception):
@@ -121,6 +159,8 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
         # the album's first release year, not a reissue's (user decision 2026-11-19)
         if c.get("original_year") and (not c["year"] or c["original_year"] < c["year"]):
             c["year"] = c["original_year"]
+        if (c.get("source") or "") != "Local":
+            _prefer_own_artist(con, u, c, tracks)
         rule = script_rule()   # catalogue/own-info names only; the user's own edits stay as typed
         c["album"], c["artist"] = _script(c["album"], rule), _script(c["artist"], rule)
         c["_script"] = rule
@@ -191,12 +231,17 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                               "src": os.path.join(root_path, s["fs_relpath"]), "dest_rel": dest_rel,
                               "codec": None, "tags": {}, "size": s["size"], "mtime": s["mtime_ns"]})
     items, dropped = _dedupe_images(items)
-    # conflicts
+    dup_units = _identical_albums(items)
+    # conflicts (an album skipped as an identical duplicate does not count)
     seen = defaultdict(list)
     for it in items:
-        seen[collision_key(it["dest_rel"])].append(it)
+        if it["unit_id"] not in dup_units:
+            seen[collision_key(it["dest_rel"])].append(it)
     for it in items:
         it["status"], it["note"] = "ok", None
+        if it["unit_id"] in dup_units:
+            it["status"], it["note"] = "duplicate_source", f"identical to {dup_units[it['unit_id']]}: copied once"
+            continue
         st = os.stat(it["src"]) if os.path.exists(it["src"]) else None
         if st is None or st.st_size != it["size"] or st.st_mtime_ns != it["mtime"]:
             it["status"], it["note"] = "source_changed", "source changed or missing since the scan; re-scan"
@@ -206,7 +251,8 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
             it["status"], it["note"] = "conflict_duplicate", "another item in this plan has the same destination name"
     summary = {"items": len(items), "ok": sum(i["status"] == "ok" for i in items),
                "duplicate_images_skipped": dropped,
-               "blocked": sum(i["status"] != "ok" for i in items),
+               "blocked": sum(i["status"] not in ("ok", "duplicate_source") for i in items),
+               "duplicate_albums_skipped": len(dup_units),
                "bytes": sum(i["size"] for i in items if i["status"] == "ok"),
                "albums": len({i["unit_id"] for i in items}), "script": script_rule()}
     pid = con.execute("INSERT INTO plan(created_at, dest_root, root_id, scope, summary_json) VALUES(?,?,?,?,?)",
@@ -217,6 +263,39 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                      for n, i in enumerate(items)])
     con.commit()
     return pid
+
+
+def _identical_albums(items: list[dict]) -> dict[int, str]:
+    """The same album twice in the collection (李烁 好梦留人 in two folders): when every audio
+    file of one album lands on the same destination as another album's file AND is
+    byte-identical to it, copy the album once. Returns {skipped unit_id: folder of the kept one}.
+    Anything less than identical stays a visible conflict."""
+    from ..hashing import file_sha256
+    audio = defaultdict(list)
+    for it in items:
+        if it["kind"] == "audio":
+            audio[it["unit_id"]].append(it)
+    by_dest = defaultdict(list)
+    for uid, its in audio.items():
+        for it in its:
+            by_dest[collision_key(it["dest_rel"])].append(it)
+    skipped: dict[int, str] = {}
+    for uid in sorted(audio):
+        if uid in skipped:
+            continue
+        for other in sorted(audio):
+            if other <= uid or other in skipped or len(audio[other]) != len(audio[uid]):
+                continue
+            pairs = []
+            for it in audio[other]:
+                mate = next((m for m in by_dest[collision_key(it["dest_rel"])] if m["unit_id"] == uid), None)
+                if mate is None or mate["size"] != it["size"]:
+                    break
+                pairs.append((mate, it))
+            else:
+                if pairs and all(file_sha256(a["src"]) == file_sha256(b["src"]) for a, b in pairs):
+                    skipped[other] = os.path.dirname(pairs[0][0]["src"])
+    return skipped
 
 
 def _dedupe_images(items: list[dict]) -> tuple[list[dict], int]:

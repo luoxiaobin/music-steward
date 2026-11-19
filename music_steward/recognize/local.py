@@ -64,6 +64,9 @@ def split_disc(album: str | None) -> tuple[str | None, int | None]:
     """'经典老歌101 CD2' -> ('经典老歌101', 2); 'Box (Disc 1)' -> ('Box', 1). Only at the end."""
     if not album:
         return album, None
+    mid = re.search(r"\s*[（(]\s*(?:cd|disc|disk)\s*0*(\d{1,2})\s*[)）]\s*", album, re.I)
+    if mid and album[:mid.start()].strip() and album[mid.end():].strip():   # '上海老歌1931-1949（CD5）姚莉'
+        return f"{album[:mid.start()].strip()} {album[mid.end():].strip()}", int(mid.group(1)) or None
     m = DISC_SUFFIX.search(album)
     if not m or not album[:m.start()].strip(" -_.·"):
         return album, None
@@ -122,15 +125,24 @@ def album_folder(folder: str) -> str:
     return parts[-1] if parts else ""
 
 
+GENRE_PREFIX = re.compile(r"^\s*(纯音乐|純音樂|轻音乐|輕音樂|民乐|民樂|器乐|器樂|古典|试音碟|試音碟|发烧碟|發燒碟)\s*[-_.·]\s*"
+                          r"(?:(二胡|钢琴|鋼琴|小提琴|大提琴|古筝|古箏|笛子|竹笛|萨克斯管?|薩克斯管?|葫芦丝|葫蘆絲|琵琶|吉他|"
+                          r"口琴|长笛|長笛|古琴|扬琴|揚琴|交响曲|交響曲|协奏曲|協奏曲)\s*[-_.·]\s*)?")
+
+
 def parse_folder(name: str) -> dict:
     """'Artist - Album (1998)' / '[1998] Album' / 'Album' -> artist, album, year."""
     year = _year(name)
+    # a genre/instrument prefix is a category, not the artist: '纯音乐-钢琴-理查德.克莱得曼.-.[…]'
+    name = GENRE_PREFIX.sub("", name)
     s = clean(name) or ""
     s = re.sub(r"[\[(（【]\s*(19|20)\d{2}\s*[\])）】]", " ", s)
     s = re.sub(r"^\s*(19|20)\d{2}\s*[-_.]\s*", "", s)
     s = re.sub(r"\s+", " ", s).strip(" -_")
     artist, album = None, s
-    m = re.match(r"^(.+?)\s+[-–—－]\s+(.+)$", s)      # only a spaced dash: "Jay-Z", "A-ha" stay whole
+    m = re.match(r"^(.+?)\s+[-–—－]\s+(.+)$", s)      # a spaced dash: "Jay-Z", "A-ha" stay whole
+    # ... or an unspaced one after a short Chinese name: '刀郎-披着羊皮的狼', '薛伟-小提琴协奏曲'
+    m = m or re.match(r"^([\u4e00-\u9fff·]{2,4})[-－](.+)$", s)
     if m:
         artist, album = m.group(1).strip(), m.group(2).strip()
     return {"artist": artist, "album": album or None, "year": year}

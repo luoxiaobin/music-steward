@@ -205,12 +205,34 @@ def _item(path: str) -> Item:
         return it
 
 
+def _folder_names(path: str) -> dict:
+    """Artist/album from the album folder's name (a 'CD 2' sub-folder counts as its parent)."""
+    from .local import album_folder, parse_folder
+    return parse_folder(album_folder(os.path.dirname(os.path.abspath(path))))
+
+
+def _fill_placeholders(items) -> int:
+    """Tags that only say 'unknown' (未知标题, 未知艺术家, Unknown Artist) make a useless search
+    (德德玛 天上的风 matched '未知標 / 鴉'). Search with the folder's name instead (in memory)."""
+    from .local import clean
+    n = 0
+    for it in items:
+        f = None
+        for fld in ("album", "artist", "albumartist"):
+            if getattr(it, fld) and clean(getattr(it, fld)) is None:
+                f = f or _folder_names(os.fsdecode(it.path))
+                setattr(it, fld, f["album"] if fld == "album" else (f["artist"] or ""))
+                n += 1
+    return n
+
+
 def match_album(paths: list[str], acoustid_key: str | None, search: dict | None = None) -> dict:
     """search: optional {"artist", "album"} terms or {"ids": [release mbid]} from the user."""
     search = search or {}
     use_chroma = configure(acoustid_key)
     items = [_item(p) for p in paths]
     repaired = _repair(items)
+    _fill_placeholders(items)
     linked = _fingerprint(items, use_chroma)
     source = Source.from_items(items)
     proposal = tag_album(source, search_artist=search.get("artist") or None,
@@ -254,6 +276,7 @@ def match_track(path: str, acoustid_key: str | None, search: dict | None = None)
     use_chroma = configure(acoustid_key)
     it = _item(path)
     repaired = _repair([it])
+    _fill_placeholders([it])
     linked = _fingerprint([it], use_chroma)
     proposal = tag_item(Source.from_item(it), search_artist=search.get("artist") or None,
                         search_name=search.get("title") or None, search_ids=search.get("ids") or None)
@@ -305,7 +328,12 @@ def match_cue(audio_path: str, album: dict, tracks: list[dict], acoustid_key: st
     """
     import shutil as _sh
     from . import httpcache
+    from .local import clean
     search = search or {}
+    if not clean(album.get("title")) or not clean(album.get("performer")):     # '未知标题' cue sheets
+        f = _folder_names(audio_path)
+        album = {**album, "title": clean(album.get("title")) or f["album"] or album.get("title"),
+                 "performer": clean(album.get("performer")) or f["artist"] or album.get("performer")}
     use_chroma = configure(acoustid_key)
     tmp = tempfile.mkdtemp(prefix="mlt_cue_")
     # Decoding slices of a big image over the network is most of the time, and for this

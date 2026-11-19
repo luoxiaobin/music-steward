@@ -136,3 +136,52 @@ def test_cue_can_keep_its_original_encoding(monkeypatch):
     assert planmod.cue_encoding() is None
     out, enc = cue.rewrite_bytes(CUE.encode("gbk"), {"old image name.wav": "x.flac"}, out_encoding=None)
     assert enc.startswith("gb") and 'FILE "x.flac"' in out.decode(enc)
+
+
+def test_catalogue_latin_artist_gives_way_to_the_albums_own_chinese_name(image_album, con, tmp_path):
+    """George Lam (Discogs) vs 林子祥 (the cue sheet): one artist must get one folder."""
+    u = next(x for x in units.plan_units(con, 1) if x["kind"] == "cue")
+    units.enqueue(con, 1, [u])
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    con.execute("UPDATE unit SET status='done', n_tracks=3 WHERE id=?", (uid,))
+    cid = con.execute("INSERT INTO candidate(unit_id, rank, source, album, artist, year, mediums, distance) "
+                      "VALUES(?, 0, 'Discogs', 'Huai Nian', 'Pai Fei =', 2002, 1, 0.2)", (uid,)).lastrowid
+    for n in (1, 2, 3):
+        con.execute("INSERT INTO cand_cue_track(candidate_id, cue_track, title, artist, medium, medium_index) "
+                    "VALUES(?,?,?,?,1,?)", (cid, n, f"T{n}", "Pai Fei =" if n < 3 else "Guest Singer", n))
+    con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at) VALUES(?, 'accept', ?, 0)", (uid, cid))
+    con.commit()
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
+    img = next(i for i in p["items"] if i["kind"] == "audio")
+    assert img["dest_rel"].startswith("柏菲/Huai Nian (2002)/") and img["tags"]["albumartist"] == "柏菲"
+    tr = next(i for i in p["items"] if i["kind"] == "cue")["tags"]["cue_rewrite"]["tracks"]
+    assert [tr[k]["performer"] for k in ("1", "2", "3")] == ["柏菲", "柏菲", "Guest Singer"]
+
+
+def test_identical_album_in_two_folders_is_copied_once(tmp_path, con):
+    """李烁 好梦留人 sits in two folders of the NAS: byte-identical copies are copied once;
+    a different album under the same name stays a conflict."""
+    import shutil
+    lib = tmp_path / "lib"
+    a = lib / "A"
+    tone(a / "image.flac", ["-c:a", "flac"], secs=6)
+    (a / "image.cue").write_bytes(CUE.replace("old image name.wav", "image.wav").encode("gbk"))
+    shutil.copytree(a, lib / "B")                                  # the same album again
+    c = lib / "C"
+    tone(c / "image.flac", ["-c:a", "flac"], secs=6, freq=600)     # same name, different audio
+    (c / "image.cue").write_bytes(CUE.replace("old image name.wav", "image.wav").encode("gbk"))
+    scan(con, lib)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["kind"] == "cue"])
+    from music_steward.recognize import local
+    for (uid,) in con.execute("SELECT id FROM unit").fetchall():
+        con.execute("UPDATE unit SET status='done', n_tracks=3 WHERE id=?", (uid,))
+        cid = local.add(con, uid)
+        con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                    "VALUES(?, 'accept', ?, 0, 'local')", (uid, cid))
+    con.commit()
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
+    st = {}
+    for i in p["items"]:
+        st.setdefault(i["src"].split("/lib/")[1].split("/")[0], set()).add(i["status"])
+    assert st["B"] == {"duplicate_source"} and p["summary"]["duplicate_albums_skipped"] == 1
+    assert st["A"] == {"conflict_duplicate"} and st["C"] == {"conflict_duplicate"}   # A vs C: really different
