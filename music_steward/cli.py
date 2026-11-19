@@ -142,15 +142,29 @@ def cmd_plan(a):
         print(f"  {it['kind']:5} {os.path.relpath(it['src'], os.path.dirname(it['src'])) [:40]:40} -> {it['dest_rel']}{flag}")
 
 
+def _resume_hint(con, run_id) -> int:
+    print(f"\ninterrupted -- nothing half-written is published; continue with: "
+          f"music-steward resume {run_id}", file=sys.stderr)
+    return 130
+
+
 def cmd_apply(a):
     from .apply import runner
     con = db.connect(a.db)
-    print(json.dumps(runner.apply(con, a.plan, progress=_progress("applying")), indent=2, ensure_ascii=False))
+    try:
+        print(json.dumps(runner.apply(con, a.plan, progress=_progress("applying")), indent=2, ensure_ascii=False))
+    except KeyboardInterrupt:   # applying again would start a second run: point to resume
+        run = con.execute("SELECT MAX(id) FROM run WHERE plan_id=?", (a.plan,)).fetchone()[0]
+        return _resume_hint(con, run)
 
 
 def cmd_resume(a):
     from .apply import runner
-    print(json.dumps(runner.resume(db.connect(a.db), a.run), indent=2, ensure_ascii=False))
+    con = db.connect(a.db)
+    try:
+        print(json.dumps(runner.resume(con, a.run), indent=2, ensure_ascii=False))
+    except KeyboardInterrupt:
+        return _resume_hint(con, a.run)
 
 
 def cmd_undo(a):

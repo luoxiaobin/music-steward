@@ -212,3 +212,30 @@ def test_sources_follow_environment(monkeypatch):
     assert A.sources() == ["musicbrainz", "deezer", "discogs"]
     monkeypatch.setenv("MLT_SOURCES", "musicbrainz")
     assert A.sources() == ["musicbrainz"]
+
+
+def test_tags_written_to_a_copy_whose_ape_tag_is_corrupt(tmp_path):
+    """mutagen refuses some real APE tags (GBK bytes, broken item lengths); the copy gets a clean
+    tag with the readable items kept (GBK converted) and the new fields set."""
+    import struct
+    from mutagen.apev2 import APEv2
+    from music_steward.apply.tagwrite import write_tags
+    from music_steward.tags import _raw_apev2
+
+    def item(k, v):
+        return struct.pack("<2I", len(v), 0) + k + b"\x00" + v
+    body = item(b"Artist", "孟庭苇".encode("gbk")) + item(b"Comment", b"ripped 1995") + item(b"Genre", b"Other")
+    tag = body + b"APETAGEX" + struct.pack("<4I", 2000, len(body) + 32, 3, 0) + b"\x00" * 8
+    p = tmp_path / "copy.ape"
+    p.write_bytes(b"MAC \x96\x0f" + b"\x00" * 100 + tag)
+    try:
+        APEv2(str(p))
+        raise AssertionError("fixture should be unreadable for mutagen")
+    except Exception as e:  # noqa: BLE001
+        assert "utf-8" in str(e)
+    write_tags(str(p), {"title": "真的还是假的", "album": "真的还是假的", "track": 1}, "ape")
+    t = APEv2(str(p))
+    assert str(t["Title"]) == "真的还是假的" and str(t["Track"]) == "1"
+    assert str(t["Artist"]) == "孟庭苇" and str(t["Comment"]) == "ripped 1995" and str(t["Genre"]) == "Other"
+    assert p.read_bytes().count(b"APETAGEX") == 2 and p.read_bytes().startswith(b"MAC ")   # one tag (header+footer)
+    assert len(_raw_apev2(str(p))) == 6

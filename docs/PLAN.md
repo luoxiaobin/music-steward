@@ -103,11 +103,23 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
     joke release "Unicode" (274,000-character track titles) cost 13 s of CPU per album that drew it
     → comparisons bounded to 300 characters, stored text to 500. Measured on 3 NAS APE albums:
     cold 10-15 s → fully warm 1.4-1.8 s each, identical candidates and distances.
+19. ✅ Resumability at scale (2026-11-19, `tools/resume_test.py`). Recognition of 329 NAS APE
+    albums (every 5th of 音乐Ape): Ctrl-C after 60, hard kill after 60 more, resumed to the end →
+    0 albums redone, both interrupted albums finished on resume, 0 left stuck; ~11 s/album.
+    Result mix: 32 Likely, 89 Needs review, 48 Weak, 151 No match. Apply of 40 of them (123 files,
+    14 GB) to a local folder, on a copy of the DB: Ctrl-C mid-copy, hard kill mid-copy, resumed →
+    temp files recovered, nothing half-written published; 123 sources unchanged; undo removed all
+    123 copies (and left alone what the run had not created).
+    Found and fixed on the way: 9 albums failed to match and 38 copies failed tagging because
+    their APE tags hold GBK bytes or corrupt items (or an ID3 block precedes the APE audio) →
+    lenient tag reading (repair proposals for GBK/Big5), beets falls back to it, and a copy's
+    unreadable APE tag is rebuilt from its salvageable items (audio verified identical).
+    Follow-up: when an album tag is a placeholder (未知标题), search with the folder name instead.
 
 ## M2 backlog (original order)
 
 1. ✅ `serve` + read-only inventory browser (three-pane, per the Review & Plan mockups)
-2. Recognition queue: ✅ resumable, one process per unit; ✅ lookup + fingerprint cache, Deezer/Discogs throttled; still to do: resumability proven at scale; one worker process per job (ADR-level finding F1)
+2. Recognition queue: ✅ resumable, one process per unit; ✅ lookup + fingerprint cache, Deezer/Discogs throttled; ✅ resumability proven at scale (item 19); one worker process per job (ADR-level finding F1)
 3. ✅ Pre-processing before matching: GBK/Big5 tag repair; cue-sheet albums; tag-sanity fallbacks
 4. ✅ Own confidence rule (AcoustID-linked + distance < ~0.15 → Ready); artist agreement for singles (still to do)
 5. ✅ Extra candidate sources for mainland releases (evaluate Discogs, Deezer)

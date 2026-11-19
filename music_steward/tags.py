@@ -80,6 +80,27 @@ def _tolerant(path: str) -> TagInfo | None:
     return ti
 
 
+def apev2_span(path: str) -> tuple[int, int] | None:
+    """(start, end) byte range of the APEv2 tag, header included; None if there is none.
+    An ID3v1 tag after it (end < file size) is not part of the range."""
+    import struct
+    with open(path, "rb") as fh:
+        fh.seek(0, 2)
+        size_f = fh.tell()
+        for footer_at in (size_f - 32, size_f - 128 - 32):
+            if footer_at < 0:
+                continue
+            fh.seek(footer_at)
+            foot = fh.read(32)
+            if foot[:8] == b"APETAGEX":
+                break
+        else:
+            return None
+    _ver, size, _count, flags = struct.unpack("<4I", foot[8:24])
+    start = footer_at + 32 - size - (32 if flags & 0x80000000 else 0)   # bit 31: has a header
+    return (start, footer_at + 32) if 0 <= start < footer_at else None
+
+
 def _raw_apev2(path: str) -> list[tuple[str, bytes]] | None:
     """Minimal APEv2 reader: footer 'APETAGEX' at the end (or before a 128-byte ID3v1 tag)."""
     import struct
