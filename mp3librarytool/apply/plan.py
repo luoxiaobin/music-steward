@@ -23,13 +23,15 @@ COVER = re.compile(r"^(cover|folder|front|albumart)([ _-]?(large|front))?\.(jpe?
 
 def _tags_for(c, t, kind) -> dict:
     total_discs = c["mediums"] or 1
+    is_mb = (c.get("source") or "MusicBrainz") == "MusicBrainz"   # never put Deezer/Discogs ids in MB tags
     return {
         "title": t["title"], "artist": t["artist"] or c["artist"],
         "album": c["album"] if kind == "album" else None,
         "albumartist": c["artist"] if kind == "album" else None,
         "track": t["medium_index"] or t["track_index"] if kind == "album" else None,
         "disc": f"{t['medium']}/{total_discs}" if kind == "album" and total_discs > 1 else None,
-        "date": c["year"], "mb_trackid": t["recording_id"], "mb_albumid": c["album_id"],
+        "date": c["year"], "mb_trackid": t["recording_id"] if is_mb else None,
+        "mb_albumid": c["album_id"] if is_mb else None,
     }
 
 

@@ -69,13 +69,30 @@ def _reset():
         ch.API_KEY = BEETS_DEFAULT_APP_KEY
 
 
+def sources() -> list[str]:
+    """Candidate sources: MusicBrainz always; Deezer unless MLT_SOURCES excludes it;
+    Discogs only when a personal token is in DISCOGS_TOKEN."""
+    wanted = os.environ.get("MLT_SOURCES", "musicbrainz,deezer,discogs").lower().split(",")
+    out = ["musicbrainz"]
+    if "deezer" in wanted:
+        out.append("deezer")
+    if "discogs" in wanted and os.environ.get("DISCOGS_TOKEN"):
+        out.append("discogs")
+    return out
+
+
 def configure(acoustid_key: str | None, search_limit: int = 5):
     _reset()
     use_chroma = bool(acoustid_key)
-    bconfig["plugins"] = ["musicbrainz"] + (["chroma"] if use_chroma else [])
+    srcs = sources()
+    bconfig["plugins"] = srcs + (["chroma"] if use_chroma else [])
+    if "discogs" in srcs:
+        bconfig["discogs"]["user_token"] = os.environ["DISCOGS_TOKEN"]
+        bconfig["discogs"]["user_token"].redact = True
+    for s in srcs:
+        bconfig[s]["search_limit"] = search_limit
     bconfig["create_backup_before_migrations"] = False
     bconfig["import"]["write"] = False
-    bconfig["musicbrainz"]["search_limit"] = search_limit
     plugins.load_plugins()
     if use_chroma:
         sys.modules["beetsplug.chroma"].API_KEY = acoustid_key

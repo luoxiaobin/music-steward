@@ -42,6 +42,10 @@ Get one album all the way through before widening any step:
    Tested: 郑绪岚《情系红楼梦》 is not on MusicBrainz at all → stays "No real match" (case for extra sources).
 10. ✅ Edit fields after Accept: album, album artist, year, per-track titles; used for the copies' tags
     and paths; kept when the same release is re-accepted or re-linked after a re-match.
+11. ✅ Extra sources: Deezer on by default (no key); Discogs automatically when DISCOGS_TOKEN is set.
+    MusicBrainz ids are only written for MusicBrainz releases. Measured on the sample with Deezer:
+    1 of 24 improved (张也 万事如意: right singer instead of 龚玥), 0 worse; Deezer has the mainland
+    artists but not these exact albums. Discogs: pending the user's token.
 
 Then widen by value: garbled-tag repair before matching → own confidence rule → edit/search/conflicts and the full Plan screen → extra sources for mainland releases → cue-sheet albums, singles rules, Simplified/Traditional key → pywebview window.
 

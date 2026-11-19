@@ -14,6 +14,7 @@ dependencies = [
     "charset-normalizer==3.5.2",
     "beets==2.14.1",          # matching (in-process, behind mp3librarytool/recognize/beets_adapter.py)
     "pyacoustid==1.3.1",
+    "python3-discogs-client==2.10",  # Discogs candidates (used only when DISCOGS_TOKEN is set)
 ]
 
 [project.optional-dependencies]

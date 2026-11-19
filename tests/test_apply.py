@@ -191,3 +191,24 @@ def test_different_disc_covers_are_both_kept(tmp_path, con):
     imgs = sorted(i["dest_rel"] for i in p["items"] if i["kind"] == "image")
     assert imgs == ["A/Box (2000)/Folder (CD 2).jpg", "A/Box (2000)/Folder.jpg"]
     assert p["summary"]["blocked"] == 0
+
+
+def test_non_musicbrainz_release_never_writes_musicbrainz_ids(accepted, con):
+    lib, dest = accepted
+    con.execute("UPDATE candidate SET source='Deezer', album_id='302127'")
+    con.commit()
+    p = plan.load(con, plan.build(con, str(dest), 1))
+    for it in (i for i in p["items"] if i["kind"] == "audio"):
+        assert it["tags"]["mb_trackid"] is None and it["tags"]["mb_albumid"] is None
+        assert it["tags"]["album"] == "夜航"
+
+
+def test_sources_follow_environment(monkeypatch):
+    from mp3librarytool.recognize import beets_adapter as A
+    monkeypatch.delenv("DISCOGS_TOKEN", raising=False)
+    monkeypatch.delenv("MLT_SOURCES", raising=False)
+    assert A.sources() == ["musicbrainz", "deezer"]
+    monkeypatch.setenv("DISCOGS_TOKEN", "x")
+    assert A.sources() == ["musicbrainz", "deezer", "discogs"]
+    monkeypatch.setenv("MLT_SOURCES", "musicbrainz")
+    assert A.sources() == ["musicbrainz"]
