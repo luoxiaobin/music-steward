@@ -42,6 +42,7 @@ class App:
         self.session = secrets.token_urlsafe(32)
         self.scan_state = {"running": False}
         self._lock = threading.Lock()
+        self._stop = threading.Event()
         self._summary_cache: dict = {}
         con = db.connect(db_path)
         con.close()
@@ -186,6 +187,7 @@ class App:
                 return {"error": f"a {self.scan_state.get('kind')} is already running"}
             self.scan_state = {"running": True, "kind": kind, "root": root, "path": path,
                                "done": 0, "total": None, "started": time.time()}
+            self._stop = threading.Event()   # Stop button: recognition stops after the current album
 
         def prog(done, total):
             self.scan_state.update(done=done, total=total)
@@ -213,7 +215,11 @@ class App:
                     sub = nfc(path)
                     q = units.enqueue(con, rid, units.plan_units(con, rid, sub), scope=sub)
                     ids = queue.pending(con, rid, sub)
-                    res = {"status": "complete", **q, **queue.run(self.db_path, ids, progress=prog)}
+                    res = {"status": "complete", **q, **queue.run(self.db_path, ids, progress=prog, stop=self._stop)}
+                    if self._stop.is_set():
+                        left = len(queue.pending(con, rid, sub))
+                        res.update(status="stopped", abort_reason=f"stopped by you; {left} albums still queued "
+                                                                 f"(Recognize folder continues them)")
                 else:
                     from . import hashpass
                     rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
@@ -227,6 +233,12 @@ class App:
                 con.close()
         threading.Thread(target=work, daemon=True).start()
         return {"started": True}
+
+    def stop_job(self) -> dict:
+        if not self.scan_state.get("running") or self.scan_state.get("kind") != "recognize":
+            return {"error": "only a running recognition can be stopped"}
+        self._stop.set()
+        return {"stopping": True}
 
     def make_plan(self, con, body) -> dict:
         from .apply import plan
@@ -357,20 +369,66 @@ class App:
     BULK_SKIP = {"no_match", "weak", "needs_review"}
 
     def bulk(self, con, body) -> dict:
-        """Folder-wide actions on UNDECIDED albums only (decisions already made are never touched):
+        """Actions on many albums at once.
+
+        Folder-wide (no `unit_ids`): only UNDECIDED albums are touched (decisions already made are
+        never changed):
           local         add own info (cue sheet / tags / names) to No match + Weak albums
           accept_local  accept the own info of albums that have it
-          skip          skip albums whose status is in `confidences` (No match / Weak / Needs review)"""
+          skip          skip albums whose status is in `confidences` (No match / Weak / Needs review)
+        Selected (`unit_ids`, chosen by the user in the table): the action applies to exactly
+        those albums, replacing an earlier decision:
+          accept_top    accept the best online candidate
+          own_info      add own info if needed and accept it
+          skip          skip
+          clear         remove the decision"""
         from .recognize import local, results
+        from .recognize.results import release_key
         action = body.get("action")
         root = os.path.abspath(body.get("root", ""))
         if root not in self.roots:
             return {"error": "not a configured root"}
         rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
+        now = time.time()
+        done, failed = 0, []
+        if body.get("unit_ids") is not None:
+            if action not in ("accept_top", "own_info", "skip", "clear"):
+                return {"error": "unknown action for selected albums"}
+            ids = {_int(i) for i in body["unit_ids"]} - {None}
+            for u in results.units(con, rid, nfc(body.get("path", ""))):
+                if u["id"] not in ids:
+                    continue
+                if action == "clear":
+                    con.execute("DELETE FROM decision WHERE unit_id=?", (u["id"],))
+                elif action == "skip":
+                    con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at) "
+                                "VALUES(?, 'skip', NULL, ?)", (u["id"], now))
+                elif action == "accept_top":
+                    if not u["top"]:
+                        failed.append(f"{u['label']}: no online candidate")
+                        continue
+                    con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                                "VALUES(?, 'accept', ?, ?, ?)", (u["id"], u["top"]["id"], now, release_key(con, u["top"]["id"])))
+                elif action == "own_info":
+                    if u["status"] != "done":
+                        failed.append(f"{u['label']}: not recognized yet")
+                        continue
+                    try:
+                        cid = u["local"]["id"] if u["local"] else local.add(con, u["id"])
+                    except (OSError, ValueError) as e:
+                        failed.append(f"{u['label']}: {e}")
+                        continue
+                    con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                                "VALUES(?, 'accept', ?, ?, 'local')", (u["id"], cid, now))
+                con.execute("UPDATE unit SET notice=NULL WHERE id=?", (u["id"],))
+                done += 1
+            con.commit()
+            return {"done": done, "failed": failed[:20], "n_failed": len(failed)}
         wanted = set(body.get("confidences") or [])
         if action == "skip" and (not wanted or not wanted <= self.BULK_SKIP):
             return {"error": "bulk skip is only for No match, Weak and Needs review albums"}
-        done, failed = 0, []
+        if action not in ("local", "accept_local", "skip"):
+            return {"error": "unknown bulk action"}
         for u in results.units(con, rid, nfc(body.get("path", ""))):
             if u["decision"] is not None or u["status"] != "done":
                 continue
@@ -382,15 +440,13 @@ class App:
                     failed.append(f"{u['label']}: {e}")
             elif action == "accept_local" and u["local"]:
                 con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
-                            "VALUES(?, 'accept', ?, ?, 'local')", (u["id"], u["local"]["id"], time.time()))
+                            "VALUES(?, 'accept', ?, ?, 'local')", (u["id"], u["local"]["id"], now))
                 con.execute("UPDATE unit SET notice=NULL WHERE id=?", (u["id"],))
                 done += 1
             elif action == "skip" and u["confidence"] in wanted:
                 con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at) "
-                            "VALUES(?, 'skip', NULL, ?)", (u["id"], time.time()))
+                            "VALUES(?, 'skip', NULL, ?)", (u["id"], now))
                 done += 1
-            elif action not in ("local", "accept_local", "skip"):
-                return {"error": "unknown bulk action"}
         con.commit()
         return {"done": done, "failed": failed[:20], "n_failed": len(failed)}
 
@@ -553,6 +609,8 @@ def make_handler(app: App, port_ref: dict):
                     return self._json(app.decide(con, body))
                 finally:
                     con.close()
+            if u.path == "/api/stop":
+                return self._json(app.stop_job())
             if u.path in ("/api/scan", "/api/hash", "/api/recognize"):
                 kind = u.path.rsplit("/", 1)[1]
                 return self._json(app.start_job(kind, body.get("root", ""), body.get("path", "")))

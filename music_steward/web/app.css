@@ -108,3 +108,8 @@ audio{width:100%}
 .field input{font:14px var(--font);min-height:36px;padding:0 10px;border:1px solid var(--btn-line);border-radius:8px;min-width:320px;flex:1}
 .err{color:var(--conflict);font-weight:600}
 [hidden]{display:none !important}
+
+.selbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.selbar .btn{min-height:28px;padding:0 10px}
+.selbar select{font:13px var(--font);min-height:28px;border:1px solid var(--btn-line);border-radius:6px}
+.selcol{width:28px;text-align:center}

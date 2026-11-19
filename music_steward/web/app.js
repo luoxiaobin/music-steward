@@ -105,6 +105,9 @@ function renderScan(sc) {
       : sc.kind === "hash"
       ? (sc.total ? `Hashing ${where}: ${sc.done} / ${sc.total} files` : `Hashing ${where}: starting…`)
       : (sc.total ? `Scanning ${where}: ${sc.done} / ${sc.total} new or changed files read` : `Scanning ${where}: listing folders…`);
+    if (sc.kind === "recognize") el.append(" ", h("button", { type: "button", class: "btn", style: "min-height:24px;padding:0 8px",
+      onclick: async e => { e.target.disabled = true; e.target.textContent = "Stopping after this album…";
+                            const r = await post2("/api/stop", {}); if (r.error) alert(r.error); } }, "Stop"));
     clearTimeout(S.scanTimer);
     S.scanTimer = setTimeout(async () => { const st = await api("/api/state"); renderScan(st.scan);
                                            if (!st.scan.running) refreshAll(); }, 1500);
@@ -252,14 +255,57 @@ async function renderUnits(where) {
     bulkBtn("Skip No match + Weak", nSkip,
       `Skip ${nSkip} undecided No match / Weak albums in this folder? They stay where they are and are left out of plans. Each skip can be undone.`,
       { action: "skip", confidences: ["no_match", "weak"] })].filter(Boolean));
+  // ---- selection: filter, tick, act on exactly the ticked albums ----
+  S.unitSel = new Set([...(S.unitSel || [])].filter(id => us.some(u => u.id === id)));
+  const statusOf = u => u.decision ? u.decision.action : u.confidence;
+  const FILTERS = [["all", "All"], ["undecided", "Undecided"], ["likely", "Likely"], ["needs_review", "Needs review"],
+                   ["weak", "Weak"], ["no_match", "No match"], ["accept", "Accepted"], ["skip", "Skipped"]];
+  const f = S.unitFilter || "all";
+  const shown = us.filter(u => (f === "all" || (f === "undecided" ? !u.decision : statusOf(u) === f)) &&
+                               (!S.titleOnly || (u.evidence && u.evidence.title_agrees)));
+  const selBar = h("div", { class: "selbar" });
+  const drawBar = () => {
+    const n = S.unitSel.size;
+    const act = (label, action, ask) => h("button", { type: "button", class: "btn", disabled: !n, onclick: async () => {
+      if (ask && !confirm(ask.replace("{n}", n))) return;
+      const r = await post2("/api/bulk", { root: S.root.path, path: S.path, action, unit_ids: [...S.unitSel] });
+      if (r.error) return alert(r.error);
+      if (r.n_failed) alert(`${r.done} done; ${r.n_failed} not done:\n` + r.failed.join("\n"));
+      S.unitSel.clear();
+      await refreshCenter();
+    } }, label);
+    selBar.replaceChildren(
+      h("label", { class: "small" }, "Show ", h("select", { onchange: e => { S.unitFilter = e.target.value; S.unitSel.clear(); refreshCenter(); } },
+        FILTERS.map(([v, l]) => h("option", { value: v, selected: v === f ? true : null },
+          `${l} (${v === "all" ? us.length : us.filter(u => v === "undecided" ? !u.decision : statusOf(u) === v).length})`)))),
+      h("label", { class: "small" }, h("input", { type: "checkbox", checked: S.titleOnly ? true : null,
+        onchange: e => { S.titleOnly = e.target.checked; S.unitSel.clear(); refreshCenter(); } }), " only where the album title agrees"),
+      h("span", { class: "small strong" }, `${n} selected`),
+      act("Accept top match", "accept_top", "Accept the best online candidate for {n} albums?"),
+      act("Use own info", "own_info", "Organize {n} albums from their own info (cue sheet / tags / names)?"),
+      act("Skip", "skip", "Skip {n} albums? They are left out of plans."),
+      act("Clear decision", "clear", null));
+  };
+  drawBar();
+  const boxes = [];
+  const all = h("input", { type: "checkbox", "aria-label": "Select all shown",
+    checked: shown.length && shown.every(u => S.unitSel.has(u.id)) ? true : null,
+    onchange: e => { for (const u of shown) e.target.checked ? S.unitSel.add(u.id) : S.unitSel.delete(u.id);
+                     boxes.forEach(b => { b.checked = e.target.checked; }); drawBar(); } });
   const body = h("tbody");
-  for (const u of us) {
+  for (const u of shown) {
     const t = u.top;
+    const box = h("input", { type: "checkbox", "aria-label": `Select ${u.label}`, checked: S.unitSel.has(u.id) ? true : null,
+      onclick: e => e.stopPropagation(),
+      onchange: e => { e.target.checked ? S.unitSel.add(u.id) : S.unitSel.delete(u.id); drawBar(); } });
+    boxes.push(box);
     const tr = h("tr", { tabindex: "0", "aria-selected": String(S.selectedUnit === u.id),
                          onclick: () => selectUnit(u.id, tr), onkeydown: e => { if (e.key === "Enter") selectUnit(u.id, tr); } },
+      h("td", { class: "selcol", onclick: e => e.stopPropagation() }, box),
       h("td", {}, h("div", { class: "strong" }, u.label), h("div", { class: "sub mono" }, (u.folder || ".") + "/")),
       h("td", {}, u.kind === "track" ? "track" : u.kind === "cue" ? `${u.n_tracks || "?"} (cue)` : u.n_files),
-      h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${yearText(t)}${t.country ? " · " + t.country : ""}`),
+      h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${yearText(t)}${t.country ? " · " + t.country : ""}`,
+                         u.evidence && u.evidence.title_agrees ? h("span", { class: "ok small" }, "  title ✓") : null),
                        h("div", { class: "sub" }, `${t.artist} · distance ${t.distance.toFixed(2)} · fingerprints ${t.fingerprint_agrees}/${u.n_tracks || u.n_files}` +
                          (u.evidence && u.evidence.disc_of_set ? ` · disc ${u.evidence.disc} of ${t.mediums}` : ""))]
                     : h("span", { class: "muted" }, u.status === "error" ? "error" : u.status === "done" ? "no candidates" : "—"),
@@ -268,8 +314,11 @@ async function renderUnits(where) {
       h("td", {}, unitBadge(u)));
     body.append(tr);
   }
+  note.after(selBar);
+  document.querySelectorAll(".selbar").forEach(el => { if (el !== selBar) el.remove(); });
   document.getElementById("table").replaceChildren(
-    h("thead", {}, h("tr", {}, ["Album / folder", "Tracks", "Best candidate", "Status"].map(x => h("th", { scope: "col" }, x)))), body);
+    h("thead", {}, h("tr", {}, h("th", { scope: "col", class: "selcol" }, all),
+      ...["Album / folder", "Tracks", "Best candidate", "Status"].map(x => h("th", { scope: "col" }, x)))), body);
   return true;
 }
 async function selectUnit(id, tr) {
@@ -572,5 +621,10 @@ document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click"
 document.getElementById("scanBtn").addEventListener("click", startScan);
 document.getElementById("rescanFolderBtn").addEventListener("click", () => startJob("scan", S.path));
 document.getElementById("hashFolderBtn").addEventListener("click", () => startJob("hash", S.path));
-document.getElementById("recognizeBtn").addEventListener("click", () => startJob("recognize", S.path));
+document.getElementById("recognizeBtn").addEventListener("click", () => {
+  const where = S.path || "the whole collection";
+  if (!confirm(`Recognize every album in “${where}”?\n\nAlbums already matched are kept; new ones are matched at about ` +
+               "10 seconds each, so a big folder can take hours. You can stop it at any time.")) return;
+  startJob("recognize", S.path);
+});
 refreshAll().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });

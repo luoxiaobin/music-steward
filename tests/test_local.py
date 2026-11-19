@@ -231,3 +231,21 @@ def test_bulk_own_info_accept_and_skip_touch_only_undecided(two_disc_cues, con, 
     assert con.execute("SELECT action FROM decision WHERE unit_id=?", (uids[1],)).fetchone()[0] == "skip"
     assert con.execute("SELECT 1 FROM decision WHERE unit_id=?", (ready,)).fetchone() is None
     assert "error" in app.bulk(con, {"root": "/elsewhere", "action": "local"})
+
+
+def test_selected_albums_accept_own_info_skip_clear(two_disc_cues, con, monkeypatch):
+    lib, uids = two_disc_cues
+    app = App(con.execute("PRAGMA database_list").fetchone()[2], [str(lib)], None)
+    root = str(lib)
+    r = app.bulk(con, {"root": root, "action": "own_info", "unit_ids": [uids[0]]})
+    assert r["done"] == 1
+    d = con.execute("SELECT * FROM decision WHERE unit_id=?", (uids[0],)).fetchone()
+    assert d["action"] == "accept" and d["release_key"] == "local"
+    assert con.execute("SELECT 1 FROM decision WHERE unit_id=?", (uids[1],)).fetchone() is None   # not selected
+    r = app.bulk(con, {"root": root, "action": "accept_top", "unit_ids": uids})
+    assert r["done"] == 0 and r["n_failed"] == 2                      # no online candidates: reported, nothing changed
+    assert app.bulk(con, {"root": root, "action": "skip", "unit_ids": uids})["done"] == 2   # replaces the accept
+    assert {r[0] for r in con.execute("SELECT action FROM decision")} == {"skip"}
+    assert app.bulk(con, {"root": root, "action": "clear", "unit_ids": [uids[1]]})["done"] == 1
+    assert con.execute("SELECT COUNT(*) FROM decision").fetchone()[0] == 1
+    assert "error" in app.bulk(con, {"root": root, "action": "local", "unit_ids": uids})
