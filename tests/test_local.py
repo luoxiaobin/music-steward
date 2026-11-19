@@ -128,3 +128,76 @@ def test_artist_and_album_from_a_suffix_shared_by_all_file_names(tmp_path, con):
     assert (info["artist"], info["album"]) == ("郑绪岚", "情系红楼梦")
     assert [t["title"] for t in info["tracks"]] == ["紫菱洲歌", "红豆曲", "晴雯歌"]
     assert info["origin"]["album"] == "file names"
+
+
+def _accept_local(con, uid):
+    cid = local.add(con, uid)
+    con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                "VALUES(?, 'accept', ?, 0, 'local')", (uid, cid))
+    con.commit()
+    return cid
+
+
+@pytest.fixture
+def two_disc_cues(tmp_path, con):
+    """经典老歌101 CD1 and CD2: two cue image albums in sibling folders."""
+    from .test_cue import CUE
+    lib = tmp_path / "lib"
+    for n in (1, 2):
+        a = lib / f"经典老歌101 CD{n}"
+        tone(a / "image.flac", ["-c:a", "flac"], secs=6, freq=300 + n)
+        (a / "image.cue").write_bytes(CUE.replace("old image name.wav", "image.wav")
+                                      .replace("HIFI年代 - 怀念战友", f"经典老歌101 CD{n}").encode("gbk"))
+    scan(con, lib)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["kind"] == "cue"])
+    con.execute("UPDATE unit SET status='done', n_tracks=3")
+    con.commit()
+    return lib, [r[0] for r in con.execute("SELECT id FROM unit ORDER BY folder")]
+
+
+def test_discs_of_a_set_share_one_album_folder(two_disc_cues, con, tmp_path):
+    lib, uids = two_disc_cues
+    for uid in uids:
+        _accept_local(con, uid)
+    info = local.describe(con, uids[1])
+    assert (info["album"], info["mediums"], info["origin"]["disc"]) == ("经典老歌101", 2, "album title")
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
+    assert all(i["status"] == "ok" for i in p["items"])
+    got = sorted((i["dest_rel"], i["tags"].get("disc")) for i in p["items"])
+    assert got == [("柏菲/经典老歌101/经典老歌101 (CD 1).cue", None), ("柏菲/经典老歌101/经典老歌101 (CD 1).flac", "1/2"),
+                   ("柏菲/经典老歌101/经典老歌101 (CD 2).cue", None), ("柏菲/经典老歌101/经典老歌101 (CD 2).flac", "2/2")]
+
+
+def test_cue_track_titles_and_disc_can_be_edited(two_disc_cues, con, tmp_path):
+    lib, uids = two_disc_cues
+    app = App(con.execute("PRAGMA database_list").fetchone()[2], [str(lib)], None)
+    _accept_local(con, uids[0])
+    assert "error" in app.edit_fields(con, {"unit_id": uids[0], "overrides": {"disc": "3", "discs": "2"}})
+    assert "error" in app.edit_fields(con, {"unit_id": uids[0], "overrides": {"disc": "x"}})
+    r = app.edit_fields(con, {"unit_id": uids[0], "overrides": {
+        "album": "经典老歌一百零一首", "disc": "1", "discs": "3", "cue_titles": {"2": "怀念战友 (电影《冰山上的来客》插曲)", "9": "x"}}})
+    assert r["overrides"]["cue_titles"] == {"2": "怀念战友 (电影《冰山上的来客》插曲)"}
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1, "经典老歌101 CD1"))
+    img = next(i for i in p["items"] if i["kind"] == "audio")
+    assert img["dest_rel"] == "柏菲/经典老歌一百零一首/经典老歌一百零一首 (CD 1).flac" and img["tags"]["disc"] == "1/3"
+    rw = next(i for i in p["items"] if i["kind"] == "cue")["tags"]["cue_rewrite"]
+    assert rw["tracks"]["2"]["title"] == "怀念战友 (电影《冰山上的来客》插曲)" and rw["tracks"]["1"]["title"] == "红星照我去战斗"
+
+
+def test_file_albums_set_as_discs_get_disc_prefixed_names(tmp_path, con):
+    lib = tmp_path / "lib"
+    for n in (1, 2):
+        for i in range(2):
+            tone(lib / f"Set part {n}" / f"0{i + 1} - Song {n}{i}.mp3", ["-c:a", "libmp3lame"], secs=1, freq=300 + 10 * n + i)
+    scan(con, lib)
+    units.enqueue(con, 1, units.plan_units(con, 1))
+    app = App(con.execute("PRAGMA database_list").fetchone()[2], [str(lib)], None)
+    for n, uid in enumerate([r[0] for r in con.execute("SELECT id FROM unit ORDER BY folder")], 1):
+        con.execute("UPDATE unit SET status='done' WHERE id=?", (uid,))
+        _accept_local(con, uid)
+        app.edit_fields(con, {"unit_id": uid, "overrides": {"album": "The Set", "albumartist": "Band", "disc": str(n)}})
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
+    assert sorted(i["dest_rel"] for i in p["items"]) == [
+        "Band/The Set/1-01 - Song 10.mp3", "Band/The Set/1-02 - Song 11.mp3",
+        "Band/The Set/2-01 - Song 20.mp3", "Band/The Set/2-02 - Song 21.mp3"]
+    assert {i["tags"]["disc"] for i in p["items"]} == {"1/2", "2/2"}

@@ -307,6 +307,20 @@ class App:
             if not str(ov["year"]).strip().isdigit() or not 1000 <= int(ov["year"]) <= 2999:
                 return {"error": "year must be a 4-digit number"}
             clean["year"] = int(ov["year"])
+        for k in ("disc", "discs"):
+            v = str(ov.get(k, "")).strip()
+            if v:
+                if not v.isdigit() or not 1 <= int(v) <= 99:
+                    return {"error": "disc numbers must be between 1 and 99"}
+                clean[k] = int(v)
+        if clean.get("disc") and clean.get("discs") and clean["discs"] < clean["disc"]:
+            return {"error": f"disc {clean['disc']} cannot be part of a {clean['discs']}-disc set"}
+        cue_nos = {r[0] for r in con.execute("SELECT cue_track FROM cand_cue_track WHERE candidate_id=?",
+                                             (d["candidate_id"],))}
+        cue_titles = {str(int(k)): v.strip() for k, v in (ov.get("cue_titles") or {}).items()
+                      if str(k).isdigit() and int(k) in cue_nos and isinstance(v, str) and v.strip()}
+        if cue_titles:
+            clean["cue_titles"] = cue_titles
         ids = set(json.loads(con.execute("SELECT file_ids FROM unit WHERE id=?", (uid,)).fetchone()[0]))
         titles = {str(int(k)): v.strip() for k, v in (ov.get("titles") or {}).items()
                   if str(k).isdigit() and int(k) in ids and isinstance(v, str) and v.strip()}

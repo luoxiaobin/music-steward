@@ -35,23 +35,26 @@ def _tags_for(c, t, kind) -> dict:
     }
 
 
-def _cue_items(con, u, c, adir, root_path, items, new_stem_of):
+def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
     """A cue-sheet image album: copy the image (album-level tags) and a rewritten cue sheet
     (new FILE name, album + track titles from the release, original encoding). No splitting."""
     from .. import cue as cuemod
     from .naming import ext_for
     f = con.execute("SELECT * FROM file WHERE id=?", (json.loads(u["file_ids"])[0],)).fetchone()
     cf = con.execute("SELECT * FROM file WHERE id=?", (u["cue_file_id"],)).fetchone()
-    stem = safe_component(c["album"], "Album")
+    multi = (c["mediums"] or 1) > 1 and c.get("_disc") is not None
+    stem = safe_component(f"{c['album']} (CD {c['_disc']})" if multi else c["album"], "Album")
     image_name = stem + ext_for(f["codec"], f["ext"])
     is_mb = (c.get("source") or "MusicBrainz") == "MusicBrainz"
     items.append({"unit_id": u["id"], "file_id": f["id"], "kind": "audio",
                   "src": os.path.join(root_path, f["fs_relpath"]), "dest_rel": f"{adir}/{image_name}",
                   "codec": f["codec"], "size": f["size"], "mtime": f["mtime_ns"],
                   "tags": {"album": c["album"], "albumartist": c["artist"], "date": c["year"],
+                           "disc": f"{c['_disc']}/{c['mediums']}" if multi else None,
                            "mb_albumid": c["album_id"] if is_mb else None}})
     sheet = cuemod.parse(os.path.join(root_path, cf["fs_relpath"]))
-    tracks = {str(t["cue_track"]): {"title": t["title"], "performer": t["artist"] or c["artist"]}
+    tracks = {str(t["cue_track"]): {"title": (cue_titles or {}).get(str(t["cue_track"])) or t["title"],
+                                    "performer": t["artist"] or c["artist"]}
               for t in con.execute("SELECT * FROM cand_cue_track WHERE candidate_id=?", (c["id"],))}
     items.append({"unit_id": u["id"], "file_id": cf["id"], "kind": "cue",
                   "src": os.path.join(root_path, cf["fs_relpath"]), "dest_rel": f"{adir}/{stem}.cue",
@@ -87,7 +90,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
         q += " AND (u.folder=? OR (u.folder >= ? AND u.folder < ?))"
         args += (scope, scope + "/", scope + "/￿")
     root_path = con.execute("SELECT path FROM root WHERE id=?", (root_id,)).fetchone()["path"]
-    items = []
+    items, prepared = [], []
     for u in con.execute(q, args).fetchall():
         c = dict(con.execute("SELECT * FROM candidate WHERE id=?", (u["candidate_id"],)).fetchone())
         tracks = {t["file_id"]: dict(t) for t in con.execute("SELECT * FROM cand_track WHERE candidate_id=?", (c["id"],))}
@@ -100,9 +103,32 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                 tracks[int(fid)]["title"] = title
         adir = (album_dir(c["artist"], c["album"], c["year"]) if u["kind"] in ("album", "cue")
                 else f"{safe_component(c['artist'], 'Unknown Artist')}/Singles")
+        # which disc of a set this unit is: the user's edit, else what the release mapping says
+        if ov.get("disc"):
+            disc = int(ov["disc"])
+            for t in tracks.values():
+                t["medium"] = disc
+        elif u["kind"] == "cue":
+            media = {r[0] for r in con.execute("SELECT DISTINCT medium FROM cand_cue_track WHERE candidate_id=?",
+                                               (c["id"],)) if r[0]}
+            disc = media.pop() if len(media) == 1 else None
+        else:
+            media = {t["medium"] for t in tracks.values() if t["medium"]}
+            disc = media.pop() if len(media) == 1 else None
+        prepared.append((u, c, tracks, ov, adir, disc))
+    # discs of one set: accepted units that land in the same album folder share it
+    discs_in = defaultdict(int)
+    for u, c, tracks, ov, adir, disc in prepared:
+        if u["kind"] in ("album", "cue"):
+            k = collision_key(adir)
+            discs_in[k] = max(discs_in[k], disc or 1, int(ov.get("discs") or 0), c["mediums"] or 1)
+    for u, c, tracks, ov, adir, disc in prepared:
+        if u["kind"] in ("album", "cue"):
+            c["mediums"] = discs_in[collision_key(adir)]
+            c["_disc"] = disc            # None: this unit holds the whole set (or it is unknown)
         new_stem_of = {}
         if u["kind"] == "cue":
-            _cue_items(con, u, c, adir, root_path, items, new_stem_of)
+            _cue_items(con, u, c, adir, root_path, items, new_stem_of, ov.get("cue_titles") or {})
         for fid in ([] if u["kind"] == "cue" else json.loads(u["file_ids"])):
             f = con.execute("SELECT * FROM file WHERE id=?", (fid,)).fetchone()
             t = tracks.get(fid)

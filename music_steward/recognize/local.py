@@ -50,6 +50,19 @@ def clean(s: str | None, number: int | None = None) -> str | None:
     return None if not s or PLACEHOLDER.match(s) else s
 
 
+DISC_SUFFIX = re.compile(r"[\s\-_.·]*[(（\[【]?\s*(?:cd|disc|disk|碟)\s*[-_.]?\s*0*(\d{1,2})\s*[)）\]】]?$", re.I)
+
+
+def split_disc(album: str | None) -> tuple[str | None, int | None]:
+    """'经典老歌101 CD2' -> ('经典老歌101', 2); 'Box (Disc 1)' -> ('Box', 1). Only at the end."""
+    if not album:
+        return album, None
+    m = DISC_SUFFIX.search(album)
+    if not m or not album[:m.start()].strip(" -_.·"):
+        return album, None
+    return album[:m.start()].strip(" -_.·"), int(m.group(1)) or None
+
+
 def _year(s) -> int | None:
     m = YEAR.search(str(s or ""))
     return int(m.group(1)) if m else None
@@ -150,14 +163,19 @@ def from_cue(con: sqlite3.Connection, u) -> dict:
     performers = {clean(t.performer) for t in f.tracks} - {None}
     if not artist and len(performers) == 1:
         artist = performers.pop()
+    album, disc = split_disc(album)
+    disc_from = "album title" if disc else None
+    if not disc:
+        disc = _disc_of(u["folder"] + "/x", u["folder"])
+        disc_from = "folder name" if disc else None
     tracks = [{"cue_track": t.number, "cue_title": t.title,
-               "title": clean(t.title, t.number) or f"Track {t.number}", "artist": clean(t.performer) or artist, "medium": 1, "medium_index": i + 1, "index": i + 1,
+               "title": clean(t.title, t.number) or f"Track {t.number}", "artist": clean(t.performer) or artist, "medium": disc or 1, "medium_index": i + 1, "index": i + 1,
                "length": t.length} for i, t in enumerate(f.tracks)]
     origin = {"album": "cue sheet" if s_title else "folder name",
               "artist": "cue sheet" if s_perf else ("folder name" if folder["artist"] else None),
               "year": "cue sheet" if _year(sheet.date) else ("folder name" if folder["year"] else None),
-              "titles": "cue sheet"}
-    return {"album": album, "artist": artist, "year": _year(sheet.date) or folder["year"], "mediums": 1,
+              "titles": "cue sheet", "disc": disc_from}
+    return {"album": album, "artist": artist, "year": _year(sheet.date) or folder["year"], "mediums": disc or 1,
             "tracks": tracks, "origin": origin}
 
 
@@ -173,11 +191,14 @@ def from_files(con: sqlite3.Connection, u) -> dict:
                   "year": folder["year"]}
     is_album = u["kind"] == "album"
     origin = {}
-    album = artist = year = None
+    album = artist = year = title_disc = None
     if is_album:
         album = _majority([tags[f["id"]].get("album") for f in rows])
         origin["album"] = "tags" if album else ("file names" if suffix else "folder name")
         album = album or folder["album"]
+        album, title_disc = split_disc(album)
+        if title_disc:
+            origin["disc"] = "album title"
         artist = _majority([tags[f["id"]].get("albumartist") for f in rows]) or \
             _majority([tags[f["id"]].get("artist") for f in rows])
         if artist:
@@ -200,7 +221,7 @@ def from_files(con: sqlite3.Connection, u) -> dict:
         title = t.get("title")
         if not title:
             title, from_name = name_title, from_name + 1
-        disc = _int(t.get("disc")) or _disc_of(f["relpath"], u["folder"]) or 1
+        disc = _int(t.get("disc")) or _disc_of(f["relpath"], u["folder"]) or title_disc or 1
         no = _int(t.get("track")) or name_no
         tracks.append({"file_id": f["id"], "title": title, "artist": t.get("artist") or artist,
                        "medium": disc, "medium_index": no, "length": f["duration"], "_pos": pos})

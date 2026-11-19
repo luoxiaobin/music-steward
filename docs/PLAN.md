@@ -85,8 +85,13 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
     repeated track numbers are dropped. Accepted like any release (Edit fields, plan, apply, undo);
     never carries MusicBrainz IDs; never counts toward confidence; kept across re-matches
     (release_key 'local'). On the 23 Weak/No-match NAS APE albums it gives a usable album,
-    artist and track list for all 23. Known gap: separate discs of one set ("经典老歌101 CD2") stay
-    separate albums; titles of cue tracks are not editable yet.
+    artist and track list for all 23.
+16. ✅ Discs of one set and cue track titles. Accepted albums that land in the same album folder
+    are discs of one set: files are named "2-01 - Title", cue images "Album (CD 2).ape" + cue, and
+    the disc tag is "2/N" (N = the highest disc seen, the release's disc count, or the user's
+    value). Own info reads the disc from a trailing "CD2"/"Disc 2"/"(CD 2)" in the album title or
+    a "CD 2" folder; Edit fields has "Disc _ of _" and, for cue albums, every track title.
+    Two different albums that would share a folder still show as name conflicts, never merge silently.
 
 ## M2 backlog (original order)
 

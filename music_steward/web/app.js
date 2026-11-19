@@ -320,23 +320,38 @@ function renderUnitDetail(d) {
   if (accepted && chosen) {
     const inp = (id, val, ph, w) => h("input", { type: "text", id, value: val ?? "", placeholder: ph ?? "",
                                                  style: `font:14px var(--font);min-height:32px;padding:0 8px;border:1px solid var(--btn-line);border-radius:6px;width:${w || "100%"}` });
-    const titles = (d.kind === "cue" ? [] : chosen.tracks).map(t => h("tr", {},
-      h("td", { class: "mono" }, (files[t.file_id]?.relpath || "").split("/").pop()),
-      h("td", {}, inp(`t-${t.file_id}`, ov.titles?.[String(t.file_id)] ?? "", t.title))));
+    const titles = d.kind === "cue"
+      ? chosen.tracks.map(t => h("tr", {},
+          h("td", { class: "mono" }, `Track ${String(t.cue_track).padStart(2, "0")}`),
+          h("td", {}, inp(`ct-${t.cue_track}`, ov.cue_titles?.[String(t.cue_track)] ?? "", t.title))))
+      : chosen.tracks.map(t => h("tr", {},
+          h("td", { class: "mono" }, (files[t.file_id]?.relpath || "").split("/").pop()),
+          h("td", {}, inp(`t-${t.file_id}`, ov.titles?.[String(t.file_id)] ?? "", t.title))));
+    const media = [...new Set(chosen.tracks.map(t => t.medium).filter(Boolean))];
     parts.push(h("details", { open: Object.keys(ov).length ? true : null },
       h("summary", { class: "strong", style: "cursor:pointer" }, "Edit fields" + (Object.keys(ov).length ? " · edited" : "")),
       h("p", { class: "muted xsmall" }, "Leave a box empty to keep the release's value (shown greyed). Used for the copies' tags and names."),
       h("table", { class: "kv" }, h("tbody", {},
         h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-album" }, "Album")), h("td", {}, inp("e-album", ov.album, chosen.album))),
         h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-aa" }, "Album artist")), h("td", {}, inp("e-aa", ov.albumartist, chosen.artist))),
-        h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-year" }, "Year")), h("td", {}, inp("e-year", ov.year, chosen.year, "8em"))))),
+        h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-year" }, "Year")), h("td", {}, inp("e-year", ov.year, chosen.year, "8em"))),
+        h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-disc" }, "Disc")),
+          h("td", {}, inp("e-disc", ov.disc, media.length === 1 ? media[0] : "", "5em"), " of ",
+            inp("e-discs", ov.discs, chosen.mediums > 1 ? chosen.mediums : "", "5em"),
+            h("div", { class: "muted xsmall" }, "Discs of one set: give them the same album, album artist and year, and each its own disc number. They are put in one album folder."))))),
       h("table", { class: "kv" }, h("thead", {}, h("tr", {}, h("th", {}, "File"), h("th", {}, "Title"))), h("tbody", {}, titles)),
       h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:8px" },
         h("button", { type: "button", class: "btn", onclick: async () => {
           const t = {};
-          for (const tr of (d.kind === "cue" ? [] : chosen.tracks)) { const v = document.getElementById(`t-${tr.file_id}`).value; if (v.trim()) t[tr.file_id] = v; }
+          const ct = {};
+          for (const tr of chosen.tracks) {
+            if (d.kind === "cue") { const v = document.getElementById(`ct-${tr.cue_track}`).value; if (v.trim()) ct[tr.cue_track] = v; }
+            else { const v = document.getElementById(`t-${tr.file_id}`).value; if (v.trim()) t[tr.file_id] = v; }
+          }
           const r = await post2("/api/edit", { unit_id: d.id, overrides: { album: document.getElementById("e-album").value,
-            albumartist: document.getElementById("e-aa").value, year: document.getElementById("e-year").value, titles: t } });
+            albumartist: document.getElementById("e-aa").value, year: document.getElementById("e-year").value,
+            disc: document.getElementById("e-disc").value, discs: document.getElementById("e-discs").value,
+            titles: t, cue_titles: ct } });
           document.getElementById("editMsg").textContent = r.error || "Saved.";
           if (!r.error) selectUnit(d.id);
         } }, "Save edits"),
