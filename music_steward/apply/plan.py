@@ -123,7 +123,7 @@ def _prefer_own_artist(con, u, c, tracks) -> None:
         c["_artist_from"] = c["artist"]
         c["artist"] = own
     else:
-        c["artist"] = cat
+        c["artist"] = None if junk else cat     # '[unknown]' with nothing better -> 'Unknown Artist'
 
 
 class PlanError(Exception):
