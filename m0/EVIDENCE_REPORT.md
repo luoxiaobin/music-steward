@@ -1,7 +1,7 @@
 # MP3LibraryTool — M0 Evidence Report
 
 **Date:** 2026-11-18 · **beets:** 2.14.1 (pinned, `m0/requirements.lock`) · **Python:** 3.12.16
-**Status:** M0a complete. M0b complete on local APFS **and on the NAS** (`music/_mlt_scratch`, Synology over SMB 2.0 from macOS). One design decision is open: the NAS publish method (§6.7).
+**Status:** M0a complete. M0b complete on local APFS **and on the NAS** (`music/_mlt_scratch`, Synology over SMB 2.0 from macOS). NAS publish method decided: claim_rename (§6.7).
 
 ## 1. Summary
 
@@ -174,7 +174,7 @@ MP3, FLAC, APE: deterministic; unchanged after a tag edit that changed the file 
    * **(a) Accept `claim_rename`** — tested and passing; safe unless another program writes the *same file name* in the same folder during an apply. Simplest.
    * **(b) Try SMB 3** (DSM → File Services → SMB → max protocol) and re-run the probe; may or may not unlock more primitives from macOS.
    * **(c) Publish on the NAS itself** (small helper in Docker on the Synology, where the local filesystem offers a true no-overwrite rename) — strongest guarantee, more moving parts.
-   Recommendation: (a) for M1, with (c) only if the tool will run alongside other writers.
+   **Decision (2026-11-18, Kevin): (a) claim_rename for the NAS.** Revisit (c) only if the tool will run alongside other writers to the same folders.
 8. Ownership classes `created / already_existed / ownership_uncertain`; **Undo only touches `created`**, and only if full SHA + inode still match.
 9. Write tags with **minimal mutagen edits** (only changed fields) — preserves APE key spelling and everything else; `mediafile` is acceptable for MP3/FLAC.
 10. Side files: `.lrc` is its own op keyed off the new stem; `.cue` is rewritten on a staged copy before publish, in its original encoding.
