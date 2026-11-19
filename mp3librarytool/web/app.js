@@ -266,7 +266,10 @@ function renderUnitDetail(d) {
     h("div", {}, h("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" }, h("h2", {}, d.label), unitBadge(d)),
       h("div", { class: "mono muted", style: "margin-top:6px" }, `${d.folder || "."}/ · ${d.n_files} file${d.n_files > 1 ? "s" : ""} · ${d.kind}`),
       d.status === "error" ? h("div", { class: "banner" }, h("strong", {}, "Recognition failed. "), (d.error || "").split("\n")[0]) : null,
-      d.acoustid_used === 0 ? h("div", { class: "banner" }, "Matched without fingerprints (no AcoustID key).") : null),
+      d.acoustid_used === 0 ? h("div", { class: "banner" }, "Matched without fingerprints (no AcoustID key).") : null,
+      d.repaired ? h("div", { class: "banner" }, h("strong", {}, "Text decoding repaired before matching. "),
+        `${d.repaired} of ${d.n_files} file${d.n_files > 1 ? "s" : ""} had garbled GBK/Big5 tags; the repaired text was used to search. ` +
+        "The files themselves are unchanged.") : null),
     list];
   if (chosen && chosen.tracks.length) {
     const rows = chosen.tracks.map(t => h("tr", {},

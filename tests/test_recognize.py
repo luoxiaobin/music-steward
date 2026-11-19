@@ -106,3 +106,25 @@ def test_worker_records_errors(music, con, monkeypatch):
 def test_confidence_rule(dist, fp, n, expect):
     assert results.confidence({"status": "done", "n_files": n},
                               {"distance": dist, "fingerprint_agrees": fp}) == expect
+
+
+def test_garbled_tags_are_repaired_in_memory_only(tmp_path):
+    from mp3librarytool.recognize import beets_adapter as A
+    from beets.library import Item
+    p = tone(tmp_path / "g.mp3", ["-c:a", "libmp3lame"], secs=1)
+    tag_id3(p, "人海中一個你".encode("gbk").decode("latin-1"), artist="林子祥".encode("gbk").decode("latin-1"),
+            album="Lam 2004 XRCD", encoding=0)
+    before = p.read_bytes()
+    it = Item.from_path(str(p))
+    assert A._repair([it]) == 1
+    assert (it.title, it.artist, it.album) == ("人海中一個你", "林子祥", "Lam 2004 XRCD")
+    assert p.read_bytes() == before                    # nothing written to the file
+
+
+def test_clean_tags_are_not_touched(tmp_path):
+    from mp3librarytool.recognize import beets_adapter as A
+    from beets.library import Item
+    p = tone(tmp_path / "c.mp3", ["-c:a", "libmp3lame"], secs=1)
+    tag_id3(p, "Motörhead", artist="Björk")
+    it = Item.from_path(str(p))
+    assert A._repair([it]) == 0 and it.title == "Motörhead"

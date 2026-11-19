@@ -25,7 +25,27 @@ from beets.autotag import Source, tag_album, tag_item  # noqa: E402
 from beets.library import Item  # noqa: E402
 from beets.util import cached_classproperty  # noqa: E402
 
+from ..tags import repair_latin1  # noqa: E402
+
 BEETS_DEFAULT_APP_KEY = "1vOwZtEn"
+REPAIR_FIELDS = ("title", "artist", "album", "albumartist")
+
+
+def _repair(items) -> int:
+    """Apply GBK/Big5 mojibake repairs to the in-memory items beets matches with.
+    Files are never written. Returns how many items had at least one field repaired."""
+    n = 0
+    for it in items:
+        changed = False
+        for f in REPAIR_FIELDS:
+            v = it.get(f)
+            if isinstance(v, str) and v:
+                r = repair_latin1(v)
+                if r:
+                    it[f] = r["proposal"]
+                    changed = True
+        n += changed
+    return n
 _LOG = blogging.getLogger("beets")
 
 
@@ -83,6 +103,7 @@ def _fingerprint(items, use_chroma) -> dict[str, bool]:
 def match_album(paths: list[str], acoustid_key: str | None) -> dict:
     use_chroma = configure(acoustid_key)
     items = [Item.from_path(p) for p in paths]
+    repaired = _repair(items)
     linked = _fingerprint(items, use_chroma)
     proposal = tag_album(Source.from_items(items))
     cands = []
@@ -107,12 +128,13 @@ def match_album(paths: list[str], acoustid_key: str | None) -> dict:
         })
     _reset()
     return {"kind": "album", "recommendation": proposal.recommendation.name, "acoustid_used": use_chroma,
-            "files_fingerprint_linked": sum(linked.values()), "candidates": cands}
+            "files_fingerprint_linked": sum(linked.values()), "repaired": repaired, "candidates": cands}
 
 
 def match_track(path: str, acoustid_key: str | None) -> dict:
     use_chroma = configure(acoustid_key)
     it = Item.from_path(path)
+    repaired = _repair([it])
     linked = _fingerprint([it], use_chroma)
     proposal = tag_item(Source.from_item(it))
     cands = []
@@ -130,7 +152,7 @@ def match_track(path: str, acoustid_key: str | None) -> dict:
         })
     _reset()
     return {"kind": "track", "recommendation": proposal.recommendation.name, "acoustid_used": use_chroma,
-            "files_fingerprint_linked": sum(linked.values()), "candidates": cands}
+            "files_fingerprint_linked": sum(linked.values()), "repaired": repaired, "candidates": cands}
 
 
 def _recordings(item) -> set:

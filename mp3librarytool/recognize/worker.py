@@ -47,9 +47,9 @@ def run_unit(db_path: str, unit_id: int) -> int:
                              t["medium"], t["medium_index"], t["title"], t["artist"], t["length"],
                              t["track_distance"]))
         con.execute("UPDATE unit SET status='done', recommendation=?, acoustid_used=?, files_linked=?, "
-                    "finished_at=? WHERE id=?",
+                    "repaired=?, finished_at=? WHERE id=?",
                     (res["recommendation"], int(res["acoustid_used"]), res["files_fingerprint_linked"],
-                     time.time(), unit_id))
+                     res.get("repaired", 0), time.time(), unit_id))
         con.commit()
         return 0
     except Exception as e:

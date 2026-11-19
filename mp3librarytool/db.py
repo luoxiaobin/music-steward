@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS dir_note(
 
 
 ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "TEXT"),
-                 ("scan", "subpath", "TEXT")]
+                 ("scan", "subpath", "TEXT"), ("unit", "repaired", "INTEGER")]
 
 
 def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
