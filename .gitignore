@@ -19,3 +19,6 @@ m0/scratch/
 # Secrets
 .env
 *.key
+
+# Collection listing from the read-only NAS scan (personal; kept local)
+m0/results/nas_scan_summary.json
