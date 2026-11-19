@@ -47,7 +47,8 @@ TITLE_AGREES = 0.8       # similarity of normalised album titles for "weak: titl
 
 def _norm_title(t: str | None) -> str:
     import re
-    t = (t or "").casefold()
+    from ..chinese import key
+    t = key(t or "").casefold()
     t = re.sub(r"[\s\-_.·•:：,，/\\|()（）\[\]【】《》<>'\"“”‘’!！?？~～]+", "", t)
     return re.sub(r"(cd|disc|disk)\d+$", "", t)
 

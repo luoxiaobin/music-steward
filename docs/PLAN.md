@@ -72,7 +72,12 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
       series titles agree across different singers)
     * cue albums fingerprint at most 4 tracks: 10.3 s/album instead of ~28 (same top results);
       full 音乐Ape ≈ 4 h
-    Next for match rate: Simplified/Traditional key (经典老歌 vs 經典老歌 missed the title check).
+14. ✅ Simplified/Traditional (OpenCC, pure Python): title check is script-insensitive (经典老歌 =
+    經典老歌). Measured: beets already scores Chinese via pinyin, and a second search in the other
+    script returned identical candidates for all 40 sample albums (the services fold scripts) at 3×
+    the time → off by default (MLT_SCRIPT_RETRY=1). Queue now records a worker that dies before
+    writing its own error (12 transient failures in one run left albums stuck 'queued'/'running';
+    all succeeded on re-run).
 
 ## M2 backlog (original order)
 

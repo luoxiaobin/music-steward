@@ -247,3 +247,18 @@ def test_cue_fingerprint_share_uses_tracks_actually_fingerprinted():
                                         ("纯美之声", "穿越的聲音", False), ("", "x", False)])
 def test_title_agreement(a, b, agree):
     assert results.title_agrees(a, b) is agree
+
+
+def test_worker_crash_is_recorded_not_left_queued(music, con, monkeypatch, tmp_path):
+    from music_steward.recognize import queue
+    scan(con, music)
+    units.enqueue(con, 1, units.plan_units(con, 1)[:1])
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    dbp = con.execute("PRAGMA database_list").fetchone()[2]
+
+    class R:
+        returncode, stderr = 1, b"Traceback ...\nsqlite3.OperationalError: database is locked"
+    monkeypatch.setattr(queue.subprocess, "run", lambda *a, **k: R())
+    assert queue.run(dbp, [uid])["errors"] == 1
+    row = con.execute("SELECT status, error FROM unit").fetchone()
+    assert row["status"] == "error" and "database is locked" in row["error"]

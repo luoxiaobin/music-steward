@@ -33,6 +33,11 @@ REPAIR_FIELDS = ("title", "artist", "album", "albumartist")
 # only, so a Discogs/Deezer copy of the same release ties on distance but shows 0 agreement.
 # Rank by distance minus a small bonus for the share of fingerprints that agree.
 FP_RANK_BONUS = 0.05
+SCRIPT_RETRY_DISTANCE = 0.15   # search again in the other Chinese script if nothing is this close
+# Measured on the NAS APE sample (40 albums): the second search returned the SAME candidates
+# every time -- the services already fold Simplified/Traditional -- while tripling the time.
+# Off by default; MLT_SCRIPT_RETRY=1 turns it on.
+SCRIPT_RETRY = os.environ.get("MLT_SCRIPT_RETRY") == "1"
 from .results import CUE_FP_TRACKS  # noqa: E402
 
 
@@ -112,6 +117,27 @@ def configure(acoustid_key: str | None, search_limit: int = 5):
     return use_chroma
 
 
+def _other_script_search(source, search: dict) -> dict | None:
+    """Search terms in the other Chinese script, if converting changes them."""
+    from ..chinese import other_script
+    artist = search.get("artist") or source.artist
+    name = search.get("album") or search.get("title") or source.name
+    a2, n2 = other_script(artist), other_script(name)
+    if not (a2 or n2):
+        return None
+    return {"artist": a2 or artist, "name": n2 or name}
+
+
+def _merge(first: list, second: list) -> list:
+    """Merge candidate lists from two searches; keep each release once (lowest distance)."""
+    best = {}
+    for c in list(first) + list(second):
+        k = (c.info.data_source, c.info.identifier if hasattr(c.info, "identifier") else id(c))
+        if k not in best or c.distance.distance < best[k].distance.distance:
+            best[k] = c
+    return sorted(best.values(), key=lambda c: c.distance.distance)
+
+
 def _track(ti, dist, path=None) -> dict:
     td = dist.tracks.get(ti) if dist is not None else None
     return {"path": path, "recording_id": ti.track_id, "release_track_id": ti.release_track_id,
@@ -137,10 +163,17 @@ def match_album(paths: list[str], acoustid_key: str | None, search: dict | None 
     items = [Item.from_path(p) for p in paths]
     repaired = _repair(items)
     linked = _fingerprint(items, use_chroma)
-    proposal = tag_album(Source.from_items(items), search_artist=search.get("artist") or None,
+    source = Source.from_items(items)
+    proposal = tag_album(source, search_artist=search.get("artist") or None,
                          search_name=search.get("album") or None, search_ids=search.get("ids") or [])
+    found = list(proposal.candidates)
+    variant = None
+    if SCRIPT_RETRY and not search.get("ids") and (not found or found[0].distance.distance > SCRIPT_RETRY_DISTANCE):
+        variant = _other_script_search(source, search)
+        if variant:
+            found = _merge(found, tag_album(source, search_artist=variant["artist"], search_name=variant["name"]).candidates)
     cands = []
-    for rank, c in enumerate(proposal.candidates):
+    for rank, c in enumerate(found):
         info = c.info
         mapping = [_track(ti, c.distance, os.fsdecode(it.path)) for it, ti in c.mapping.items()]
         rec_ids = {m["recording_id"] for m in mapping}
@@ -162,7 +195,8 @@ def match_album(paths: list[str], acoustid_key: str | None, search: dict | None 
     cands = _rerank(cands, len(items))
     _reset()
     return {"kind": "album", "recommendation": proposal.recommendation.name, "acoustid_used": use_chroma,
-            "files_fingerprint_linked": sum(linked.values()), "repaired": repaired, "candidates": cands}
+            "files_fingerprint_linked": sum(linked.values()), "repaired": repaired, "candidates": cands,
+            "script_variant": variant}
 
 
 def match_track(path: str, acoustid_key: str | None, search: dict | None = None) -> dict:
@@ -249,10 +283,18 @@ def match_cue(audio_path: str, album: dict, tracks: list[dict], acoustid_key: st
                 if os.path.exists(it.path):
                     ch.acoustid_match(_LOG, it.path)
             linked = {it.path: it.path in ch._matches for it in items}
-        proposal = tag_album(Source.from_items(items), search_artist=search.get("artist") or None,
+        source = Source.from_items(items)
+        proposal = tag_album(source, search_artist=search.get("artist") or None,
                              search_name=search.get("album") or None, search_ids=search.get("ids") or [])
+        found = list(proposal.candidates)
+        variant = None
+        if SCRIPT_RETRY and not search.get("ids") and (not found or found[0].distance.distance > SCRIPT_RETRY_DISTANCE):
+            variant = _other_script_search(source, search)
+            if variant:
+                found = _merge(found, tag_album(source, search_artist=variant["artist"],
+                                                search_name=variant["name"]).candidates)
         cands = []
-        for rank, c in enumerate(proposal.candidates):
+        for rank, c in enumerate(found):
             info = c.info
             mapping = []
             fp = 0
@@ -278,7 +320,7 @@ def match_cue(audio_path: str, album: dict, tracks: list[dict], acoustid_key: st
         cands = _rerank(cands, len(items))
         return {"kind": "cue", "recommendation": proposal.recommendation.name, "acoustid_used": use_chroma,
                 "files_fingerprint_linked": sum(linked.values()), "repaired": repaired, "candidates": cands,
-                "n_tracks": len(items)}
+                "n_tracks": len(items), "script_variant": variant}
     finally:
         _reset()
         _sh.rmtree(tmp, ignore_errors=True)
