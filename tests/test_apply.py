@@ -250,3 +250,31 @@ def test_tags_written_to_a_wav_copy(tmp_path):
     write_tags(str(p), {"album": "天涯歌女", "albumartist": "陈松伶", "date": 1990, "disc": "1/2"}, "pcm_s16le")
     t = mutagen.File(str(p)).tags
     assert str(t["TALB"]) == "天涯歌女" and str(t["TPE2"]) == "陈松伶" and str(t["TPOS"]) == "1/2"
+
+
+def test_ape_copy_fingerprint_ignores_tags_and_catches_audio_changes(tmp_path):
+    """The apply check for APE hashes the audio BYTES (between an ID3 prefix and the end tags)
+    instead of decoding twice: tag writes must not change it, any audio byte must."""
+    from mutagen.apev2 import APEv2
+    from mutagen.id3 import ID3, TIT2
+    from music_steward.apply.tagwrite import write_tags
+    from music_steward.hashing import copy_audio_fingerprint
+    p = tmp_path / "a.ape"
+    p.write_bytes(b"MAC \x96\x0f" + bytes(range(256)) * 40)
+    t = ID3()
+    t.add(TIT2(encoding=3, text=["prefix"]))
+    t.save(str(p))                                      # ID3 block in front, as on the NAS
+    f0 = copy_audio_fingerprint(str(p), ".ape", "ape")
+    write_tags(str(p), {"title": "新", "album": "专辑", "track": 3}, "ape")
+    assert copy_audio_fingerprint(str(p), ".ape", "ape") == f0
+    a = APEv2(str(p))
+    a["Comment"] = "x" * 5000
+    a.save(str(p))                                      # a much bigger tag: still the same audio
+    with open(p, "ab") as fh:
+        fh.write(b"TAG" + b"\x00" * 125)                # plus an ID3v1 tag at the very end
+    assert copy_audio_fingerprint(str(p), ".ape", "ape") == f0
+    raw = bytearray(p.read_bytes())
+    i = raw.find(b"MAC ") + 100
+    raw[i] ^= 1                                         # one audio bit
+    p.write_bytes(bytes(raw))
+    assert copy_audio_fingerprint(str(p), ".ape", "ape") != f0

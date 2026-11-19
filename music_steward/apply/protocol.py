@@ -19,7 +19,7 @@ import shutil
 import time
 from pathlib import Path
 
-from ..hashing import audio_hash, file_sha256
+from ..hashing import copy_audio_fingerprint, file_sha256
 from .tagwrite import write_tags
 
 CHUNK = 1 << 20
@@ -165,7 +165,14 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
             j.write({"op": op, "state": "aborted_source_changed", "ownership": "none",
                      "reason": "source changed during the copy"})
             return
-        src_audio = audio_hash(str(src), src.suffix, codec=o["codec"])[0] if o["kind"] == "audio" else None
+        # the copy must be byte-identical to what was read from the source (local read, fast);
+        # the audio fingerprint is then taken from the LOCAL copy, not by re-reading the source
+        if file_sha256(str(temp)) != h.hexdigest():
+            temp.unlink(missing_ok=True)
+            j.write({"op": op, "state": "aborted_copy_mismatch", "ownership": "none",
+                     "reason": "the copy differs from the bytes read from the source"})
+            return
+        src_audio = copy_audio_fingerprint(str(temp), src.suffix, o["codec"]) if o["kind"] == "audio" else None
         j.write({"op": op, "state": "copied", "src_sha": h.hexdigest(), "src_audio": src_audio})
         o["src_audio"] = src_audio
         _crash("after_copy", crash_at)
@@ -184,7 +191,7 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
                 fh.flush()
                 os.fsync(fh.fileno())
         if o["kind"] == "audio":
-            after = audio_hash(str(temp), temp.suffix, codec=o["codec"])[0]
+            after = copy_audio_fingerprint(str(temp), temp.suffix, o["codec"])
             if after != o.get("src_audio"):
                 temp.unlink(missing_ok=True)
                 j.write({"op": op, "state": "aborted_audio_changed", "ownership": "none",
