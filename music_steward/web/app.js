@@ -207,7 +207,8 @@ const CONF = {
   queued: ["b-rel", "Queued"], running: ["b-rel", "Recognizing…"], error: ["b-conflict", "Error"],
 };
 function unitBadge(u) {
-  if (u.decision) return u.decision.action === "accept" ? h("span", { class: "badge b-ready" }, "Accepted")
+  if (u.decision) return u.decision.action === "accept"
+    ? h("span", { class: "badge b-ready" }, u.decision.release_key === "local" ? "Accepted · own info" : "Accepted")
                                                           : h("span", { class: "badge b-unid" }, "Skipped");
   const [cls, txt] = CONF[u.confidence] || ["b-unid", u.confidence];
   return h("span", { class: `badge ${cls}` }, txt);
@@ -256,6 +257,7 @@ async function selectUnit(id, tr) {
   S.unitChoice = sel;
   renderUnitDetail(d);
 }
+const online = cands => cands.filter(c => c.source !== "Local");
 function renderUnitDetail(d) {
   const cands = d.candidates;
   const chosen = cands.find(c => c.id === S.unitChoice) || cands[0];
@@ -263,8 +265,20 @@ function renderUnitDetail(d) {
   const list = h("fieldset", { style: "border:0;margin:0;padding:0" }, h("legend", { class: "strong", style: "margin-bottom:8px" },
     cands.length ? `Candidate releases (${cands.length})` : "No candidates"));
   const nT = d.n_tracks || d.n_files;
-  for (const c of cands.slice(0, 6)) {
+  const shown = cands.filter(c => c.source !== "Local").slice(0, 6).concat(cands.filter(c => c.source === "Local"));
+  const ORIGIN = o => Object.entries(o || {}).filter(([, v]) => v).map(([k, v]) => `${k} from ${v}`).join(" · ");
+  for (const c of shown) {
     const fpShare = nT ? c.fingerprint_agrees / nT : 0;
+    if (c.source === "Local") {
+      list.append(h("label", { class: "cand" + (c.id === chosen?.id ? " sel" : "") },
+        h("input", { type: "radio", name: "cand", checked: c.id === chosen?.id,
+                     onchange: () => { S.unitChoice = c.id; renderUnitDetail(d); } }),
+        h("span", { style: "flex:1" },
+          h("span", { class: "strong" }, `${c.album || c.tracks[0]?.title || "?"} · ${c.year || "?"}`),
+          h("br"), h("span", { class: "ev" }, `${c.artist || "Unknown Artist"}`), h("br"),
+          h("span", { class: "ev" }, "Your album's own info (not an online release): ", ORIGIN(c.origin)))));
+      continue;
+    }
     list.append(h("label", { class: "cand" + (c.id === chosen?.id ? " sel" : "") },
       h("input", { type: "radio", name: "cand", checked: c.id === chosen?.id,
                    onchange: () => { S.unitChoice = c.id; renderUnitDetail(d); } }),
@@ -295,7 +309,8 @@ function renderUnitDetail(d) {
     const rows = chosen.tracks.map(t => h("tr", {},
       h("td", { class: "mono" }, t.label || (files[t.file_id]?.relpath || "").split("/").pop()),
       h("td", {}, `${chosen.mediums > 1 ? t.medium + "-" : ""}${t.medium_index ?? t.track_index}. ${t.title}`),
-      h("td", { class: t.track_distance > 0.3 ? "warn" : "ok" }, t.track_distance > 0.3 ? `check (${t.track_distance.toFixed(2)})` : "✓")));
+      chosen.source === "Local" ? h("td", { class: "muted" }, "own info")
+        : h("td", { class: t.track_distance > 0.3 ? "warn" : "ok" }, t.track_distance > 0.3 ? `check (${t.track_distance.toFixed(2)})` : "✓")));
     parts.push(h("div", {}, h("h3", {}, "Track mapping"), h("table", { class: "kv" },
       h("thead", {}, h("tr", {}, h("th", {}, "Source file"), h("th", {}, "Release track"), h("th", {}, "Check"))), h("tbody", {}, rows))));
   }
@@ -327,6 +342,22 @@ function renderUnitDetail(d) {
         } }, "Save edits"),
         h("span", { id: "editMsg", class: "muted small" }))));
   }
+  // ---- Use the album's own info (cue sheet / tags / folder name) ----
+  const hasLocal = cands.some(c => c.source === "Local");
+  parts.push(h("details", { open: !d.decision && !hasLocal && ["no_match", "weak"].includes(d.confidence) ? true : null },
+    h("summary", { class: "strong", style: "cursor:pointer" }, "Use the album's own info" + (hasLocal ? " · added" : "")),
+    h("p", { class: "muted xsmall" }, d.kind === "cue"
+      ? "Not in any online catalogue? Organize it from its cue sheet: album, artist, year and every track title. You can correct them after accepting."
+      : "Not in any online catalogue? Organize it from its tags (repaired if garbled), file names and folder name. You can correct them after accepting."),
+    h("div", { style: "display:flex;gap:8px;align-items:center" },
+      h("button", { type: "button", class: "btn", onclick: async () => {
+        const r = await post2("/api/local", { unit_id: d.id });
+        if (r.error) { document.getElementById("localMsg").textContent = r.error; return; }
+        const nd = await api(`/api/unit/${d.id}`);
+        S.unitChoice = r.candidate_id;
+        renderUnitDetail(nd);
+      } }, hasLocal ? "Read it again" : "Use own info"),
+      h("span", { id: "localMsg", class: "muted small" }))));
   // ---- Search again ----
   const sj = d.search_json ? JSON.parse(d.search_json) : null;
   const isTrack = d.kind === "track";
@@ -358,7 +389,8 @@ function renderUnitDetail(d) {
   };
   parts.push(h("div", { class: "btnrow" },
     h("button", { type: "button", class: "btn btn-primary", disabled: !chosen, onclick: () => decide("accept") },
-      d.decision?.action === "accept" && d.decision.candidate_id === chosen?.id ? "Accepted ✓" : "Accept release"),
+      d.decision?.action === "accept" && d.decision.candidate_id === chosen?.id ? "Accepted ✓"
+        : chosen?.source === "Local" ? "Accept own info" : "Accept release"),
     h("button", { type: "button", class: "btn", onclick: () => decide("skip") }, "Skip album"),
     d.decision ? h("button", { type: "button", class: "btn", onclick: () => decide("clear") }, "Undo decision") : null));
   parts.push(h("p", { class: "muted xsmall" }, "Decisions are saved immediately. Nothing is copied or changed until you apply a plan."));

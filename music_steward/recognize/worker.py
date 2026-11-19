@@ -80,7 +80,11 @@ def run_unit(db_path: str, unit_id: int) -> int:
                              t["track_distance"]))
         notice = None
         if dec is not None and dec["action"] == "accept":
-            new_cid = candidate_for(con, unit_id, kept_key) if kept_key else None
+            if kept_key == "local":         # the user organizes this album from its own info
+                from . import local
+                new_cid = local.add(con, unit_id)
+            else:
+                new_cid = candidate_for(con, unit_id, kept_key) if kept_key else None
             if new_cid:
                 con.execute("UPDATE decision SET candidate_id=?, release_key=? WHERE unit_id=?",
                             (new_cid, kept_key, unit_id))

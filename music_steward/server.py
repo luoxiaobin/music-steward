@@ -279,6 +279,20 @@ class App:
         root = con.execute("SELECT path FROM root WHERE id=?", (u["root_id"],)).fetchone()["path"]
         return self.start_job("recognize_unit", root, str(uid))
 
+    def use_local(self, con, body) -> dict:
+        """Add (or rebuild) the album's Local candidate: its own cue sheet, tags or folder name."""
+        from .recognize import local
+        uid = _int(body.get("unit_id"))
+        if not uid or not con.execute("SELECT 1 FROM unit WHERE id=?", (uid,)).fetchone():
+            return {"error": "no such album"}
+        try:
+            cid = local.add(con, uid)
+        except (OSError, ValueError) as e:
+            con.rollback()
+            return {"error": f"could not read the album's own info: {e}"}
+        con.commit()
+        return {"candidate_id": cid}
+
     def edit_fields(self, con, body) -> dict:
         uid = _int(body.get("unit_id"))
         d = con.execute("SELECT * FROM decision WHERE unit_id=? AND action='accept'", (uid,)).fetchone()
@@ -469,10 +483,11 @@ def make_handler(app: App, port_ref: dict):
                     return self._json(app.bulk_accept(con, body))
                 finally:
                     con.close()
-            if u.path in ("/api/search", "/api/edit"):
+            if u.path in ("/api/search", "/api/edit", "/api/local"):
                 con = app.con()
                 try:
                     return self._json(app.search_again(con, body) if u.path == "/api/search"
+                                      else app.use_local(con, body) if u.path == "/api/local"
                                       else app.edit_fields(con, body))
                 finally:
                     con.close()

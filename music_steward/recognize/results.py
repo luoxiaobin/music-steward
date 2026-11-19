@@ -24,9 +24,11 @@ NO_MATCH_DISTANCE = 0.5
 def release_key(con: sqlite3.Connection, candidate_id: int) -> str | None:
     """Stable identity of a candidate across re-matches: the MusicBrainz release for an
     album, the recording for a single track."""
-    c = con.execute("SELECT album_id FROM candidate WHERE id=?", (candidate_id,)).fetchone()
+    c = con.execute("SELECT album_id, source FROM candidate WHERE id=?", (candidate_id,)).fetchone()
     if c is None:
         return None
+    if c["source"] == "Local":
+        return "local"                  # rebuilt from the files' own info after a re-match
     if c["album_id"]:
         return f"release:{c['album_id']}"
     t = con.execute("SELECT recording_id FROM cand_track WHERE candidate_id=? LIMIT 1", (candidate_id,)).fetchone()
@@ -117,7 +119,8 @@ def units(con: sqlite3.Connection, root_id: int, folder: str = "") -> list[dict]
     for r in con.execute(q + " ORDER BY folder, label", args):
         u = dict(r)
         u["n_files"] = len(json.loads(u["file_ids"]))
-        c = con.execute("SELECT * FROM candidate WHERE unit_id=? ORDER BY rank LIMIT 1", (u["id"],)).fetchone()
+        c = con.execute("SELECT * FROM candidate WHERE unit_id=? AND COALESCE(source,'')<>'Local' "
+                        "ORDER BY rank LIMIT 1", (u["id"],)).fetchone()
         u["top"] = dict(c) if c else None
         if u["top"]:
             u["top"]["_mapped_media"] = _mapped_media(con, u["kind"], u["top"]["id"])
@@ -149,6 +152,7 @@ def unit_detail(con: sqlite3.Connection, unit_id: int) -> dict | None:
         c["penalties"] = json.loads(c.pop("penalties_json") or "[]")
         c["extra_tracks"] = json.loads(c.pop("extra_tracks_json") or "[]")
         c["extra_items"] = json.loads(c.pop("extra_items_json") or "[]")
+        c["origin"] = json.loads(c.pop("origin_json") or "null")
         if u["kind"] == "cue":
             c["tracks"] = [{**dict(t), "file_id": None, "label": f"{t['cue_track']:02d}. {t['cue_title'] or ''}"}
                            for t in con.execute("SELECT * FROM cand_cue_track WHERE candidate_id=? "
@@ -163,7 +167,8 @@ def unit_detail(con: sqlite3.Connection, unit_id: int) -> dict | None:
     for c in cands:
         c["_mapped_media"] = {t["medium"] for t in c["tracks"] if t.get("medium") is not None}
         c["evidence"] = evidence(u, c)
-    u["confidence"] = confidence(u, cands[0] if cands else None)
+    online = [c for c in cands if c["source"] != "Local"]
+    u["confidence"] = confidence(u, online[0] if online else None)
     for c in cands:
         c.pop("_mapped_media")
     d = con.execute("SELECT * FROM decision WHERE unit_id=?", (unit_id,)).fetchone()

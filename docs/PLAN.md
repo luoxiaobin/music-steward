@@ -78,6 +78,15 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
     the time → off by default (MLT_SCRIPT_RETRY=1). Queue now records a worker that dies before
     writing its own error (12 transient failures in one run left albums stuck 'queued'/'running';
     all succeeded on re-run).
+15. ✅ Organize from the album's own info, for albums no online source knows ("Use own info").
+    A 'Local' candidate built from the cue sheet (cue albums) or tags (repaired) → shared file-name
+    suffix "(Artist – Album)" → file names → folder name "Artist - Album (1998)"; placeholders
+    (未知标题, Unknown Artist) count as missing; download-site noise (`.-.`, `.专辑`, `(APE)`) and
+    repeated track numbers are dropped. Accepted like any release (Edit fields, plan, apply, undo);
+    never carries MusicBrainz IDs; never counts toward confidence; kept across re-matches
+    (release_key 'local'). On the 23 Weak/No-match NAS APE albums it gives a usable album,
+    artist and track list for all 23. Known gap: separate discs of one set ("经典老歌101 CD2") stay
+    separate albums; titles of cue tracks are not editable yet.
 
 ## M2 backlog (original order)
 
