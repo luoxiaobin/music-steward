@@ -95,6 +95,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                 items.append({"unit_id": u["id"], "file_id": s["id"], "kind": s["kind"],
                               "src": os.path.join(root_path, s["fs_relpath"]), "dest_rel": dest_rel,
                               "codec": None, "tags": {}, "size": s["size"], "mtime": s["mtime_ns"]})
+    items, dropped = _dedupe_images(items)
     # conflicts
     seen = defaultdict(list)
     for it in items:
@@ -109,6 +110,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
         elif len(seen[collision_key(it["dest_rel"])]) > 1:
             it["status"], it["note"] = "conflict_duplicate", "another item in this plan has the same destination name"
     summary = {"items": len(items), "ok": sum(i["status"] == "ok" for i in items),
+               "duplicate_images_skipped": dropped,
                "blocked": sum(i["status"] != "ok" for i in items),
                "bytes": sum(i["size"] for i in items if i["status"] == "ok"),
                "albums": len({i["unit_id"] for i in items})}
@@ -120,6 +122,32 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                      for n, i in enumerate(items)])
     con.commit()
     return pid
+
+
+def _dedupe_images(items: list[dict]) -> tuple[list[dict], int]:
+    """Cover images from several disc folders (CD 1/Folder.jpg, CD 2/Folder.jpg) land on one
+    name. Keep one copy when they are byte-identical; when they differ, keep both and name
+    the later ones after their own folder ("Folder (CD 2).jpg"). Never a blocking conflict."""
+    from ..hashing import file_sha256
+    groups = defaultdict(list)
+    for it in items:
+        if it["kind"] == "image":
+            groups[(it["unit_id"], collision_key(it["dest_rel"]))].append(it)
+    drop = set()
+    for group in groups.values():
+        if len(group) < 2:
+            continue
+        kept_hashes = {file_sha256(group[0]["src"]): group[0]}
+        for it in group[1:]:
+            h = file_sha256(it["src"])
+            if h in kept_hashes:
+                drop.add(id(it))
+                continue
+            kept_hashes[h] = it
+            folder = os.path.basename(os.path.dirname(it["src"]))
+            stem, ext = os.path.splitext(it["dest_rel"])
+            it["dest_rel"] = f"{stem} ({safe_component(folder)}){ext}"
+    return [i for i in items if id(i) not in drop], len(drop)
 
 
 def load(con: sqlite3.Connection, plan_id: int) -> dict:

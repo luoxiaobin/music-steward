@@ -34,9 +34,10 @@ Get one album all the way through before widening any step:
    tag and path changes, side files, runs with Apply / Undo run / Resume; destination may never
    overlap a source root. Tested in the browser: apply 36 files, undo, sources unchanged.
 
-Found while testing, to do: identical cover images in CD 1/CD 2 collide on one name (blocked, not
-overwritten) — keep one when identical. Re-recognizing a folder clears its decisions (by design;
-consider keeping a decision when the same release is still a candidate).
+7. ✅ Accepts survive a re-match when the same release (or recording, for a single) is still a
+   candidate; otherwise dropped with a notice. Skips always survive; a changed set of files resets.
+8. ✅ Cover images from several disc folders: one copy when byte-identical, otherwise both kept
+   ("Folder (CD 2).jpg") — never blocked.
 
 Then widen by value: garbled-tag repair before matching → own confidence rule → edit/search/conflicts and the full Plan screen → extra sources for mainland releases → cue-sheet albums, singles rules, Simplified/Traditional key → pywebview window.
 

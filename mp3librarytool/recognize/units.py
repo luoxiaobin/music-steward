@@ -85,7 +85,9 @@ def enqueue(con: sqlite3.Connection, root_id: int, units: list[dict], requeue: b
         elif requeue or row["file_ids"] != ids or row["status"] == "error":
             con.execute("UPDATE unit SET status='queued', file_ids=?, label=?, queued_at=?, error=NULL "
                         "WHERE id=?", (ids, u["label"], now, row["id"]))
-            con.execute("DELETE FROM decision WHERE unit_id=?", (row["id"],))
+            if row["file_ids"] != ids:
+                # different files -> a different album: the old decision no longer applies
+                con.execute("DELETE FROM decision WHERE unit_id=?", (row["id"],))
             c["requeued"] += 1
         else:
             c["already_done" if row["status"] == "done" else "queued"] += 1

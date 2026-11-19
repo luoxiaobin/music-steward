@@ -21,6 +21,25 @@ STRONG_FP_SHARE = 0.9
 NO_MATCH_DISTANCE = 0.5
 
 
+def release_key(con: sqlite3.Connection, candidate_id: int) -> str | None:
+    """Stable identity of a candidate across re-matches: the MusicBrainz release for an
+    album, the recording for a single track."""
+    c = con.execute("SELECT album_id FROM candidate WHERE id=?", (candidate_id,)).fetchone()
+    if c is None:
+        return None
+    if c["album_id"]:
+        return f"release:{c['album_id']}"
+    t = con.execute("SELECT recording_id FROM cand_track WHERE candidate_id=? LIMIT 1", (candidate_id,)).fetchone()
+    return f"recording:{t['recording_id']}" if t and t["recording_id"] else None
+
+
+def candidate_for(con: sqlite3.Connection, unit_id: int, key: str) -> int | None:
+    for (cid,) in con.execute("SELECT id FROM candidate WHERE unit_id=? ORDER BY rank", (unit_id,)):
+        if release_key(con, cid) == key:
+            return cid
+    return None
+
+
 def confidence(u: dict, top: dict | None) -> str:
     if u["status"] != "done":
         return u["status"]

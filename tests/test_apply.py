@@ -43,7 +43,7 @@ def accepted(tmp_path, con):
         n = int(rel.split("/")[-1][:2])
         con.execute("INSERT INTO cand_track VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                     (cid, fid, f"rec-{n}", f"rt-{n}", n, 1, n, ["序曲", "夜航"][n - 1], "周海晴", 2.0, 0.0))
-    con.execute("INSERT INTO decision VALUES(?, 'accept', ?, 0)", (uid, cid))
+    con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at) VALUES(?, 'accept', ?, 0)", (uid, cid))
     con.commit()
     return lib, tmp_path / "Organized"
 
@@ -155,3 +155,39 @@ def test_destination_may_not_overlap_the_collection(accepted, con, where):
     dest = {"inside": lib / "Organized", "same": lib, "parent": lib.parent}[where]
     with pytest.raises(plan.PlanError):
         plan.build(con, str(dest), 1)
+
+
+def _two_disc_album(tmp_path, con, same_cover: bool):
+    lib = tmp_path / "lib2"
+    for d in ("CD 1", "CD 2"):
+        tag_id3(tone(lib / "Box" / d / "01.mp3", ["-c:a", "libmp3lame"], secs=1, freq=300 if d == "CD 1" else 600),
+                f"T {d}", album="Box")
+        (lib / "Box" / d / "Folder.jpg").write_bytes(b"\xff\xd8same" if same_cover else f"\xff\xd8{d}".encode())
+    scan(con, lib)
+    units.enqueue(con, 1, units.plan_units(con, 1))
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    cid = con.execute("INSERT INTO candidate(unit_id, rank, album_id, album, artist, year, mediums, distance) "
+                      "VALUES(?,0,'b1','Box','A',2000,2,0.05)", (uid,)).lastrowid
+    for fid, rel in con.execute("SELECT id, relpath FROM file WHERE kind='audio' ORDER BY relpath").fetchall():
+        disc = 1 if "CD 1" in rel else 2
+        con.execute("INSERT INTO cand_track VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (cid, fid, f"r{disc}", None, disc, disc, 1, f"Song {disc}", "A", 1.0, 0.0))
+    con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at) VALUES(?, 'accept', ?, 0)", (uid, cid))
+    con.commit()
+    return lib
+
+
+def test_identical_disc_covers_are_copied_once(tmp_path, con):
+    _two_disc_album(tmp_path, con, same_cover=True)
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
+    imgs = [i["dest_rel"] for i in p["items"] if i["kind"] == "image"]
+    assert imgs == ["A/Box (2000)/Folder.jpg"]
+    assert p["summary"]["duplicate_images_skipped"] == 1 and p["summary"]["blocked"] == 0
+
+
+def test_different_disc_covers_are_both_kept(tmp_path, con):
+    _two_disc_album(tmp_path, con, same_cover=False)
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
+    imgs = sorted(i["dest_rel"] for i in p["items"] if i["kind"] == "image")
+    assert imgs == ["A/Box (2000)/Folder (CD 2).jpg", "A/Box (2000)/Folder.jpg"]
+    assert p["summary"]["blocked"] == 0

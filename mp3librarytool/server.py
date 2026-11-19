@@ -273,8 +273,11 @@ class App:
             if action == "accept" and not con.execute(
                     "SELECT 1 FROM candidate WHERE id=? AND unit_id=?", (cid, uid)).fetchone():
                 return {"error": "candidate does not belong to this album"}
-            con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at) "
-                        "VALUES(?,?,?,?)", (uid, action, cid, time.time()))
+            from .recognize.results import release_key
+            key = release_key(con, cid) if action == "accept" else None
+            con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                        "VALUES(?,?,?,?,?)", (uid, action, cid, time.time(), key))
+            con.execute("UPDATE unit SET notice=NULL WHERE id=?", (uid,))
         con.commit()
         return {"ok": True}
 

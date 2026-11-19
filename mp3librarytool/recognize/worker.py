@@ -30,6 +30,12 @@ def run_unit(db_path: str, unit_id: int) -> int:
         key = os.environ.get("ACOUSTID_API_KEY")
         paths = [path_of[i] for i in sorted(path_of)]
         res = A.match_track(paths[0], key) if u["kind"] == "track" else A.match_album(paths, key)
+        from .results import candidate_for, release_key
+        dec = con.execute("SELECT * FROM decision WHERE unit_id=?", (unit_id,)).fetchone()
+        kept_key = None
+        if dec is not None and dec["action"] == "accept":
+            kept_key = dec["release_key"] or (release_key(con, dec["candidate_id"]) if dec["candidate_id"] else None)
+            con.execute("UPDATE decision SET candidate_id=NULL WHERE unit_id=?", (unit_id,))
         con.execute("DELETE FROM candidate WHERE unit_id=?", (unit_id,))
         for c in res["candidates"]:
             cid = con.execute(
@@ -46,6 +52,16 @@ def run_unit(db_path: str, unit_id: int) -> int:
                             (cid, id_of[t["path"]], t["recording_id"], t["release_track_id"], t["index"],
                              t["medium"], t["medium_index"], t["title"], t["artist"], t["length"],
                              t["track_distance"]))
+        notice = None
+        if dec is not None and dec["action"] == "accept":
+            new_cid = candidate_for(con, unit_id, kept_key) if kept_key else None
+            if new_cid:
+                con.execute("UPDATE decision SET candidate_id=?, release_key=? WHERE unit_id=?",
+                            (new_cid, kept_key, unit_id))
+            else:
+                con.execute("DELETE FROM decision WHERE unit_id=?", (unit_id,))
+                notice = "Your earlier choice is no longer among the candidates; please review again."
+        con.execute("UPDATE unit SET notice=? WHERE id=?", (notice, unit_id))
         con.execute("UPDATE unit SET status='done', recommendation=?, acoustid_used=?, files_linked=?, "
                     "repaired=?, finished_at=? WHERE id=?",
                     (res["recommendation"], int(res["acoustid_used"]), res["files_fingerprint_linked"],

@@ -128,3 +128,72 @@ def test_clean_tags_are_not_touched(tmp_path):
     tag_id3(p, "Motörhead", artist="Björk")
     it = Item.from_path(str(p))
     assert A._repair([it]) == 0 and it.title == "Motörhead"
+
+
+def _accept_top(con, uid):
+    from mp3librarytool.recognize.results import release_key
+    cid = con.execute("SELECT id FROM candidate WHERE unit_id=? AND rank=0", (uid,)).fetchone()[0]
+    con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                "VALUES(?, 'accept', ?, 0, ?)", (uid, cid, release_key(con, cid)))
+    con.commit()
+
+
+def test_accept_survives_rematch_when_release_still_there(music, con, monkeypatch):
+    scan(con, music)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"])
+    from mp3librarytool.recognize import beets_adapter
+    monkeypatch.setattr(beets_adapter, "match_album", fake_album)
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    dbp = con.execute("PRAGMA database_list").fetchone()[2]
+    worker.run_unit(dbp, uid)
+    _accept_top(con, uid)
+
+    def reordered(paths, key):            # same release comes back at rank 1 after re-match
+        r = fake_album(paths, key)
+        r["candidates"].reverse()
+        for i, c in enumerate(r["candidates"]):
+            c["rank"] = i
+        return r
+    monkeypatch.setattr(beets_adapter, "match_album", reordered)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"], requeue=True)
+    worker.run_unit(dbp, uid)
+    d = results.unit_detail(con, uid)
+    chosen = next(c for c in d["candidates"] if c["id"] == d["decision"]["candidate_id"])
+    assert d["decision"]["action"] == "accept" and chosen["album_id"] == "a1" and not d["notice"]
+
+
+def test_accept_dropped_with_notice_when_release_gone(music, con, monkeypatch):
+    scan(con, music)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"])
+    from mp3librarytool.recognize import beets_adapter
+    monkeypatch.setattr(beets_adapter, "match_album", fake_album)
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    dbp = con.execute("PRAGMA database_list").fetchone()[2]
+    worker.run_unit(dbp, uid)
+    _accept_top(con, uid)
+
+    def other(paths, key):
+        r = fake_album(paths, key)
+        r["candidates"] = r["candidates"][1:]
+        r["candidates"][0]["rank"] = 0
+        return r
+    monkeypatch.setattr(beets_adapter, "match_album", other)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"], requeue=True)
+    worker.run_unit(dbp, uid)
+    d = results.unit_detail(con, uid)
+    assert d["decision"] is None and "no longer among the candidates" in d["notice"]
+
+
+def test_skip_survives_rematch(music, con, monkeypatch):
+    scan(con, music)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"])
+    from mp3librarytool.recognize import beets_adapter
+    monkeypatch.setattr(beets_adapter, "match_album", fake_album)
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    dbp = con.execute("PRAGMA database_list").fetchone()[2]
+    worker.run_unit(dbp, uid)
+    con.execute("INSERT INTO decision(unit_id, action, decided_at) VALUES(?, 'skip', 0)", (uid,))
+    con.commit()
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["label"] == "Album A"], requeue=True)
+    worker.run_unit(dbp, uid)
+    assert results.unit_detail(con, uid)["decision"]["action"] == "skip"
