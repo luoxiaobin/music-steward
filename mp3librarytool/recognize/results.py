@@ -3,7 +3,9 @@
 Confidence (M0 evidence, to be tuned): beets' 'strong' (< 0.04) marked nothing on the
 real collection, while correct releases sat at 0.09-0.30 with most tracks
 fingerprint-linked to them.
-  ready         most files' fingerprints agree with the top candidate AND distance < 0.15
+  ready         distance < 0.15 with >= 60% of fingerprints agreeing, OR
+                distance < 0.25 with >= 90% agreeing (titles may differ in punctuation;
+                Phil Collins: 25/25 fingerprints, distance 0.17)
   needs_review  any other candidate
   no_match      no candidates, or top distance > 0.5 with no fingerprint agreement
 """
@@ -14,6 +16,8 @@ import sqlite3
 
 READY_DISTANCE = 0.15
 READY_FP_SHARE = 0.6
+READY_DISTANCE_STRONG_FP = 0.25
+STRONG_FP_SHARE = 0.9
 NO_MATCH_DISTANCE = 0.5
 
 
@@ -23,7 +27,8 @@ def confidence(u: dict, top: dict | None) -> str:
     if not top:
         return "no_match"
     share = (top["fingerprint_agrees"] or 0) / max(1, u["n_files"])
-    if top["distance"] < READY_DISTANCE and share >= READY_FP_SHARE:
+    if (top["distance"] < READY_DISTANCE and share >= READY_FP_SHARE) or \
+            (top["distance"] < READY_DISTANCE_STRONG_FP and share >= STRONG_FP_SHARE):
         return "ready"
     if top["distance"] > NO_MATCH_DISTANCE and not top["fingerprint_agrees"]:
         return "no_match"

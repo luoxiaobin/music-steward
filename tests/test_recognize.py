@@ -101,7 +101,8 @@ def test_worker_records_errors(music, con, monkeypatch):
 
 @pytest.mark.parametrize("dist,fp,n,expect", [
     (0.08, 10, 11, "ready"), (0.11, 2, 11, "needs_review"), (0.30, 9, 11, "needs_review"),
-    (0.72, 0, 11, "no_match"), (0.72, 3, 11, "needs_review")])
+    (0.72, 0, 11, "no_match"), (0.72, 3, 11, "needs_review"),
+    (0.17, 25, 25, "ready"), (0.17, 14, 25, "needs_review"), (0.13, 0, 1, "needs_review")])
 def test_confidence_rule(dist, fp, n, expect):
     assert results.confidence({"status": "done", "n_files": n},
                               {"distance": dist, "fingerprint_agrees": fp}) == expect

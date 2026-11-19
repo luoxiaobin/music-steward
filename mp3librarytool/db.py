@@ -96,6 +96,26 @@ CREATE TABLE IF NOT EXISTS decision(
     decided_at REAL NOT NULL
 );
 
+-- plans and runs (M3 slice): a plan is frozen; a run applies it with a journal
+CREATE TABLE IF NOT EXISTS plan(
+    id INTEGER PRIMARY KEY, created_at REAL NOT NULL, dest_root TEXT NOT NULL,
+    root_id INTEGER, scope TEXT, summary_json TEXT
+);
+CREATE TABLE IF NOT EXISTS plan_item(
+    plan_id INTEGER NOT NULL REFERENCES plan(id) ON DELETE CASCADE,
+    seq INTEGER NOT NULL, unit_id INTEGER, file_id INTEGER NOT NULL, kind TEXT NOT NULL,
+    src TEXT NOT NULL, dest_rel TEXT NOT NULL, codec TEXT, tags_json TEXT,
+    src_size INTEGER, src_mtime_ns INTEGER,
+    status TEXT NOT NULL,               -- ok | conflict_existing | conflict_duplicate | source_changed
+    note TEXT,
+    PRIMARY KEY(plan_id, seq)
+);
+CREATE TABLE IF NOT EXISTS run(
+    id INTEGER PRIMARY KEY, plan_id INTEGER NOT NULL REFERENCES plan(id), run_key TEXT NOT NULL,
+    journal TEXT NOT NULL, method TEXT, started_at REAL, finished_at REAL, summary_json TEXT,
+    undone_at REAL
+);
+
 CREATE TABLE IF NOT EXISTS dir_note(
     root_id INTEGER NOT NULL, relpath TEXT NOT NULL, note TEXT NOT NULL, detail TEXT,
     last_scan INTEGER,

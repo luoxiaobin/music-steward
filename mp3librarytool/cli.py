@@ -127,6 +127,34 @@ def cmd_results(a):
         print(line)
 
 
+def cmd_plan(a):
+    from .apply import plan
+    con = db.connect(a.db)
+    rid, sub = _target(con, a.path)
+    pid = plan.build(con, a.dest, rid, sub)
+    p = plan.load(con, pid)
+    print(json.dumps({"plan": pid, "dest": p["dest_root"], **p["summary"]}, indent=2))
+    for it in p["items"][: a.limit]:
+        flag = "" if it["status"] == "ok" else f"   [{it['status']}: {it['note']}]"
+        print(f"  {it['kind']:5} {os.path.relpath(it['src'], os.path.dirname(it['src'])) [:40]:40} -> {it['dest_rel']}{flag}")
+
+
+def cmd_apply(a):
+    from .apply import runner
+    con = db.connect(a.db)
+    print(json.dumps(runner.apply(con, a.plan, progress=_progress("applying")), indent=2, ensure_ascii=False))
+
+
+def cmd_resume(a):
+    from .apply import runner
+    print(json.dumps(runner.resume(db.connect(a.db), a.run), indent=2, ensure_ascii=False))
+
+
+def cmd_undo(a):
+    from .apply import runner
+    print(json.dumps(runner.undo(db.connect(a.db), a.run), indent=2, ensure_ascii=False))
+
+
 def cmd_serve(a):
     from .server import serve
     serve(a.db, a.root, port=a.port, open_browser=not a.no_browser)
@@ -178,6 +206,24 @@ def main(argv=None):
     rs.add_argument("path")
     rs.add_argument("--limit", type=int)
     rs.set_defaults(func=cmd_results)
+
+    pl = sub.add_parser("plan", help="build a plan from accepted albums in a folder (changes nothing)")
+    pl.add_argument("path")
+    pl.add_argument("--dest", required=True, help="destination folder for organized copies")
+    pl.add_argument("--limit", type=int, default=40)
+    pl.set_defaults(func=cmd_plan)
+
+    apc = sub.add_parser("apply", help="apply a saved plan: copy, tag the copies, verify, publish")
+    apc.add_argument("plan", type=int)
+    apc.set_defaults(func=cmd_apply)
+
+    rsm = sub.add_parser("resume", help="finish an interrupted run from its journal")
+    rsm.add_argument("run", type=int)
+    rsm.set_defaults(func=cmd_resume)
+
+    und = sub.add_parser("undo", help="remove the copies a run created (unchanged ones only)")
+    und.add_argument("run", type=int)
+    und.set_defaults(func=cmd_undo)
 
     sv = sub.add_parser("serve", help="local web UI (127.0.0.1 only, token-protected)")
     sv.add_argument("--root", action="append", required=True, help="a folder the UI may browse (repeatable)")
