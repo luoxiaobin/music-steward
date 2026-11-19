@@ -29,7 +29,9 @@ def run_unit(db_path: str, unit_id: int) -> int:
         from . import beets_adapter as A
         key = os.environ.get("ACOUSTID_API_KEY")
         paths = [path_of[i] for i in sorted(path_of)]
-        res = A.match_track(paths[0], key) if u["kind"] == "track" else A.match_album(paths, key)
+        search = json.loads(u["search_json"]) if u["search_json"] else None
+        res = (A.match_track(paths[0], key, search) if u["kind"] == "track"
+               else A.match_album(paths, key, search))
         from .results import candidate_for, release_key
         dec = con.execute("SELECT * FROM decision WHERE unit_id=?", (unit_id,)).fetchone()
         kept_key = None

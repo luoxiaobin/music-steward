@@ -38,6 +38,10 @@ Get one album all the way through before widening any step:
    candidate; otherwise dropped with a notice. Skips always survive; a changed set of files resets.
 8. ✅ Cover images from several disc folders: one copy when byte-identical, otherwise both kept
    ("Folder (CD 2).jpg") — never blocked.
+9. ✅ Search again: your own artist + album/title, or a pasted MusicBrainz release/recording link.
+   Tested: 郑绪岚《情系红楼梦》 is not on MusicBrainz at all → stays "No real match" (case for extra sources).
+10. ✅ Edit fields after Accept: album, album artist, year, per-track titles; used for the copies' tags
+    and paths; kept when the same release is re-accepted or re-linked after a re-match.
 
 Then widen by value: garbled-tag repair before matching → own confidence rule → edit/search/conflicts and the full Plan screen → extra sources for mainland releases → cue-sheet albums, singles rules, Simplified/Traditional key → pywebview window.
 

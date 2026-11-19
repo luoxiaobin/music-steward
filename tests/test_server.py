@@ -124,3 +124,24 @@ def test_plan_api_refuses_destination_inside_root(server, library):
     r = json.loads(req(port, "/api/plan", cookie=ck, method="POST", headers={"X-MLT": "1"},
                        body=json.dumps({"root": str(library), "path": "", "dest": ""}))[2])
     assert "destination" in r["error"]
+
+
+def test_edit_requires_accept_and_validates(server):
+    app, port = server
+    ck = login(app, port)
+    from mp3librarytool import db as dbm
+    c = dbm.connect(app.db_path)
+    c.execute("INSERT INTO unit(root_id, folder, label, kind, key, file_ids, status) "
+              "VALUES(1,'A','A','album','album:A','[1,2]','done')")
+    c.execute("INSERT INTO candidate(unit_id, rank, album, artist, year, distance) VALUES(1,0,'A','X',2000,0.1)")
+    c.commit()
+    post = lambda url, body: json.loads(req(port, url, cookie=ck, method="POST", body=json.dumps(body),
+                                            headers={"X-MLT": "1"})[2])
+    assert "accept a release first" in post("/api/edit", {"unit_id": 1, "overrides": {"album": "B"}})["error"]
+    post("/api/decision", {"unit_id": 1, "action": "accept", "candidate_id": 1})
+    assert "4-digit" in post("/api/edit", {"unit_id": 1, "overrides": {"year": "19x"}})["error"]
+    r = post("/api/edit", {"unit_id": 1, "overrides": {"album": " B ", "year": "1999", "titles": {"2": "T", "99": "no"}}})
+    assert r["overrides"] == {"album": "B", "year": 1999, "titles": {"2": "T"}}   # file 99 not in this album
+    post("/api/decision", {"unit_id": 1, "action": "accept", "candidate_id": 1})   # re-accept same: edits kept
+    assert json.loads(c.execute("SELECT overrides_json FROM decision").fetchone()[0])["album"] == "B"
+    assert "MusicBrainz" in post("/api/search", {"unit_id": 1, "link": "https://example.com"})["error"]

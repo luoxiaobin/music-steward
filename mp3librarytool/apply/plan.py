@@ -51,7 +51,7 @@ def check_destination(con: sqlite3.Connection, dest: Path):
 def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = "") -> int:
     dest = Path(dest_root).expanduser().resolve()
     check_destination(con, dest)
-    q = ("SELECT u.*, d.candidate_id FROM unit u JOIN decision d ON d.unit_id=u.id "
+    q = ("SELECT u.*, d.candidate_id, d.overrides_json FROM unit u JOIN decision d ON d.unit_id=u.id "
          "WHERE d.action='accept' AND u.root_id=?")
     args: tuple = (root_id,)
     if scope:
@@ -60,8 +60,15 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
     root_path = con.execute("SELECT path FROM root WHERE id=?", (root_id,)).fetchone()["path"]
     items = []
     for u in con.execute(q, args).fetchall():
-        c = con.execute("SELECT * FROM candidate WHERE id=?", (u["candidate_id"],)).fetchone()
-        tracks = {t["file_id"]: t for t in con.execute("SELECT * FROM cand_track WHERE candidate_id=?", (c["id"],))}
+        c = dict(con.execute("SELECT * FROM candidate WHERE id=?", (u["candidate_id"],)).fetchone())
+        tracks = {t["file_id"]: dict(t) for t in con.execute("SELECT * FROM cand_track WHERE candidate_id=?", (c["id"],))}
+        ov = json.loads(u["overrides_json"] or "{}")
+        for k_from, k_to in (("album", "album"), ("albumartist", "artist"), ("year", "year")):
+            if ov.get(k_from) not in (None, ""):
+                c[k_to] = int(ov[k_from]) if k_from == "year" else ov[k_from]
+        for fid, title in (ov.get("titles") or {}).items():
+            if int(fid) in tracks and title:
+                tracks[int(fid)]["title"] = title
         adir = (album_dir(c["artist"], c["album"], c["year"]) if u["kind"] == "album"
                 else f"{safe_component(c['artist'], 'Unknown Artist')}/Singles")
         new_stem_of = {}

@@ -100,12 +100,15 @@ def _fingerprint(items, use_chroma) -> dict[str, bool]:
     return {os.fsdecode(it.path): it.path in ch._matches for it in items}
 
 
-def match_album(paths: list[str], acoustid_key: str | None) -> dict:
+def match_album(paths: list[str], acoustid_key: str | None, search: dict | None = None) -> dict:
+    """search: optional {"artist", "album"} terms or {"ids": [release mbid]} from the user."""
+    search = search or {}
     use_chroma = configure(acoustid_key)
     items = [Item.from_path(p) for p in paths]
     repaired = _repair(items)
     linked = _fingerprint(items, use_chroma)
-    proposal = tag_album(Source.from_items(items))
+    proposal = tag_album(Source.from_items(items), search_artist=search.get("artist") or None,
+                         search_name=search.get("album") or None, search_ids=search.get("ids") or [])
     cands = []
     for rank, c in enumerate(proposal.candidates):
         info = c.info
@@ -131,12 +134,14 @@ def match_album(paths: list[str], acoustid_key: str | None) -> dict:
             "files_fingerprint_linked": sum(linked.values()), "repaired": repaired, "candidates": cands}
 
 
-def match_track(path: str, acoustid_key: str | None) -> dict:
+def match_track(path: str, acoustid_key: str | None, search: dict | None = None) -> dict:
+    search = search or {}
     use_chroma = configure(acoustid_key)
     it = Item.from_path(path)
     repaired = _repair([it])
     linked = _fingerprint([it], use_chroma)
-    proposal = tag_item(Source.from_item(it))
+    proposal = tag_item(Source.from_item(it), search_artist=search.get("artist") or None,
+                        search_name=search.get("title") or None, search_ids=search.get("ids") or None)
     cands = []
     for rank, c in enumerate(proposal.candidates):
         ti = c.info

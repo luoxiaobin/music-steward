@@ -99,7 +99,8 @@ function renderScan(sc) {
                    document.getElementById("recognizeBtn")]) b.disabled = busy;
   if (sc && sc.running) {
     const where = sc.path ? `“${sc.path}”` : "whole root";
-    el.textContent = sc.kind === "recognize"
+    el.textContent = sc.kind === "recognize_unit" ? "Searching again…"
+      : sc.kind === "recognize"
       ? (sc.total ? `Recognizing ${where}: ${sc.done} / ${sc.total} albums & tracks` : `Recognizing ${where}: planning…`)
       : sc.kind === "hash"
       ? (sc.total ? `Hashing ${where}: ${sc.done} / ${sc.total} files` : `Hashing ${where}: starting…`)
@@ -110,6 +111,7 @@ function renderScan(sc) {
   } else if (sc && sc.result) {
     const r = sc.result, where = sc.path ? ` of “${sc.path}”` : "";
     el.textContent = r.status !== "complete" ? `${sc.kind === "hash" ? "Hash" : "Scan"}${where} ${r.status}: ${r.abort_reason || ""}`
+      : sc.kind === "recognize_unit" ? `Searched again: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
       : sc.kind === "recognize" ? `Recognized${where}: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
       : sc.kind === "hash" ? `Hashed${where}: ${r.hashed} files (${fmtSize(r.bytes)}) in ${r.seconds}s, ${r.errors} errors`
       : `Scan${where}: ${r.n_new} new, ${r.n_changed} changed, ${r.n_unchanged} unchanged, ${r.n_removed} removed`;
@@ -280,6 +282,57 @@ function renderUnitDetail(d) {
     parts.push(h("div", {}, h("h3", {}, "Track mapping"), h("table", { class: "kv" },
       h("thead", {}, h("tr", {}, h("th", {}, "Source file"), h("th", {}, "Release track"), h("th", {}, "Check"))), h("tbody", {}, rows))));
   }
+  // ---- Edit fields (only for the accepted release) ----
+  const accepted = d.decision && d.decision.action === "accept" && d.decision.candidate_id === chosen?.id;
+  const ov = accepted && d.decision.overrides_json ? JSON.parse(d.decision.overrides_json) : {};
+  if (accepted && chosen) {
+    const inp = (id, val, ph, w) => h("input", { type: "text", id, value: val ?? "", placeholder: ph ?? "",
+                                                 style: `font:14px var(--font);min-height:32px;padding:0 8px;border:1px solid var(--btn-line);border-radius:6px;width:${w || "100%"}` });
+    const titles = chosen.tracks.map(t => h("tr", {},
+      h("td", { class: "mono" }, (files[t.file_id]?.relpath || "").split("/").pop()),
+      h("td", {}, inp(`t-${t.file_id}`, ov.titles?.[String(t.file_id)] ?? "", t.title))));
+    parts.push(h("details", { open: Object.keys(ov).length ? true : null },
+      h("summary", { class: "strong", style: "cursor:pointer" }, "Edit fields" + (Object.keys(ov).length ? " · edited" : "")),
+      h("p", { class: "muted xsmall" }, "Leave a box empty to keep the release's value (shown greyed). Used for the copies' tags and names."),
+      h("table", { class: "kv" }, h("tbody", {},
+        h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-album" }, "Album")), h("td", {}, inp("e-album", ov.album, chosen.album))),
+        h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-aa" }, "Album artist")), h("td", {}, inp("e-aa", ov.albumartist, chosen.artist))),
+        h("tr", {}, h("td", { class: "muted" }, h("label", { for: "e-year" }, "Year")), h("td", {}, inp("e-year", ov.year, chosen.year, "8em"))))),
+      h("table", { class: "kv" }, h("thead", {}, h("tr", {}, h("th", {}, "File"), h("th", {}, "Title"))), h("tbody", {}, titles)),
+      h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:8px" },
+        h("button", { type: "button", class: "btn", onclick: async () => {
+          const t = {};
+          for (const tr of chosen.tracks) { const v = document.getElementById(`t-${tr.file_id}`).value; if (v.trim()) t[tr.file_id] = v; }
+          const r = await post2("/api/edit", { unit_id: d.id, overrides: { album: document.getElementById("e-album").value,
+            albumartist: document.getElementById("e-aa").value, year: document.getElementById("e-year").value, titles: t } });
+          document.getElementById("editMsg").textContent = r.error || "Saved.";
+          if (!r.error) selectUnit(d.id);
+        } }, "Save edits"),
+        h("span", { id: "editMsg", class: "muted small" }))));
+  }
+  // ---- Search again ----
+  const sj = d.search_json ? JSON.parse(d.search_json) : null;
+  const isTrack = d.kind === "track";
+  const topc = cands[0] || {};
+  const firstFileTags = d.files[0]?.tags || {};
+  const sInp = (id, val, ph) => h("input", { type: "text", id, value: val ?? "", placeholder: ph,
+    style: "font:14px var(--font);min-height:32px;padding:0 8px;border:1px solid var(--btn-line);border-radius:6px;width:100%" });
+  parts.push(h("details", {},
+    h("summary", { class: "strong", style: "cursor:pointer" }, "Search again" + (sj ? ` · last: ${sj.link || [sj.artist, sj.album || sj.title].join(" – ")}` : "")),
+    h("p", { class: "muted xsmall" }, `Match this ${isTrack ? "track" : "album"} again with your own terms, or paste a MusicBrainz ${isTrack ? "recording" : "release"} link.`),
+    h("table", { class: "kv" }, h("tbody", {},
+      h("tr", {}, h("td", { class: "muted" }, h("label", { for: "s-artist" }, "Artist")), h("td", {}, sInp("s-artist", sj?.artist ?? (topc.artist || firstFileTags.artist), "artist"))),
+      h("tr", {}, h("td", { class: "muted" }, h("label", { for: "s-name" }, isTrack ? "Title" : "Album")),
+                  h("td", {}, sInp("s-name", isTrack ? (sj?.title ?? firstFileTags.title) : (sj?.album ?? firstFileTags.album), isTrack ? "title" : "album"))),
+      h("tr", {}, h("td", { class: "muted" }, h("label", { for: "s-link" }, "or link")), h("td", {}, sInp("s-link", sj?.link, "https://musicbrainz.org/release/…"))))),
+    h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:8px" },
+      h("button", { type: "button", class: "btn", onclick: async () => {
+        const r = await post2("/api/search", { unit_id: d.id, artist: document.getElementById("s-artist").value,
+          name: document.getElementById("s-name").value, link: document.getElementById("s-link").value });
+        document.getElementById("searchMsg").textContent = r.error || "Searching… (this album will refresh when done)";
+        if (!r.error) { const st = await api("/api/state"); renderScan(st.scan); waitThenReload(d.id); }
+      } }, "Search"),
+      h("span", { id: "searchMsg", class: "muted small" }))));
   const decide = async (action) => {
     await api("/api/decision", { method: "POST", headers: { "Content-Type": "application/json", "X-MLT": "1" },
       body: JSON.stringify({ unit_id: d.id, action, candidate_id: action === "accept" ? chosen.id : null }) });
@@ -293,6 +346,18 @@ function renderUnitDetail(d) {
     d.decision ? h("button", { type: "button", class: "btn", onclick: () => decide("clear") }, "Undo decision") : null));
   parts.push(h("p", { class: "muted xsmall" }, "Decisions are saved immediately. Nothing is copied or changed until you apply a plan."));
   document.getElementById("details").replaceChildren(...parts.filter(Boolean));
+}
+const post2 = (url, body) => api(url, { method: "POST", headers: { "Content-Type": "application/json", "X-MLT": "1" },
+                                        body: JSON.stringify(body) });
+function waitThenReload(unitId) {
+  const tick = async () => {
+    const st = await api("/api/state");
+    if (st.scan && st.scan.running) return setTimeout(tick, 1500);
+    await refreshCenter();
+    const tr = [...document.querySelectorAll("#table tbody tr")].find(r => r.getAttribute("aria-selected") === "true");
+    selectUnit(unitId, tr);
+  };
+  setTimeout(tick, 1500);
 }
 function renderAlbums(where, fl) {
   const groups = albumGroups();

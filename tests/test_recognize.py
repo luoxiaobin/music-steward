@@ -54,7 +54,7 @@ def test_enqueue_is_idempotent_and_resumable(music, con):
     assert units.enqueue(con, 1, us, requeue=True)["requeued"] == len(us)
 
 
-def fake_album(paths, key):
+def fake_album(paths, key, search=None):
     return {"kind": "album", "recommendation": "medium", "acoustid_used": True,
             "files_fingerprint_linked": len(paths), "candidates": [
                 {"rank": 0, "source": "MusicBrainz", "album_id": "a1", "album": "Album A", "artist": "Artist",
@@ -89,7 +89,7 @@ def test_worker_records_errors(music, con, monkeypatch):
     units.enqueue(con, 1, units.plan_units(con, 1)[:1])
     from mp3librarytool.recognize import beets_adapter
 
-    def boom(paths, key):
+    def boom(paths, key, search=None):
         raise RuntimeError("musicbrainz is down")
     monkeypatch.setattr(beets_adapter, "match_album", boom)
     uid = con.execute("SELECT id FROM unit").fetchone()[0]
@@ -148,7 +148,7 @@ def test_accept_survives_rematch_when_release_still_there(music, con, monkeypatc
     worker.run_unit(dbp, uid)
     _accept_top(con, uid)
 
-    def reordered(paths, key):            # same release comes back at rank 1 after re-match
+    def reordered(paths, key, search=None):  # same release comes back at rank 1 after re-match
         r = fake_album(paths, key)
         r["candidates"].reverse()
         for i, c in enumerate(r["candidates"]):
@@ -172,7 +172,7 @@ def test_accept_dropped_with_notice_when_release_gone(music, con, monkeypatch):
     worker.run_unit(dbp, uid)
     _accept_top(con, uid)
 
-    def other(paths, key):
+    def other(paths, key, search=None):
         r = fake_album(paths, key)
         r["candidates"] = r["candidates"][1:]
         r["candidates"][0]["rank"] = 0

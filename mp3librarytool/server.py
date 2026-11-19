@@ -167,19 +167,19 @@ class App:
 
     def start_job(self, kind: str, root: str, path: str = "") -> dict:
         """Background scan or hash of a root or one of its sub-folders. One job at a time."""
-        if kind in ("apply", "undo", "resume"):
-            root = self.roots[0]
+        if kind in ("apply", "undo", "resume", "recognize_unit"):
+            root = root or self.roots[0]
             if not str(path).isdigit():
                 return {"error": "bad id"}
         root = os.path.abspath(root)
         if root not in self.roots:
             return {"error": "not a configured root"}
-        if kind in ("apply", "undo", "resume"):
+        if kind in ("apply", "undo", "resume", "recognize_unit"):
             pass
         elif path and (".." in path.split("/") or path.startswith("/")):
             return {"error": "bad path"}
         target = os.path.join(root, str(path)) if path else root
-        if kind not in ("apply", "undo", "resume") and not os.path.realpath(target).startswith(os.path.realpath(root)):
+        if kind not in ("apply", "undo", "resume", "recognize_unit") and not os.path.realpath(target).startswith(os.path.realpath(root)):
             return {"error": "bad path"}
         with self._lock:
             if self.scan_state.get("running"):
@@ -204,6 +204,9 @@ class App:
                                                     else runner.resume(con, n))}
                     if res.get("error"):
                         res["status"], res["abort_reason"] = "error", res["error"]
+                elif kind == "recognize_unit":
+                    from .recognize import queue
+                    res = {"status": "complete", **queue.run(self.db_path, [int(path)], progress=prog)}
                 elif kind == "recognize":
                     from .recognize import queue, units
                     rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
@@ -261,6 +264,45 @@ class App:
             r["summary"] = json.loads(r.pop("summary_json") or "{}")
         return p
 
+    def search_again(self, con, body) -> dict:
+        from .recognize import search as srch
+        uid = _int(body.get("unit_id"))
+        u = con.execute("SELECT * FROM unit WHERE id=?", (uid,)).fetchone()
+        if not u:
+            return {"error": "no such album"}
+        try:
+            s = srch.parse(u["kind"], body.get("artist", ""), body.get("name", ""), body.get("link", ""))
+        except srch.SearchError as e:
+            return {"error": str(e)}
+        con.execute("UPDATE unit SET search_json=?, status='queued' WHERE id=?", (json.dumps(s, ensure_ascii=False), uid))
+        con.commit()
+        root = con.execute("SELECT path FROM root WHERE id=?", (u["root_id"],)).fetchone()["path"]
+        return self.start_job("recognize_unit", root, str(uid))
+
+    def edit_fields(self, con, body) -> dict:
+        uid = _int(body.get("unit_id"))
+        d = con.execute("SELECT * FROM decision WHERE unit_id=? AND action='accept'", (uid,)).fetchone()
+        if not d:
+            return {"error": "accept a release first, then edit its fields"}
+        ov = body.get("overrides") or {}
+        clean = {}
+        for k in ("album", "albumartist"):
+            if isinstance(ov.get(k), str) and ov[k].strip():
+                clean[k] = ov[k].strip()
+        if str(ov.get("year", "")).strip():
+            if not str(ov["year"]).strip().isdigit() or not 1000 <= int(ov["year"]) <= 2999:
+                return {"error": "year must be a 4-digit number"}
+            clean["year"] = int(ov["year"])
+        ids = set(json.loads(con.execute("SELECT file_ids FROM unit WHERE id=?", (uid,)).fetchone()[0]))
+        titles = {str(int(k)): v.strip() for k, v in (ov.get("titles") or {}).items()
+                  if str(k).isdigit() and int(k) in ids and isinstance(v, str) and v.strip()}
+        if titles:
+            clean["titles"] = titles
+        con.execute("UPDATE decision SET overrides_json=? WHERE unit_id=?",
+                    (json.dumps(clean, ensure_ascii=False) if clean else None, uid))
+        con.commit()
+        return {"ok": True, "overrides": clean}
+
     def decide(self, con, body) -> dict:
         """Save a review decision immediately (Accept a candidate, or Skip)."""
         uid, action = _int(body.get("unit_id")), body.get("action")
@@ -275,8 +317,10 @@ class App:
                 return {"error": "candidate does not belong to this album"}
             from .recognize.results import release_key
             key = release_key(con, cid) if action == "accept" else None
-            con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
-                        "VALUES(?,?,?,?,?)", (uid, action, cid, time.time(), key))
+            prev = con.execute("SELECT candidate_id, overrides_json FROM decision WHERE unit_id=?", (uid,)).fetchone()
+            keep = prev["overrides_json"] if prev and action == "accept" and prev["candidate_id"] == cid else None
+            con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key, "
+                        "overrides_json) VALUES(?,?,?,?,?,?)", (uid, action, cid, time.time(), key, keep))
             con.execute("UPDATE unit SET notice=NULL WHERE id=?", (uid,))
         con.commit()
         return {"ok": True}
@@ -397,6 +441,13 @@ def make_handler(app: App, port_ref: dict):
             if u.path in ("/api/apply", "/api/undo", "/api/resume"):
                 kind = u.path.rsplit("/", 1)[1]
                 return self._json(app.start_job(kind, "", str(body.get("id", ""))))
+            if u.path in ("/api/search", "/api/edit"):
+                con = app.con()
+                try:
+                    return self._json(app.search_again(con, body) if u.path == "/api/search"
+                                      else app.edit_fields(con, body))
+                finally:
+                    con.close()
             if u.path == "/api/decision":
                 con = app.con()
                 try:
