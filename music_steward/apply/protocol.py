@@ -177,7 +177,8 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
             from ..cue import rewrite_bytes
             rw = o["tags"]["cue_rewrite"]
             data, _enc = rewrite_bytes(temp.read_bytes(), rw.get("files"), rw.get("album"),
-                                       {int(k): v for k, v in (rw.get("tracks") or {}).items()})
+                                       {int(k): v for k, v in (rw.get("tracks") or {}).items()},
+                                       out_encoding=rw.get("encoding"))   # plans before 2026-11-19: original
             with open(temp, "wb") as fh:
                 fh.write(data)
                 fh.flush()

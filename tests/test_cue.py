@@ -113,7 +113,8 @@ def test_cue_album_apply_copies_image_and_rewritten_cue_then_undo(image_album, c
     assert res["states"] == {"committed": 3}, res
     adir = dest / "Various Artists/HIFI年代1 · 怀念战友 (2002)"
     new_cue = cue.parse(str(adir / "HIFI年代1 · 怀念战友.cue"))
-    assert new_cue.encoding in ("gb18030", "gbk", "gb2312")             # still GBK
+    assert new_cue.encoding == "utf-8-sig"          # UTF-8 + BOM: macOS players misread GBK cues
+    assert (adir / "HIFI年代1 · 怀念战友.cue").read_bytes().startswith(b"\xef\xbb\xbf")
     assert new_cue.files[0].name == "HIFI年代1 · 怀念战友.flac" and new_cue.title == "HIFI年代1 · 怀念战友"
     assert [t.title for t in new_cue.tracks] == ["红星照我去战斗", "怀念战友", "大海啊故乡"]
     from mutagen.flac import FLAC
@@ -127,3 +128,11 @@ def test_detection_falls_back_to_gb18030_before_latin1():
     """charset-normalizer gave up on a short rewritten GB18030 cue; it must not be read as Latin-1."""
     raw = 'FILE "林子祥创作＋流行歌集.ape" WAVE\r\n  TRACK 01 AUDIO\r\n    INDEX 01 00:00:00\r\n'.encode("gb18030")
     assert cue.parse_bytes(raw).files[0].name == "林子祥创作＋流行歌集.ape"
+
+
+def test_cue_can_keep_its_original_encoding(monkeypatch):
+    from music_steward.apply import plan as planmod
+    monkeypatch.setenv("MLT_CUE_ENCODING", "original")
+    assert planmod.cue_encoding() is None
+    out, enc = cue.rewrite_bytes(CUE.encode("gbk"), {"old image name.wav": "x.flac"}, out_encoding=None)
+    assert enc.startswith("gb") and 'FILE "x.flac"' in out.decode(enc)

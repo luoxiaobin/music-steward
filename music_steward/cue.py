@@ -122,9 +122,11 @@ def with_lengths(f: CueFile, total: float | None) -> CueFile:
 
 
 def rewrite_bytes(raw: bytes, file_renames: dict[str, str] | None = None, album: dict | None = None,
-                  tracks: dict[int, dict] | None = None) -> tuple[bytes, str]:
+                  tracks: dict[int, dict] | None = None, out_encoding: str | None = None) -> tuple[bytes, str]:
     """Return the cue with FILE references renamed and (optionally) album/track TITLE and
-    PERFORMER replaced -- in the cue's ORIGINAL encoding. Everything else is kept."""
+    PERFORMER replaced. Everything else is kept. Written in `out_encoding` (e.g. "utf-8-sig":
+    UTF-8 with a BOM, which macOS players need -- foobar2000 for Mac showed GB18030 cues as
+    mojibake), or in the cue's ORIGINAL encoding when None."""
     enc = detect_encoding(raw)
     file_renames, album, tracks = file_renames or {}, album or {}, tracks or {}
     out, cur_track = [], None
@@ -154,6 +156,8 @@ def rewrite_bytes(raw: bytes, file_renames: dict[str, str] | None = None, album:
                 line = f'{indent}{cmd} "{tracks[cur_track][key]}"{eol}'
         out.append(line)
     text = "".join(out)
+    if out_encoding:
+        return text.encode(out_encoding), out_encoding
     try:
         return text.encode(enc), enc
     except UnicodeEncodeError:

@@ -59,10 +59,19 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
     items.append({"unit_id": u["id"], "file_id": cf["id"], "kind": "cue",
                   "src": os.path.join(root_path, cf["fs_relpath"]), "dest_rel": f"{adir}/{stem}.cue",
                   "codec": None, "size": cf["size"], "mtime": cf["mtime_ns"],
-                  "tags": {"cue_rewrite": {"files": {fl.name: image_name for fl in sheet.files},
+                  "tags": {"cue_rewrite": {"encoding": cue_encoding(),
+                                           "files": {fl.name: image_name for fl in sheet.files},
                                            "album": {"title": c["album"], "performer": c["artist"]},
                                            "tracks": tracks}}})
     new_stem_of[f["relpath"].rsplit(".", 1)[0]] = f"{adir}/{stem}"
+
+
+def cue_encoding() -> str | None:
+    """Encoding of copied cue sheets: UTF-8 with a BOM by default (readable by foobar2000 on Mac
+    and Windows and most players; GB18030 cues showed as mojibake on the Mac).
+    MLT_CUE_ENCODING=original keeps each cue's own encoding (old Chinese Windows players)."""
+    v = os.environ.get("MLT_CUE_ENCODING", "utf-8-sig")
+    return None if v.lower() == "original" else v
 
 
 def script_rule() -> str:
