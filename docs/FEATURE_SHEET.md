@@ -39,6 +39,16 @@ Full scan 75 min once, folder re-scan ~75 s for 6.9k files; recognition ~10–13
 ## Not done yet
 Desktop window and installer · apply to the NAS (protocol proven, UI targets a local folder) · singles rules · APE playback in the browser · Apple (ALAC) export · Windows testing.
 
+## Future features (proposed order)
+Guiding constraint: the heavy work (scanning terabytes, decoding APE, fingerprinting) belongs on a computer or on the NAS, not on a phone.
+1. **Chinese UI** (Simplified + Traditional) — string tables for the plain HTML/JS UI; fits the core audience. *Days.*
+2. **macOS app** — pywebview window, bundled Python + FFmpeg, signed and notarized download. *~1 week.*
+3. **NAS / Docker mode + phone-friendly review** — run the engine on the NAS (local disk speed instead of SMB: faster scan and hash); every device uses the same web UI over the home network with proper sign-in. A swipe-to-Accept/Skip review with audio preview covers **iPhone and Android** with no store app.
+4. **Windows desktop** — UNC paths, the publish-safety probe on NTFS/SMB, WebView2 window, installer, full test pass. *1–2 weeks.*
+5. **More collection languages** — tag repair for Japanese (Shift-JIS), Korean (EUC-KR/CP949), Cyrillic (CP1251), each with its own heuristics and test files; added one script at a time, on demand.
+6. **Apple export (M4)** — FLAC/APE → ALAC tree for iPhone listening; Android plays the organized FLAC copy directly.
+7. **Native iPhone / Android apps** — only if a store launch becomes a goal and the licence questions below are settled; phones suit listening and reviewing, not organizing.
+
 ---
 
 ## Brief for a functional review

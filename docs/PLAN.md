@@ -115,6 +115,13 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
 7. ✅ Destination preview from the naming template; casefold/NFC collision and existing-file conflicts
 8. **Desktop window with pywebview + native folder picker** — [ADR 0001](adr/0001-desktop-shell-pywebview.md)
 
+## Future features (after M2/M3; see `docs/FEATURE_SHEET.md`)
+
+Chinese UI → macOS app (notarized) → NAS/Docker mode + phone-friendly review over the home network
+(covers iPhone and Android) → Windows desktop → tag repair for more scripts (Japanese, Korean,
+Cyrillic) on demand → Apple export (M4) → native phone apps only if a store launch becomes a goal
+(GPL vs App Store and service terms to settle first).
+
 ## Decisions
 
 | Date | Decision | Record |
