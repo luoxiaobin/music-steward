@@ -182,11 +182,34 @@ def _fingerprint(items, use_chroma) -> dict[str, bool]:
     return {os.fsdecode(it.path): it.path in ch._matches for it in items}
 
 
+def _item(path: str) -> Item:
+    """beets' own reader fails on some real files (APE with an ID3 block in front, APEv2 tags with
+    GBK bytes). Fall back to our tolerant reader, with the repair proposal applied, and the
+    duration from ffprobe, so the album can still be matched and fingerprinted."""
+    try:
+        return Item.from_path(path)
+    except Exception:  # noqa: BLE001 -- beets ReadError, mediafile/mutagen errors
+        from ..probe import probe
+        from ..tags import read_tags
+        ti = read_tags(path)
+        v = dict(ti.values)
+        for i in ti.issues:
+            if i.get("field") and i.get("proposal"):
+                v[i["field"]] = i["proposal"]
+        num = lambda x: int(str(x).split("/")[0]) if x and str(x).split("/")[0].strip().isdigit() else 0  # noqa: E731
+        it = Item(title=v.get("title") or "", artist=v.get("artist") or "", album=v.get("album") or "",
+                  albumartist=v.get("albumartist") or "", track=num(v.get("track")), disc=num(v.get("disc")),
+                  length=probe(path, ext=os.path.splitext(path)[1].lower()).duration or 0.0)
+        it.path = os.fsencode(path)
+        it._mlt_fallback = True
+        return it
+
+
 def match_album(paths: list[str], acoustid_key: str | None, search: dict | None = None) -> dict:
     """search: optional {"artist", "album"} terms or {"ids": [release mbid]} from the user."""
     search = search or {}
     use_chroma = configure(acoustid_key)
-    items = [Item.from_path(p) for p in paths]
+    items = [_item(p) for p in paths]
     repaired = _repair(items)
     linked = _fingerprint(items, use_chroma)
     source = Source.from_items(items)
@@ -228,7 +251,7 @@ def match_album(paths: list[str], acoustid_key: str | None, search: dict | None 
 def match_track(path: str, acoustid_key: str | None, search: dict | None = None) -> dict:
     search = search or {}
     use_chroma = configure(acoustid_key)
-    it = Item.from_path(path)
+    it = _item(path)
     repaired = _repair([it])
     linked = _fingerprint([it], use_chroma)
     proposal = tag_item(Source.from_item(it), search_artist=search.get("artist") or None,

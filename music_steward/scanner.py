@@ -146,7 +146,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
         return not subkey or rel.startswith(subkey + "/")
 
     known = {r["relpath"]: r for r in con.execute(
-        "SELECT id, relpath, size, mtime_ns, removed_at, probe_status FROM file WHERE root_id=?", (root_id,))
+        "SELECT id, relpath, size, mtime_ns, removed_at, probe_status, tag_issues_json FROM file WHERE root_id=?", (root_id,))
         if in_scope(r["relpath"])}
 
     # ---- 1. walk (listing only) ------------------------------------------
@@ -203,7 +203,8 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
     todo: list[_Found] = []
     for f in found:
         k = known.get(f.rel)
-        retry = reprobe_errors and k is not None and k["probe_status"] == "error"
+        retry = reprobe_errors and k is not None and (
+            k["probe_status"] == "error" or '"tag_read_error"' in (k["tag_issues_json"] or ""))
         if k and not retry and k["removed_at"] is None and k["size"] == f.size and k["mtime_ns"] == f.mtime_ns:
             seen.add(f.rel)
             c["n_unchanged"] += 1

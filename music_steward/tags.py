@@ -31,6 +31,92 @@ class TagInfo:
 
 
 def read_tags(path: str) -> TagInfo:
+    try:
+        return _read_tags(path)
+    except Exception as e:  # noqa: BLE001 -- mutagen raises many types
+        ti = _tolerant(path)
+        if ti is None:
+            raise
+        ti.issues.append({"kind": "tag_read_fallback", "error": f"{type(e).__name__}: {e}"[:200]})
+        return ti
+
+
+def _tolerant(path: str) -> TagInfo | None:
+    """When mutagen refuses a file: an APE file with an ID3 block in front (mutagen takes it
+    for MP3), or an APEv2 tag holding GBK/Big5 bytes where UTF-8 is required. Read what is
+    there; legacy text gets the usual repair proposal."""
+    from mutagen.id3 import ID3
+    with open(path, "rb") as fh:
+        head = fh.read(3)
+    if head == b"ID3":
+        try:
+            ti = TagInfo("ID3 (prefix)")
+            _read_id3(ID3(path), ti)
+            if ti.values:
+                return ti
+        except Exception:  # noqa: BLE001
+            pass
+    items = _raw_apev2(path)
+    if items is None:
+        return None
+    ti = TagInfo("APEv2 (lenient)")
+    for key, raw in items:
+        fld = VORBIS_MAP.get(key.lower())
+        if not fld or fld in ti.values:
+            continue
+        try:
+            ti.values[fld] = raw.decode("utf-8").strip("\x00").strip()
+            continue
+        except UnicodeDecodeError:
+            pass
+        shown = raw.decode("latin-1").strip("\x00").strip()
+        ti.values[fld] = shown
+        prop = repair_latin1(shown)
+        if prop:
+            ti.issues.append({"field": fld, "kind": "legacy_encoding", "frame": f"APE:{key}",
+                              "shown_as": shown, **prop})
+    for k in [k for k, v in ti.values.items() if not v]:
+        del ti.values[k]
+    return ti
+
+
+def _raw_apev2(path: str) -> list[tuple[str, bytes]] | None:
+    """Minimal APEv2 reader: footer 'APETAGEX' at the end (or before a 128-byte ID3v1 tag)."""
+    import struct
+    with open(path, "rb") as fh:
+        fh.seek(0, 2)
+        end = fh.tell()
+        for footer_at in (end - 32, end - 128 - 32):
+            if footer_at < 0:
+                continue
+            fh.seek(footer_at)
+            foot = fh.read(32)
+            if foot[:8] == b"APETAGEX":
+                break
+        else:
+            return None
+        _ver, size, count, _flags = struct.unpack("<4I", foot[8:24])
+        if size < 32 or size > 16 * 1024 * 1024 or count > 1000 or footer_at - (size - 32) < 0:
+            return None
+        fh.seek(footer_at - (size - 32))
+        body = fh.read(size - 32)
+    out, pos = [], 0
+    for _ in range(count):
+        if pos + 8 > len(body):
+            break
+        vlen, iflags = struct.unpack("<2I", body[pos:pos + 8])
+        k_end = body.find(b"\x00", pos + 8)
+        if k_end < 0 or k_end + 1 + vlen > len(body):
+            break
+        key = body[pos + 8:k_end].decode("latin-1")
+        value = body[k_end + 1:k_end + 1 + vlen]
+        pos = k_end + 1 + vlen
+        if (iflags >> 1) & 3 == 0:          # text item (not binary / external)
+            out.append((key, value.split(b"\x00")[0]))
+    return out
+
+
+def _read_tags(path: str) -> TagInfo:
     f = mutagen.File(path)
     if f is None:
         return TagInfo(None)

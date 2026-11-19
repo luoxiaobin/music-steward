@@ -256,7 +256,12 @@ def main(argv=None):
     sv.set_defaults(func=cmd_serve)
 
     a = ap.parse_args(argv)
-    a.func(a)
+    try:
+        return a.func(a)
+    except KeyboardInterrupt:
+        # every long command is resumable: say so instead of printing a traceback
+        print("\ninterrupted -- run the same command again to continue where it stopped", file=sys.stderr)
+        return 130
 
 
 if __name__ == "__main__":
