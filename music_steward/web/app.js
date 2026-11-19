@@ -202,7 +202,8 @@ function albumGroups() {
   return [...g.values()];
 }
 const CONF = {
-  ready: ["b-ready", "Ready"], needs_review: ["b-review", "Needs review"], no_match: ["b-unid", "No real match"],
+  ready: ["b-ready", "Ready"], likely: ["b-rel", "Likely"], needs_review: ["b-review", "Needs review"],
+  weak: ["b-unid", "Weak: title agrees"], no_match: ["b-unid", "No real match"],
   queued: ["b-rel", "Queued"], running: ["b-rel", "Recognizing…"], error: ["b-conflict", "Error"],
 };
 function unitBadge(u) {
@@ -217,7 +218,18 @@ async function renderUnits(where) {
   const counts = {};
   for (const u of us) { const k = u.decision ? u.decision.action : u.confidence; counts[k] = (counts[k] || 0) + 1; }
   document.getElementById("tableTitle").textContent = `Albums · ${us.length} recognized units in ${where}`;
-  document.getElementById("tableNote").textContent = Object.entries(counts).map(([k, n]) => `${n} ${k.replace("_", " ")}`).join(" · ");
+  const note = document.getElementById("tableNote");
+  note.replaceChildren(Object.entries(counts).map(([k, n]) => `${n} ${k.replace("_", " ")}`).join(" · "));
+  const nLikely = us.filter(u => !u.decision && u.confidence === "likely").length;
+  const nReady = us.filter(u => !u.decision && u.confidence === "ready").length;
+  if (nLikely + nReady) note.append(" ", h("button", { type: "button", class: "btn", style: "min-height:28px;padding:0 10px;margin-left:6px",
+    onclick: async () => {
+      if (!confirm(`Accept the top candidate for ${nReady} Ready and ${nLikely} Likely albums in this folder? ` +
+                   "Nothing is copied until you apply a plan; each decision can be undone.")) return;
+      const r = await post2("/api/bulk_accept", { root: S.root.path, path: S.path, confidences: ["ready", "likely"] });
+      if (r.error) alert(r.error);
+      await refreshCenter();
+    } }, `Accept all Ready + Likely (${nReady + nLikely})`));
   const body = h("tbody");
   for (const u of us) {
     const t = u.top;
@@ -226,7 +238,8 @@ async function renderUnits(where) {
       h("td", {}, h("div", { class: "strong" }, u.label), h("div", { class: "sub mono" }, (u.folder || ".") + "/")),
       h("td", {}, u.kind === "track" ? "track" : u.kind === "cue" ? `${u.n_tracks || "?"} (cue)` : u.n_files),
       h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${t.year || "?"}${t.country ? " · " + t.country : ""}`),
-                       h("div", { class: "sub" }, `${t.artist} · distance ${t.distance.toFixed(2)} · fingerprints ${t.fingerprint_agrees}/${u.n_tracks || u.n_files}`)]
+                       h("div", { class: "sub" }, `${t.artist} · distance ${t.distance.toFixed(2)} · fingerprints ${t.fingerprint_agrees}/${u.n_tracks || u.n_files}` +
+                         (u.evidence && u.evidence.disc_of_set ? ` · disc ${u.evidence.disc} of ${t.mediums}` : ""))]
                     : h("span", { class: "muted" }, u.status === "error" ? "error" : u.status === "done" ? "no candidates" : "—")),
       h("td", {}, unitBadge(u)));
     body.append(tr);
@@ -261,6 +274,7 @@ function renderUnitDetail(d) {
         h("br"), h("span", { class: "ev" }, `${c.artist} · ${c.label || ""}`), h("br"),
         h("span", { class: "ev" }, `distance ${c.distance.toFixed(2)} · `,
           h("span", { class: fpShare >= 0.6 ? "ok" : "warn" }, `fingerprints agree ${c.fingerprint_agrees}/${nT}`),
+          c.evidence && c.evidence.disc_of_set ? ` · your files are disc ${c.evidence.disc} of ${c.mediums}` :
           c.extra_tracks.length ? ` · ${c.extra_tracks.length} release tracks missing locally` : "",
           c.extra_items.length ? ` · ${c.extra_items.length} local files not on this release` : "",
           ` · ${c.source}`))));

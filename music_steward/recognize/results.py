@@ -40,18 +40,70 @@ def candidate_for(con: sqlite3.Connection, unit_id: int, key: str) -> int | None
     return None
 
 
+CUE_FP_TRACKS = 4        # cue albums: only this many tracks are fingerprinted (speed)
+LIKELY_DISTANCE = 0.15   # no fingerprints needed: very close, every track mapped, none missing
+TITLE_AGREES = 0.8       # similarity of normalised album titles for "weak: title agrees"
+
+
+def _norm_title(t: str | None) -> str:
+    import re
+    t = (t or "").casefold()
+    t = re.sub(r"[\s\-_.·•:：,，/\\|()（）\[\]【】《》<>'\"“”‘’!！?？~～]+", "", t)
+    return re.sub(r"(cd|disc|disk)\d+$", "", t)
+
+
+def title_agrees(a: str | None, b: str | None) -> bool:
+    from difflib import SequenceMatcher
+    x, y = _norm_title(a), _norm_title(b)
+    if not x or not y:
+        return False
+    return x in y or y in x or SequenceMatcher(None, x, y).ratio() >= TITLE_AGREES
+
+
+def evidence(u: dict, top: dict) -> dict:
+    """Facts the confidence rule uses, computed from the stored candidate."""
+    n = u.get("n_tracks") or u["n_files"]
+    extra = top.get("extra_tracks")
+    if extra is None:
+        extra = json.loads(top.get("extra_tracks_json") or "[]")
+    media = top.get("_mapped_media") or set()
+    disc_of_set = bool((top.get("mediums") or 1) > 1 and len(media) == 1)
+    return {"n": n, "all_mapped": (top.get("n_mapped") or 0) >= n, "missing": len(extra),
+            "disc_of_set": disc_of_set, "disc": next(iter(media)) if disc_of_set else None,
+            "title_agrees": title_agrees(u.get("label"), top.get("album"))}
+
+
 def confidence(u: dict, top: dict | None) -> str:
+    """ready        fingerprints confirm (see module doc)
+    likely       no fingerprint confirmation, but distance <= 0.15, every track mapped, none missing
+                 (APE sample: all such matches were right) -- accept in bulk after a spot check
+    needs_review any other plausible candidate, incl. one disc of a multi-disc set
+    weak         distance > 0.5 and no fingerprints, but the album title clearly agrees
+    no_match     nothing usable"""
     if u["status"] != "done":
         return u["status"]
     if not top:
         return "no_match"
-    share = (top["fingerprint_agrees"] or 0) / max(1, u.get("n_tracks") or u["n_files"])
+    n = u.get("n_tracks") or u["n_files"]
+    tried = min(n, CUE_FP_TRACKS) if u.get("kind") == "cue" else n
+    share = (top["fingerprint_agrees"] or 0) / max(1, tried)
     if (top["distance"] < READY_DISTANCE and share >= READY_FP_SHARE) or \
             (top["distance"] < READY_DISTANCE_STRONG_FP and share >= STRONG_FP_SHARE):
         return "ready"
+    ev = evidence(u, top)
+    if top["distance"] <= LIKELY_DISTANCE and ev["all_mapped"] and ev["missing"] == 0:
+        return "likely"
     if top["distance"] > NO_MATCH_DISTANCE and not top["fingerprint_agrees"]:
-        return "no_match"
+        if ev["disc_of_set"] and ev["all_mapped"] and ev["title_agrees"]:
+            return "needs_review"      # one disc of a set: other discs' tracks are not "missing"
+        return "weak" if ev["title_agrees"] else "no_match"
     return "needs_review"
+
+
+def _mapped_media(con, unit_kind: str, candidate_id: int) -> set:
+    table = "cand_cue_track" if unit_kind == "cue" else "cand_track"
+    return {r[0] for r in con.execute(f"SELECT DISTINCT medium FROM {table} WHERE candidate_id=?", (candidate_id,))
+            if r[0] is not None}
 
 
 def units(con: sqlite3.Connection, root_id: int, folder: str = "") -> list[dict]:
@@ -66,7 +118,12 @@ def units(con: sqlite3.Connection, root_id: int, folder: str = "") -> list[dict]
         u["n_files"] = len(json.loads(u["file_ids"]))
         c = con.execute("SELECT * FROM candidate WHERE unit_id=? ORDER BY rank LIMIT 1", (u["id"],)).fetchone()
         u["top"] = dict(c) if c else None
+        if u["top"]:
+            u["top"]["_mapped_media"] = _mapped_media(con, u["kind"], u["top"]["id"])
         u["confidence"] = confidence(u, u["top"])
+        if u["top"]:
+            u["evidence"] = evidence(u, u["top"])
+            u["top"].pop("_mapped_media")
         d = con.execute("SELECT * FROM decision WHERE unit_id=?", (u["id"],)).fetchone()
         u["decision"] = dict(d) if d else None
         out.append(u)
@@ -102,7 +159,12 @@ def unit_detail(con: sqlite3.Connection, unit_id: int) -> dict | None:
     u["candidates"] = cands
     if u["kind"] == "cue" and cands:
         u["n_cue_tracks"] = max(len(c["tracks"]) for c in cands)
+    for c in cands:
+        c["_mapped_media"] = {t["medium"] for t in c["tracks"] if t.get("medium") is not None}
+        c["evidence"] = evidence(u, c)
     u["confidence"] = confidence(u, cands[0] if cands else None)
+    for c in cands:
+        c.pop("_mapped_media")
     d = con.execute("SELECT * FROM decision WHERE unit_id=?", (unit_id,)).fetchone()
     u["decision"] = dict(d) if d else None
     return u

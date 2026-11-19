@@ -61,6 +61,19 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
     HIFI年代1 · 怀念战友 matched (was "no real match"), applied in 21 s, audio identical, cue still
     GB18030, track performers improved (姜苏 / 伽菲珈而 instead of the label 柏菲), undone.
 
+13. ✅ APE sample from the NAS (40 cue albums of 1,483 in 音乐Ape, every 37th): 19 min, 0 errors.
+    ~16 plausible matches, ~24 wrong/not found; fingerprints agreed on 1 of 40 (AcoustID has no
+    MusicBrainz links for this repertoire). Tuned the rule on it:
+    * **Likely** (no fingerprints): distance ≤ 0.15, every track mapped, none missing → 4 of 40, all
+      right; bulk "Accept all Ready + Likely" per folder (decisions only; undoable)
+    * **disc of a set**: an image that maps onto one disc of a multi-disc release is not "missing"
+      the other discs → needs review ("disc 2 of 3") instead of no match
+    * **Weak: title agrees** instead of no match when only the album title agrees (still needs care:
+      series titles agree across different singers)
+    * cue albums fingerprint at most 4 tracks: 10.3 s/album instead of ~28 (same top results);
+      full 音乐Ape ≈ 4 h
+    Next for match rate: Simplified/Traditional key (经典老歌 vs 經典老歌 missed the title check).
+
 ## M2 backlog (original order)
 
 1. ✅ `serve` + read-only inventory browser (three-pane, per the Review & Plan mockups)

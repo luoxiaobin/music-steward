@@ -33,6 +33,7 @@ REPAIR_FIELDS = ("title", "artist", "album", "albumartist")
 # only, so a Discogs/Deezer copy of the same release ties on distance but shows 0 agreement.
 # Rank by distance minus a small bonus for the share of fingerprints that agree.
 FP_RANK_BONUS = 0.05
+from .results import CUE_FP_TRACKS  # noqa: E402
 
 
 def _rerank(cands: list[dict], n_files: int) -> list[dict]:
@@ -222,6 +223,11 @@ def match_cue(audio_path: str, album: dict, tracks: list[dict], acoustid_key: st
     search = search or {}
     use_chroma = configure(acoustid_key)
     tmp = tempfile.mkdtemp(prefix="mlt_cue_")
+    # Decoding slices of a big image over the network is most of the time, and for this
+    # collection fingerprints rarely link (APE sample: 1 of 40). Fingerprint at most
+    # CUE_FP_TRACKS evenly spaced tracks; the others match on title and length.
+    step = max(1, len(tracks) // CUE_FP_TRACKS)
+    fp_numbers = {t["number"] for t in tracks[::step][:CUE_FP_TRACKS]}
     try:
         items, number_of = [], {}
         for t in tracks:
@@ -229,7 +235,7 @@ def match_cue(audio_path: str, album: dict, tracks: list[dict], acoustid_key: st
                       album=album.get("title") or "", albumartist=album.get("performer") or "",
                       track=t["number"], tracktotal=len(tracks), length=t.get("length") or 0.0)
             seg = os.path.join(tmp, f"t{t['number']:02d}.wav")
-            if use_chroma and _segment_wav(audio_path, t["start"], t.get("length"), seg, offset):
+            if use_chroma and t["number"] in fp_numbers and _segment_wav(audio_path, t["start"], t.get("length"), seg, offset):
                 it.path = os.fsencode(seg)
             else:
                 it.path = os.fsencode(os.path.join(tmp, f"virtual-{t['number']:02d}"))

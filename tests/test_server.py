@@ -145,3 +145,22 @@ def test_edit_requires_accept_and_validates(server):
     post("/api/decision", {"unit_id": 1, "action": "accept", "candidate_id": 1})   # re-accept same: edits kept
     assert json.loads(c.execute("SELECT overrides_json FROM decision").fetchone()[0])["album"] == "B"
     assert "MusicBrainz" in post("/api/search", {"unit_id": 1, "link": "https://example.com"})["error"]
+
+
+def test_bulk_accept_only_ready_or_likely_and_undecided(server):
+    app, port = server
+    ck = login(app, port)
+    from music_steward import db as dbm
+    c = dbm.connect(app.db_path)
+    for i, (d, fp) in enumerate([(0.10, 1), (0.12, 0), (0.40, 0)], 1):   # ready, likely, needs review
+        c.execute("INSERT INTO unit(root_id, folder, label, kind, key, file_ids, status) "
+                  "VALUES(1,'F',?,'album',?, '[1]','done')", (f"A{i}", f"album:F{i}"))
+        c.execute("INSERT INTO candidate(unit_id, rank, album, distance, fingerprint_agrees, n_mapped, extra_tracks_json) "
+                  "VALUES(?,0,?,?,?,1,'[]')", (i, f"A{i}", d, fp))
+    c.commit()
+    post = lambda body: json.loads(req(port, "/api/bulk_accept", cookie=ck, method="POST", body=json.dumps(body),
+                                       headers={"X-MLT": "1"})[2])
+    assert "only for Ready and Likely" in post({"root": app.roots[0], "path": "", "confidences": ["needs_review"]})["error"]
+    assert post({"root": app.roots[0], "path": "", "confidences": ["ready", "likely"]}) == {"accepted": 2}
+    assert post({"root": app.roots[0], "path": "", "confidences": ["ready", "likely"]}) == {"accepted": 0}  # idempotent
+    assert {r[0] for r in c.execute("SELECT unit_id FROM decision")} == {1, 2}

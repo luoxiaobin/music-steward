@@ -207,3 +207,43 @@ def test_fingerprint_confirmed_candidate_wins_a_distance_tie():
     out = _rerank(cands, 25)
     assert [c["source"] for c in out][:2] == ["MusicBrainz", "Discogs"] and [c["rank"] for c in out] == [0, 1, 2]
     assert out[2]["distance"] == 0.60     # a bonus never lifts a far-off release above a close one
+
+
+def _u(n=11, kind="album", label="Album"):
+    return {"status": "done", "n_files": n, "n_tracks": n if kind == "cue" else None, "kind": kind, "label": label}
+
+
+def _c(d, fp=0, mapped=11, extra=0, mediums=1, media=(1,), album="Album"):
+    return {"distance": d, "fingerprint_agrees": fp, "n_mapped": mapped, "extra_tracks": [{}] * extra,
+            "mediums": mediums, "_mapped_media": set(media), "album": album}
+
+
+def test_likely_needs_close_full_mapping_without_fingerprints():
+    assert results.confidence(_u(), _c(0.12)) == "likely"
+    assert results.confidence(_u(), _c(0.12, mapped=10)) == "needs_review"       # a track unmapped
+    assert results.confidence(_u(), _c(0.12, extra=1)) == "needs_review"         # a release track missing
+    assert results.confidence(_u(), _c(0.16)) == "needs_review"
+
+
+def test_one_disc_of_a_set_is_not_no_match():
+    c = _c(0.58, mapped=11, extra=11, mediums=2, media=(1,), album="Classical Chillout 2")
+    assert results.confidence(_u(label="Classical Chillout 2"), c) == "needs_review"
+    assert results.evidence(_u(), c)["disc_of_set"] is True
+
+
+def test_weak_when_title_agrees_but_distance_is_large():
+    assert results.confidence(_u(label="寶麗金-難忘的回憶精選"), _c(0.55, album="寶麗金：難忘的回憶")) == "weak"
+    assert results.confidence(_u(label="葛兰·京曲选萃"), _c(0.63, album="京極流箏曲集 第一集")) == "no_match"
+
+
+def test_cue_fingerprint_share_uses_tracks_actually_fingerprinted():
+    u = _u(n=12, kind="cue")
+    assert results.confidence(u, _c(0.10, fp=4, mapped=12)) == "ready"           # 4 of 4 tried agree
+
+
+@pytest.mark.parametrize("a,b,agree", [("HIFI年代6 - 红民歌", "HI-FI年代6 红民歌", True),
+                                        ("Classical Chillout 2", "Classical Chillout 2", True),
+                                        ("笛子-漫步人生路，邓丽君CD2", "漫步人生路", True),
+                                        ("纯美之声", "穿越的聲音", False), ("", "x", False)])
+def test_title_agreement(a, b, agree):
+    assert results.title_agrees(a, b) is agree

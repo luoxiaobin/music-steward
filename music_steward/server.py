@@ -303,6 +303,28 @@ class App:
         con.commit()
         return {"ok": True, "overrides": clean}
 
+    def bulk_accept(self, con, body) -> dict:
+        """Accept the top candidate of every undecided album in a folder whose status is one
+        of the given confidences (only 'ready' and 'likely' are allowed)."""
+        from .recognize import results
+        from .recognize.results import release_key
+        wanted = set(body.get("confidences") or [])
+        if not wanted or not wanted <= {"ready", "likely"}:
+            return {"error": "bulk accept is only for Ready and Likely albums"}
+        root = os.path.abspath(body.get("root", ""))
+        if root not in self.roots:
+            return {"error": "not a configured root"}
+        rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
+        n = 0
+        for u in results.units(con, rid, nfc(body.get("path", ""))):
+            if u["decision"] is None and u["confidence"] in wanted and u["top"]:
+                cid = u["top"]["id"]
+                con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                            "VALUES(?, 'accept', ?, ?, ?)", (u["id"], cid, time.time(), release_key(con, cid)))
+                n += 1
+        con.commit()
+        return {"accepted": n}
+
     def decide(self, con, body) -> dict:
         """Save a review decision immediately (Accept a candidate, or Skip)."""
         uid, action = _int(body.get("unit_id")), body.get("action")
@@ -441,6 +463,12 @@ def make_handler(app: App, port_ref: dict):
             if u.path in ("/api/apply", "/api/undo", "/api/resume"):
                 kind = u.path.rsplit("/", 1)[1]
                 return self._json(app.start_job(kind, "", str(body.get("id", ""))))
+            if u.path == "/api/bulk_accept":
+                con = app.con()
+                try:
+                    return self._json(app.bulk_accept(con, body))
+                finally:
+                    con.close()
             if u.path in ("/api/search", "/api/edit"):
                 con = app.con()
                 try:
