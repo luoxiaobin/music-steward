@@ -86,3 +86,10 @@ tbody tr[aria-selected="true"]{background:var(--accent-soft);box-shadow:inset 3p
 audio{width:100%}
 @media (max-width:760px){ .layout{padding:12px} .left,.right{position:static;max-height:none;max-width:none} }
 .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.cand{display:flex;gap:10px;padding:12px;border:1px solid var(--btn-line);border-radius:10px;margin-bottom:8px;cursor:pointer}
+.cand.sel{border:2px solid var(--accent);padding:11px}
+.cand input{margin-top:3px}
+.ev{font-size:13px;color:var(--muted)}
+.ok{color:var(--ready)} .warn{color:var(--review)}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;padding-top:6px;border-top:1px solid var(--line2)}
+.btnrow .btn{min-height:44px}

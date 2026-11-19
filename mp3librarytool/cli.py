@@ -90,6 +90,43 @@ def cmd_inspect(a):
     print(json.dumps(out, ensure_ascii=False, indent=2))
 
 
+def _target(con, path):
+    root, sub = resolve(con, path)
+    return _root_id(con, root), nfc(sub)
+
+
+def cmd_recognize(a):
+    from .recognize import queue, units
+    con = db.connect(a.db)
+    rid, sub = _target(con, a.path)
+    us = units.plan_units(con, rid, sub)
+    n_tracks = sum(1 for u in us if u["kind"] == "track")
+    print(f"{len(us)} units ({len(us) - n_tracks} albums, {n_tracks} single tracks)", file=sys.stderr)
+    if a.plan_only:
+        for u in us[: a.limit]:
+            print(f"{u['kind']:5} {len(u['file_ids']):3} files  {u['label']}  [{u['folder']}]")
+        return
+    print(json.dumps(units.enqueue(con, rid, us, requeue=a.requeue)), file=sys.stderr)
+    if not os.environ.get("ACOUSTID_API_KEY"):
+        print("note: ACOUSTID_API_KEY not set -- matching without fingerprints", file=sys.stderr)
+    ids = queue.pending(con, rid, sub)[: a.limit]
+    con.close()
+    print(json.dumps(queue.run(a.db, ids, progress=_progress("recognizing")), indent=2))
+
+
+def cmd_results(a):
+    from .recognize import results
+    con = db.connect(a.db)
+    rid, sub = _target(con, a.path)
+    for u in results.units(con, rid, sub)[: a.limit]:
+        top = u["top"]
+        line = (f"{u['status']:7} {u['confidence'] or '':12} {u['label'][:40]:40}  ->  "
+                + (f"{top['album'] or ''} / {top['artist']} ({top['year'] or '?'}, {top['country'] or '?'})  "
+                   f"d={top['distance']:.2f} fp={top['fingerprint_agrees']}/{u['n_files']}" if top else
+                   (u.get("error") or "no candidates")))
+        print(line)
+
+
 def cmd_serve(a):
     from .server import serve
     serve(a.db, a.root, port=a.port, open_browser=not a.no_browser)
@@ -129,6 +166,18 @@ def main(argv=None):
     i.add_argument("file")
     i.add_argument("--hash", action="store_true")
     i.set_defaults(func=cmd_inspect)
+
+    rc = sub.add_parser("recognize", help="queue and match the albums in a folder (resumable)")
+    rc.add_argument("path")
+    rc.add_argument("--plan-only", action="store_true", help="only show the units that would be matched")
+    rc.add_argument("--requeue", action="store_true", help="match again even if already done")
+    rc.add_argument("--limit", type=int)
+    rc.set_defaults(func=cmd_recognize)
+
+    rs = sub.add_parser("results", help="recognition results for a folder")
+    rs.add_argument("path")
+    rs.add_argument("--limit", type=int)
+    rs.set_defaults(func=cmd_results)
 
     sv = sub.add_parser("serve", help="local web UI (127.0.0.1 only, token-protected)")
     sv.add_argument("--root", action="append", required=True, help="a folder the UI may browse (repeatable)")

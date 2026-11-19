@@ -1,0 +1,69 @@
+"""Match ONE unit in a fresh process: python -m mp3librarytool.recognize.worker --db X --unit N
+
+A new process per unit is the strongest isolation from beets' process-global state
+(M0 finding F1). Writes results straight into the app DB.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import time
+import traceback
+
+from .. import db
+
+
+def run_unit(db_path: str, unit_id: int) -> int:
+    con = db.connect(db_path)
+    u = con.execute("SELECT * FROM unit WHERE id=?", (unit_id,)).fetchone()
+    files = {r["id"]: r for r in con.execute(
+        f"SELECT f.id, f.fs_relpath, r.path AS root FROM file f JOIN root r ON r.id=f.root_id "
+        f"WHERE f.id IN ({','.join('?' * len(json.loads(u['file_ids'])))})", json.loads(u["file_ids"]))}
+    path_of = {fid: os.path.join(r["root"], r["fs_relpath"]) for fid, r in files.items()}
+    id_of = {p: fid for fid, p in path_of.items()}
+    con.execute("UPDATE unit SET status='running', started_at=?, error=NULL WHERE id=?", (time.time(), unit_id))
+    con.commit()
+    try:
+        from . import beets_adapter as A
+        key = os.environ.get("ACOUSTID_API_KEY")
+        paths = [path_of[i] for i in sorted(path_of)]
+        res = A.match_track(paths[0], key) if u["kind"] == "track" else A.match_album(paths, key)
+        con.execute("DELETE FROM candidate WHERE unit_id=?", (unit_id,))
+        for c in res["candidates"]:
+            cid = con.execute(
+                "INSERT INTO candidate(unit_id, rank, source, album_id, album, artist, year, country, label, "
+                "media, mediums, distance, penalties_json, extra_items_json, extra_tracks_json, "
+                "fingerprint_agrees, n_mapped) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (unit_id, c["rank"], c["source"], c["album_id"], c["album"], c["artist"], c["year"],
+                 c["country"], c["label"], c["media"], c["mediums"], c["distance"],
+                 json.dumps(c["penalties"]), json.dumps([id_of.get(p) for p in c["extra_items"]]),
+                 json.dumps(c["extra_tracks"], ensure_ascii=False), c["fingerprint_agrees"],
+                 c["n_mapped"])).lastrowid
+            for t in c["tracks"]:
+                con.execute("INSERT INTO cand_track VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                            (cid, id_of[t["path"]], t["recording_id"], t["release_track_id"], t["index"],
+                             t["medium"], t["medium_index"], t["title"], t["artist"], t["length"],
+                             t["track_distance"]))
+        con.execute("UPDATE unit SET status='done', recommendation=?, acoustid_used=?, files_linked=?, "
+                    "finished_at=? WHERE id=?",
+                    (res["recommendation"], int(res["acoustid_used"]), res["files_fingerprint_linked"],
+                     time.time(), unit_id))
+        con.commit()
+        return 0
+    except Exception as e:
+        con.rollback()
+        con.execute("UPDATE unit SET status='error', error=?, finished_at=? WHERE id=?",
+                    (f"{type(e).__name__}: {e}"[:500] + "\n" + traceback.format_exc()[-1500:],
+                     time.time(), unit_id))
+        con.commit()
+        return 1
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--db", required=True)
+    ap.add_argument("--unit", type=int, required=True)
+    a = ap.parse_args()
+    sys.exit(run_unit(a.db, a.unit))

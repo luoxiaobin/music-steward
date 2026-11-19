@@ -18,7 +18,18 @@ Living plan. Sources: the Architecture Assessment and M0 Experiments specs (Nov 
 | **M3** Apply, verify, recover | saved plans; copy → tag → verify → publish; journal; resume; undo | protocol proven in M0 |
 | **M4** Apple export | FLAC/APE → ALAC tree for iPhone; MP3 copied | later |
 
-## M2 order of work
+## Next: thin end-to-end slice (decided 2026-11-19)
+
+Get one album all the way through before widening any step:
+
+1. Minimal matching queue: "Recognize" a folder → album units → candidates with evidence in the DB; resumable; each unit matched in its own worker process
+2. Minimal review: pick a candidate → Accept / Skip
+3. Minimal plan + apply to a **local destination folder** (try-out), verify, journal, Undo run — M0 protocol
+4. Test on 劉德華 (clean HK), 林子祥 (garbled tags), Phil Collins (2 CDs)
+
+Then widen by value: garbled-tag repair before matching → own confidence rule → edit/search/conflicts and the full Plan screen → extra sources for mainland releases → cue-sheet albums, singles rules, Simplified/Traditional key → pywebview window.
+
+## M2 backlog (original order)
 
 1. ✅ `serve` + read-only inventory browser (three-pane, per the Review & Plan mockups)
 2. Recognition queue: rate-limited (MusicBrainz ~1/s, AcoustID 3/s), resumable, cached; one worker process per job (ADR-level finding F1)
@@ -36,6 +47,7 @@ Living plan. Sources: the Architecture Assessment and M0 Experiments specs (Nov 
 | 2026-11-18 | NAS publish method: `claim_rename` (O_EXCL placeholder, then rename); local disk keeps `RENAME_EXCL` | `m0/EVIDENCE_REPORT.md` §6.7 |
 | 2026-11-18 | Desktop shell: pywebview at the end of M2; not Electron | [ADR 0001](adr/0001-desktop-shell-pywebview.md) |
 | 2026-11-18 | License GPL-3.0-or-later | `LICENSE` |
+| 2026-11-19 | Thin end-to-end slice first; first apply destination is a **local folder** (NAS later) | this file |
 | 2026-11-18 | **No whole-NAS hashing.** Hash per selected folder (CLI `hash <folder>`, UI "Hash folder"); re-scan per folder too | this file |
 
 ## Scale (measured on the NAS, 2026-11-18)

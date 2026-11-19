@@ -60,6 +60,42 @@ CREATE TABLE IF NOT EXISTS file(
 CREATE INDEX IF NOT EXISTS file_sha ON file(file_sha256);
 CREATE INDEX IF NOT EXISTS file_audio ON file(audio_hash);
 
+-- recognition (M2): a unit is an album (or one loose track) queued for matching
+CREATE TABLE IF NOT EXISTS unit(
+    id INTEGER PRIMARY KEY,
+    root_id INTEGER NOT NULL REFERENCES root(id),
+    folder TEXT NOT NULL,               -- NFC relpath of the folder the unit lives in
+    label TEXT NOT NULL,                -- album tag or folder/file name, for display
+    kind TEXT NOT NULL,                 -- album | track
+    key TEXT NOT NULL,                  -- stable identity: kind + folder + album tag / file
+    file_ids TEXT NOT NULL,             -- JSON list of file.id
+    status TEXT NOT NULL,               -- queued | running | done | error
+    recommendation TEXT, acoustid_used INTEGER, files_linked INTEGER,
+    error TEXT, queued_at REAL, started_at REAL, finished_at REAL,
+    UNIQUE(root_id, key)
+);
+CREATE TABLE IF NOT EXISTS candidate(
+    id INTEGER PRIMARY KEY,
+    unit_id INTEGER NOT NULL REFERENCES unit(id) ON DELETE CASCADE,
+    rank INTEGER NOT NULL, source TEXT, album_id TEXT, album TEXT, artist TEXT,
+    year INTEGER, country TEXT, label TEXT, media TEXT, mediums INTEGER,
+    distance REAL, penalties_json TEXT, extra_items_json TEXT, extra_tracks_json TEXT,
+    fingerprint_agrees INTEGER, n_mapped INTEGER
+);
+CREATE TABLE IF NOT EXISTS cand_track(
+    candidate_id INTEGER NOT NULL REFERENCES candidate(id) ON DELETE CASCADE,
+    file_id INTEGER NOT NULL REFERENCES file(id),
+    recording_id TEXT, release_track_id TEXT, track_index INTEGER, medium INTEGER,
+    medium_index INTEGER, title TEXT, artist TEXT, length REAL, track_distance REAL,
+    PRIMARY KEY(candidate_id, file_id)
+);
+CREATE TABLE IF NOT EXISTS decision(
+    unit_id INTEGER PRIMARY KEY REFERENCES unit(id) ON DELETE CASCADE,
+    action TEXT NOT NULL,               -- accept | skip
+    candidate_id INTEGER REFERENCES candidate(id),
+    decided_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS dir_note(
     root_id INTEGER NOT NULL, relpath TEXT NOT NULL, note TEXT NOT NULL, detail TEXT,
     last_scan INTEGER,

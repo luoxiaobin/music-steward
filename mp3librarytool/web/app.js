@@ -95,10 +95,13 @@ function renderFilters() {
 function renderScan(sc) {
   const el = document.getElementById("scanNote"), btn = document.getElementById("scanBtn");
   const busy = !!(sc && sc.running) || !S.root || !S.root.available;
-  for (const b of [btn, document.getElementById("rescanFolderBtn"), document.getElementById("hashFolderBtn")]) b.disabled = busy;
+  for (const b of [btn, document.getElementById("rescanFolderBtn"), document.getElementById("hashFolderBtn"),
+                   document.getElementById("recognizeBtn")]) b.disabled = busy;
   if (sc && sc.running) {
     const where = sc.path ? `“${sc.path}”` : "whole root";
-    el.textContent = sc.kind === "hash"
+    el.textContent = sc.kind === "recognize"
+      ? (sc.total ? `Recognizing ${where}: ${sc.done} / ${sc.total} albums & tracks` : `Recognizing ${where}: planning…`)
+      : sc.kind === "hash"
       ? (sc.total ? `Hashing ${where}: ${sc.done} / ${sc.total} files` : `Hashing ${where}: starting…`)
       : (sc.total ? `Scanning ${where}: ${sc.done} / ${sc.total} new or changed files read` : `Scanning ${where}: listing folders…`);
     clearTimeout(S.scanTimer);
@@ -107,6 +110,7 @@ function renderScan(sc) {
   } else if (sc && sc.result) {
     const r = sc.result, where = sc.path ? ` of “${sc.path}”` : "";
     el.textContent = r.status !== "complete" ? `${sc.kind === "hash" ? "Hash" : "Scan"}${where} ${r.status}: ${r.abort_reason || ""}`
+      : sc.kind === "recognize" ? `Recognized${where}: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
       : sc.kind === "hash" ? `Hashed${where}: ${r.hashed} files (${fmtSize(r.bytes)}) in ${r.seconds}s, ${r.errors} errors`
       : `Scan${where}: ${r.n_new} new, ${r.n_changed} changed, ${r.n_unchanged} unchanged, ${r.n_removed} removed`;
   } else el.textContent = "";
@@ -161,7 +165,8 @@ async function refreshCenter() {
   const fl = S.filter ? ` · ${FILTER_LABELS[S.filter]}` : "";
   document.getElementById("tableNote").textContent =
     d.total > d.shown ? `showing first ${d.shown} of ${d.total.toLocaleString()} — pick a sub-folder to narrow` : "";
-  if (S.view === "albums") renderAlbums(where, fl); else renderFiles(d.total, where, fl);
+  if (S.view === "albums") { if (S.filter || !(await renderUnits(where))) renderAlbums(where, fl); }
+  else renderFiles(d.total, where, fl);
 }
 function renderFiles(total, where, fl) {
   document.getElementById("tableTitle").textContent = `Files · ${total.toLocaleString()} in ${where}${fl}`;
@@ -193,6 +198,97 @@ function albumGroups() {
     g.get(key).files.push(f);
   }
   return [...g.values()];
+}
+const CONF = {
+  ready: ["b-ready", "Ready"], needs_review: ["b-review", "Needs review"], no_match: ["b-unid", "No real match"],
+  queued: ["b-rel", "Queued"], running: ["b-rel", "Recognizing…"], error: ["b-conflict", "Error"],
+};
+function unitBadge(u) {
+  if (u.decision) return u.decision.action === "accept" ? h("span", { class: "badge b-ready" }, "Accepted")
+                                                          : h("span", { class: "badge b-unid" }, "Skipped");
+  const [cls, txt] = CONF[u.confidence] || ["b-unid", u.confidence];
+  return h("span", { class: `badge ${cls}` }, txt);
+}
+async function renderUnits(where) {
+  const us = await api(`/api/units?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}`);
+  if (!us.length) return false;
+  const counts = {};
+  for (const u of us) { const k = u.decision ? u.decision.action : u.confidence; counts[k] = (counts[k] || 0) + 1; }
+  document.getElementById("tableTitle").textContent = `Albums · ${us.length} recognized units in ${where}`;
+  document.getElementById("tableNote").textContent = Object.entries(counts).map(([k, n]) => `${n} ${k.replace("_", " ")}`).join(" · ");
+  const body = h("tbody");
+  for (const u of us) {
+    const t = u.top;
+    const tr = h("tr", { tabindex: "0", "aria-selected": String(S.selectedUnit === u.id),
+                         onclick: () => selectUnit(u.id, tr), onkeydown: e => { if (e.key === "Enter") selectUnit(u.id, tr); } },
+      h("td", {}, h("div", { class: "strong" }, u.label), h("div", { class: "sub mono" }, (u.folder || ".") + "/")),
+      h("td", {}, u.kind === "track" ? "track" : u.n_files),
+      h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${t.year || "?"}${t.country ? " · " + t.country : ""}`),
+                       h("div", { class: "sub" }, `${t.artist} · distance ${t.distance.toFixed(2)} · fingerprints ${t.fingerprint_agrees}/${u.n_files}`)]
+                    : h("span", { class: "muted" }, u.status === "error" ? "error" : u.status === "done" ? "no candidates" : "—")),
+      h("td", {}, unitBadge(u)));
+    body.append(tr);
+  }
+  document.getElementById("table").replaceChildren(
+    h("thead", {}, h("tr", {}, ["Album / folder", "Tracks", "Best candidate", "Status"].map(x => h("th", { scope: "col" }, x)))), body);
+  return true;
+}
+async function selectUnit(id, tr) {
+  if (tr) markSelected(tr);
+  S.selectedUnit = id;
+  const d = await api(`/api/unit/${id}`);
+  const sel = d.decision && d.decision.candidate_id || (d.candidates[0] && d.candidates[0].id);
+  S.unitChoice = sel;
+  renderUnitDetail(d);
+}
+function renderUnitDetail(d) {
+  const cands = d.candidates;
+  const chosen = cands.find(c => c.id === S.unitChoice) || cands[0];
+  const files = Object.fromEntries(d.files.map(f => [f.id, f]));
+  const list = h("fieldset", { style: "border:0;margin:0;padding:0" }, h("legend", { class: "strong", style: "margin-bottom:8px" },
+    cands.length ? `Candidate releases (${cands.length})` : "No candidates"));
+  for (const c of cands.slice(0, 6)) {
+    const fpShare = d.n_files ? c.fingerprint_agrees / d.n_files : 0;
+    list.append(h("label", { class: "cand" + (c.id === chosen?.id ? " sel" : "") },
+      h("input", { type: "radio", name: "cand", checked: c.id === chosen?.id,
+                   onchange: () => { S.unitChoice = c.id; renderUnitDetail(d); } }),
+      h("span", { style: "flex:1" },
+        h("span", { class: "strong" }, `${c.album || c.tracks[0]?.title || "?"} · ${c.year || "?"}${c.country ? " · " + c.country : ""}` +
+          (c.media ? ` · ${c.mediums > 1 ? c.mediums + "×" : ""}${c.media}` : "")),
+        h("br"), h("span", { class: "ev" }, `${c.artist} · ${c.label || ""}`), h("br"),
+        h("span", { class: "ev" }, `distance ${c.distance.toFixed(2)} · `,
+          h("span", { class: fpShare >= 0.6 ? "ok" : "warn" }, `fingerprints agree ${c.fingerprint_agrees}/${d.n_files}`),
+          c.extra_tracks.length ? ` · ${c.extra_tracks.length} release tracks missing locally` : "",
+          c.extra_items.length ? ` · ${c.extra_items.length} local files not on this release` : "",
+          ` · ${c.source}`))));
+  }
+  const parts = [
+    h("div", {}, h("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" }, h("h2", {}, d.label), unitBadge(d)),
+      h("div", { class: "mono muted", style: "margin-top:6px" }, `${d.folder || "."}/ · ${d.n_files} file${d.n_files > 1 ? "s" : ""} · ${d.kind}`),
+      d.status === "error" ? h("div", { class: "banner" }, h("strong", {}, "Recognition failed. "), (d.error || "").split("\n")[0]) : null,
+      d.acoustid_used === 0 ? h("div", { class: "banner" }, "Matched without fingerprints (no AcoustID key).") : null),
+    list];
+  if (chosen && chosen.tracks.length) {
+    const rows = chosen.tracks.map(t => h("tr", {},
+      h("td", { class: "mono" }, (files[t.file_id]?.relpath || "").split("/").pop()),
+      h("td", {}, `${chosen.mediums > 1 ? t.medium + "-" : ""}${t.medium_index ?? t.track_index}. ${t.title}`),
+      h("td", { class: t.track_distance > 0.3 ? "warn" : "ok" }, t.track_distance > 0.3 ? `check (${t.track_distance.toFixed(2)})` : "✓")));
+    parts.push(h("div", {}, h("h3", {}, "Track mapping"), h("table", { class: "kv" },
+      h("thead", {}, h("tr", {}, h("th", {}, "Source file"), h("th", {}, "Release track"), h("th", {}, "Check"))), h("tbody", {}, rows))));
+  }
+  const decide = async (action) => {
+    await api("/api/decision", { method: "POST", headers: { "Content-Type": "application/json", "X-MLT": "1" },
+      body: JSON.stringify({ unit_id: d.id, action, candidate_id: action === "accept" ? chosen.id : null }) });
+    await refreshCenter();
+    await selectUnit(d.id, document.querySelector(`#table tbody tr[aria-selected="true"]`));
+  };
+  parts.push(h("div", { class: "btnrow" },
+    h("button", { type: "button", class: "btn btn-primary", disabled: !chosen, onclick: () => decide("accept") },
+      d.decision?.action === "accept" && d.decision.candidate_id === chosen?.id ? "Accepted ✓" : "Accept release"),
+    h("button", { type: "button", class: "btn", onclick: () => decide("skip") }, "Skip album"),
+    d.decision ? h("button", { type: "button", class: "btn", onclick: () => decide("clear") }, "Undo decision") : null));
+  parts.push(h("p", { class: "muted xsmall" }, "Decisions are saved immediately. Nothing is copied or changed until you apply a plan."));
+  document.getElementById("details").replaceChildren(...parts.filter(Boolean));
 }
 function renderAlbums(where, fl) {
   const groups = albumGroups();
@@ -318,4 +414,5 @@ document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click"
 document.getElementById("scanBtn").addEventListener("click", startScan);
 document.getElementById("rescanFolderBtn").addEventListener("click", () => startJob("scan", S.path));
 document.getElementById("hashFolderBtn").addEventListener("click", () => startJob("hash", S.path));
+document.getElementById("recognizeBtn").addEventListener("click", () => startJob("recognize", S.path));
 refreshAll().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });

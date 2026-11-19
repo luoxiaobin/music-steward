@@ -90,3 +90,26 @@ def test_static_cannot_escape_web_dir(server):
     ck = login(app, port)
     assert req(port, "/static/../server.py", cookie=ck)[0] == 404
     assert req(port, "/static/app.js", cookie=ck)[0] == 200
+
+
+def test_decisions_are_validated_and_saved(server):
+    app, port = server
+    ck = login(app, port)
+    from mp3librarytool import db as dbm
+    c = dbm.connect(app.db_path)
+    c.execute("INSERT INTO unit(root_id, folder, label, kind, key, file_ids, status) "
+              "VALUES(1,'Clean Album','Album','album','album:Clean Album','[1]','done')")
+    c.execute("INSERT INTO unit(root_id, folder, label, kind, key, file_ids, status) "
+              "VALUES(1,'Other','Other','album','album:Other','[2]','done')")
+    c.execute("INSERT INTO candidate(unit_id, rank, album, distance) VALUES(1, 0, 'Album', 0.1)")
+    c.execute("INSERT INTO candidate(unit_id, rank, album, distance) VALUES(2, 0, 'Other', 0.1)")
+    c.commit()
+    post = lambda body: json.loads(req(port, "/api/decision", cookie=ck, method="POST",
+                                       body=json.dumps(body), headers={"X-MLT": "1"})[2])
+    assert "error" in post({"unit_id": 1, "action": "accept", "candidate_id": 2})   # other album's candidate
+    assert post({"unit_id": 1, "action": "accept", "candidate_id": 1}) == {"ok": True}
+    assert c.execute("SELECT action, candidate_id FROM decision WHERE unit_id=1").fetchone()[:] == ("accept", 1)
+    assert post({"unit_id": 1, "action": "skip"}) == {"ok": True}
+    assert post({"unit_id": 1, "action": "clear"}) == {"ok": True}
+    assert c.execute("SELECT count(*) FROM decision").fetchone()[0] == 0
+    assert "error" in post({"unit_id": 1, "action": "delete-everything"})

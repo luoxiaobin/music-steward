@@ -189,6 +189,13 @@ class App:
                 if kind == "scan":
                     r = scan(con, target, progress=prog)
                     res = {"status": r.status, **r.counts, "abort_reason": r.abort_reason}
+                elif kind == "recognize":
+                    from .recognize import queue, units
+                    rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
+                    sub = nfc(path)
+                    q = units.enqueue(con, rid, units.plan_units(con, rid, sub))
+                    ids = queue.pending(con, rid, sub)
+                    res = {"status": "complete", **q, **queue.run(self.db_path, ids, progress=prog)}
                 else:
                     from . import hashpass
                     rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
@@ -202,6 +209,23 @@ class App:
                 con.close()
         threading.Thread(target=work, daemon=True).start()
         return {"started": True}
+
+    def decide(self, con, body) -> dict:
+        """Save a review decision immediately (Accept a candidate, or Skip)."""
+        uid, action = _int(body.get("unit_id")), body.get("action")
+        if action not in ("accept", "skip", "clear") or not uid:
+            return {"error": "bad decision"}
+        if action == "clear":
+            con.execute("DELETE FROM decision WHERE unit_id=?", (uid,))
+        else:
+            cid = _int(body.get("candidate_id")) if action == "accept" else None
+            if action == "accept" and not con.execute(
+                    "SELECT 1 FROM candidate WHERE id=? AND unit_id=?", (cid, uid)).fetchone():
+                return {"error": "candidate does not belong to this album"}
+            con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at) "
+                        "VALUES(?,?,?,?)", (uid, action, cid, time.time()))
+        con.commit()
+        return {"ok": True}
 
     def start_scan(self, root: str, path: str = "") -> dict:  # kept for callers/tests
         return self.start_job("scan", root, path)
@@ -273,6 +297,14 @@ def make_handler(app: App, port_ref: dict):
                     if flt and flt not in audit.FILTERS:
                         return self._json({"error": "unknown filter"}, 400)
                     return self._json(app.files(con, _int(q["root_id"]), q.get("path", ""), flt))
+                if u.path == "/api/units":
+                    from .recognize import results
+                    return self._json(results.units(con, _int(q["root_id"]), q.get("path", "")))
+                m = re.fullmatch(r"/api/unit/(\d+)", u.path)
+                if m:
+                    from .recognize import results
+                    d = results.unit_detail(con, int(m.group(1)))
+                    return self._json(d) if d else self._json({"error": "not found"}, 404)
                 m = re.fullmatch(r"/api/file/(\d+)", u.path)
                 if m:
                     d = app.file_detail(con, int(m.group(1)))
@@ -295,7 +327,13 @@ def make_handler(app: App, port_ref: dict):
             u = urlparse(self.path)
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}")
-            if u.path in ("/api/scan", "/api/hash"):
+            if u.path == "/api/decision":
+                con = app.con()
+                try:
+                    return self._json(app.decide(con, body))
+                finally:
+                    con.close()
+            if u.path in ("/api/scan", "/api/hash", "/api/recognize"):
                 kind = u.path.rsplit("/", 1)[1]
                 return self._json(app.start_job(kind, body.get("root", ""), body.get("path", "")))
             return self._json({"error": "no such endpoint"}, 404)
