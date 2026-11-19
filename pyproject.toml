@@ -23,5 +23,8 @@ mp3librarytool = "mp3librarytool.cli:main"
 [tool.setuptools]
 packages = ["mp3librarytool"]
 
+[tool.setuptools.package-data]
+mp3librarytool = ["web/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

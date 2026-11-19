@@ -84,6 +84,11 @@ def cmd_inspect(a):
     print(json.dumps(out, ensure_ascii=False, indent=2))
 
 
+def cmd_serve(a):
+    from .server import serve
+    serve(a.db, a.root, port=a.port, open_browser=not a.no_browser)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="mp3librarytool")
     ap.add_argument("--db", default=str(db.DEFAULT_DB), help="app database (default %(default)s)")
@@ -113,6 +118,12 @@ def main(argv=None):
     i.add_argument("file")
     i.add_argument("--hash", action="store_true")
     i.set_defaults(func=cmd_inspect)
+
+    sv = sub.add_parser("serve", help="local web UI (127.0.0.1 only, token-protected)")
+    sv.add_argument("--root", action="append", required=True, help="a folder the UI may browse (repeatable)")
+    sv.add_argument("--port", type=int, default=0, help="default: a random free port")
+    sv.add_argument("--no-browser", action="store_true")
+    sv.set_defaults(func=cmd_serve)
 
     a = ap.parse_args(argv)
     a.func(a)

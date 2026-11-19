@@ -91,5 +91,9 @@ def summary(con: sqlite3.Connection, root_id: int | None = None) -> dict:
     s["by_codec"] = {r["codec"] or "?": r["n"] for r in con.execute(
         f"SELECT codec, count(*) n FROM file f WHERE f.removed_at IS NULL AND kind='audio' {w} "
         f"GROUP BY codec ORDER BY n DESC", a)}
-    s["filters"] = {name: len(run(con, name, root_id)) for name in FILTERS}
+    s["filters"] = {}
+    for name in FILTERS:
+        rows = run(con, name, root_id)
+        # garbled_tags yields one row per field; count files, as the UI lists files
+        s["filters"][name] = len({r["relpath"] for r in rows}) if name == "garbled_tags" else len(rows)
     return s

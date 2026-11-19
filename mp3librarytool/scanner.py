@@ -107,6 +107,9 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
     if not _root_ok(root):
         raise RootUnavailable(f"root not available: {root}")
     root_id = _ensure_root(con, root)
+    # a previous scan killed mid-way (Ctrl-C, crash) never reached 'complete'
+    con.execute("UPDATE scan SET status='interrupted', finished_at=? WHERE root_id=? AND status='running'",
+                (t0, root_id))
     scan_id = con.execute("INSERT INTO scan(root_id, started_at, status) VALUES(?,?, 'running')",
                           (root_id, t0)).lastrowid
     con.commit()
@@ -188,7 +191,8 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
 
     # ---- 3. analyze new/changed files in parallel; write in this thread --
     done = 0
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+    pool = ThreadPoolExecutor(max_workers=max(1, workers))
+    try:
         futs = {pool.submit(_analyze, root, f): f for f in todo}
         for fut in as_completed(futs):
             f = futs[fut]
@@ -229,6 +233,15 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
                 con.commit()
                 if progress:
                     progress(done, len(todo))
+    except KeyboardInterrupt:
+        # Ctrl-C: drop queued reads, keep what is already recorded, mark nothing removed.
+        pool.shutdown(wait=False, cancel_futures=True)
+        con.commit()
+        con.execute("UPDATE scan SET status='interrupted', finished_at=? WHERE id=?", (time.time(), scan_id))
+        con.commit()
+        raise
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
     if progress:
         progress(done, len(todo))
 

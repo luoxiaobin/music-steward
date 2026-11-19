@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MP3LibraryTool</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">MP3LibraryTool</div>
+  <div class="chip" id="rootChip">…</div>
+  <div class="seg" role="group" aria-label="View">
+    <button type="button" class="btn" data-view="folders" aria-pressed="true">Folders</button>
+    <button type="button" class="btn" data-view="albums" aria-pressed="false">Albums</button>
+  </div>
+  <button type="button" class="btn" id="scanBtn">Scan</button>
+  <button type="button" class="btn" disabled title="Arrives in M2 (recognition)">Recognize selected</button>
+  <button type="button" class="btn btn-primary" disabled title="Arrives in M3 (plans)">Review plan →</button>
+</header>
+
+<div class="layout">
+  <nav class="panel left" aria-label="Sources and filters">
+    <section>
+      <h2 class="ph">Sources</h2>
+      <div id="tree" class="tree"></div>
+    </section>
+    <section>
+      <div class="row-between muted small"><span>Inventory</span><span id="invCount"></span></div>
+      <div class="bar"><div id="hashBar" class="bar-fill"></div></div>
+      <div class="muted xsmall" id="invNote"></div>
+      <div class="muted xsmall" id="scanNote"></div>
+    </section>
+    <section>
+      <h2 class="ph">Filters</h2>
+      <div id="filters" class="filters"></div>
+    </section>
+  </nav>
+
+  <main class="panel center">
+    <div class="center-head">
+      <h1 id="tableTitle">…</h1>
+      <span class="muted small" id="tableNote"></span>
+    </div>
+    <div class="table-wrap"><table id="table"></table></div>
+  </main>
+
+  <aside class="panel right" aria-label="Details" id="details">
+    <p class="muted">Select a file or album to see its details.</p>
+  </aside>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

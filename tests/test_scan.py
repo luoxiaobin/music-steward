@@ -213,3 +213,33 @@ def test_scan_never_writes_to_the_collection(library, con):
     scan(con, library)
     hashpass.run(con)
     assert snap() == before
+
+
+def test_ctrl_c_stops_promptly_keeps_progress_marks_nothing_removed(library, con, monkeypatch):
+    scan(con, library)
+    for p in (library / "Clean Album").iterdir():  # make some files 'changed'
+        os.utime(p, ns=(0, p.stat().st_mtime_ns + 10_000_000))
+    real = scanmod._analyze
+    calls = {"n": 0}
+
+    def flaky(root, item):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise KeyboardInterrupt
+        return real(root, item)
+    monkeypatch.setattr(scanmod, "_analyze", flaky)
+    with pytest.raises(KeyboardInterrupt):
+        scan(con, library, workers=1)
+    assert con.execute("SELECT status FROM scan ORDER BY id DESC LIMIT 1").fetchone()[0] == "interrupted"
+    assert not audit.run(con, "removed")
+    monkeypatch.setattr(scanmod, "_analyze", real)
+    r = scan(con, library)
+    assert r.status == "complete" and r.counts["n_removed"] == 0
+
+
+def test_stale_running_scan_is_marked_interrupted(library, con):
+    con.execute("INSERT INTO root(path, added_at) VALUES(?, 0)", (str(library),))
+    con.execute("INSERT INTO scan(root_id, started_at, status) VALUES(1, 0, 'running')")
+    con.commit()
+    scan(con, library)
+    assert con.execute("SELECT status FROM scan WHERE id=1").fetchone()[0] == "interrupted"
