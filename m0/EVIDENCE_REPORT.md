@@ -1,7 +1,7 @@
 # MP3LibraryTool — M0 Evidence Report
 
 **Date:** 2026-11-18 · **beets:** 2.14.1 (pinned, `m0/requirements.lock`) · **Python:** 3.12.16
-**Status:** M0a complete. M0b complete on **local disk only** — the NAS run is blocked (see §5).
+**Status:** M0a complete. M0b complete on local APFS **and on the NAS** (`music/_mlt_scratch`, Synology over SMB 2.0 from macOS). One design decision is open: the NAS publish method (§6.7).
 
 ## 1. Summary
 
@@ -10,8 +10,8 @@
 | Can beets be used as a library? | **Yes**, behind a harness that resets beets' process-wide state (or runs each job in its own worker process) and disables migration backups. | High |
 | Does matching work on your music? | **Mechanically yes, practically weak for Chinese releases.** 0 of 18 sample units matched confidently; the only correct top candidate was the Western 2-CD set. | Medium (small sample) |
 | Can files be copied/tagged safely? | **Yes on local APFS**: journal-first protocol survives a crash at every step with no duplicates, no overwrite, no half-written final, every item accounted for. | High (local) |
-| …on the NAS? | **Not yet tested.** Mount is guest/read-only and no scratch path was given. | — |
-| Publish method | Local APFS: `renamex_np(RENAME_EXCL)` (preferred) and `link()+unlink()` both refuse to overwrite. NAS: unknown. | High (local) |
+| …on the NAS? | **Yes, with a weaker publish method.** All crash points, awkward cases, tags, audio hash and side files pass on the NAS. | High (SMB drop still simulated) |
+| Publish method | Local APFS: `renamex_np(RENAME_EXCL)` or `link()+unlink()`. **NAS: neither is supported** (ENOTSUP); only `O_EXCL` create refuses to overwrite → **claim-then-rename**, which leaves a tiny check-then-rename window (§3). | High |
 | Tags survive an edit (MP3/FLAC/APE)? | **Yes**, every field (custom, multi-artist, artwork, lyrics, ReplayGain) with both mutagen and beets' `mediafile`; `mediafile` renames APE key `Title`→`TITLE` (harmless per spec). | High |
 
 ## 2. M0a — beets as a component (`scripts/m0a_v2.py`, `scripts/beets_harness.py`)
@@ -70,36 +70,46 @@ Why (from the evidence, not guesswork):
 
 Evidence: `results/m0b_local_result.json`. Destination: `m0/scratch/dest_local` (APFS). Journal: local JSONL, fsync per record. Sources: APFS clones of 3 real NAS-sample files (FLAC, MP3, FLAC). `nas_sample/` is only read.
 
-### Publish probe (local APFS)
-| Primitive | Result |
-|---|---|
-| `renamex_np(…, RENAME_EXCL)` onto existing | refused `EEXIST`, existing untouched, inode preserved |
-| `link()` onto existing | refused `EEXIST`, existing untouched |
-| `O_CREAT|O_EXCL` onto existing | refused `EEXIST` |
-| plain `rename()` | **silently overwrites** (must never be used to publish) |
+NAS evidence: `results/m0b_nas_result.json` — same script, `--dest /Volumes/music/_mlt_scratch` (Synology, SMB 2.002, mounted from macOS as the DSM user), 164 s.
+
+### Publish probe
+| Primitive | Local APFS | NAS (SMB 2.0 via macOS smbfs) |
+|---|---|---|
+| `renamex_np(…, RENAME_EXCL)` to a new name | ok, inode preserved | **ENOTSUP** |
+| `link()` to a new name | ok | **ENOTSUP** |
+| `O_CREAT\|O_EXCL` onto existing | refused `EEXIST` | refused `EEXIST` |
+| plain `rename()` | **silently overwrites** | **silently overwrites**; preserves the file ID |
+| file ID / inode stable | yes | yes (`FILE_IDS_SUPPORTED`) |
+| **chosen method** | `renamex_excl` | **`claim_rename`** |
+
+**claim_rename** (added for the NAS): after tagging, journal `claiming` → create the final name as an **empty `O_EXCL` placeholder** (fails if anything is there → conflict) → journal `claimed` with the placeholder's file ID → re-check the final is still *our* empty placeholder → `rename(temp, final)`.
+Guarantee: never overwrites a file that existed before our claim, and never overwrites a file swapped in *before our re-check* (tested). **Residual risk:** another program replacing the placeholder in the microseconds between the re-check and `rename()` would be overwritten. A crash between the `O_EXCL` create and the `claimed` record leaves a 0-byte file whose ownership is inferred by timestamp, not file ID.
 
 ### Protocol
 `intent` (journalled before touching the destination: source size/mtime/SHA-256/audio hash, final path, temp path, pre-existing final's hash) → copy into `.<stem>.mlt-<run>-<op>.tmp.<ext>` in the destination dir (`O_EXCL`) while hashing → verify source unchanged → `copied` → edit tags → `tagged` (temp SHA, audio hash, **inode**) → publish with no-overwrite primitive → `published` (final inode + SHA) → `committed` (ownership `created`).
 Recovery inspects the journal **and the files**, never memory: partial temps are discarded; a final with our SHA **and** our inode is ours; our SHA with a different inode → `ownership_uncertain`; a different file → `conflict`.
 
 ### Crash injection — 3 files, crash during file 2, then recover + rerun
-Crash = `os._exit(137)` in a forked child (like `kill -9`). Both publish methods tested.
+Crash = `os._exit(137)` in a forked child (like `kill -9`). All three publish methods tested locally; `claim_rename` on the NAS.
 
-| Crash point | renamex | link+unlink | Recovery decision for the crashed op |
-|---|---|---|---|
-| after intent | pass | pass | restart from intent |
-| mid-copy (after 2 × 256 KB) | pass | pass | partial temp discarded, restart |
-| after copy | pass | pass | temp discarded, restart |
-| after tag | pass | pass | temp intact → resume at publish |
-| after link, before unlink | n/a | pass | final is ours (inode+SHA) → published, temp removed |
-| after publish syscall, before journal | pass | pass | final is ours (inode+SHA) → published |
-| after `published`, before commit | pass | pass | commit |
+| Crash point | local renamex | local link+unlink | local claim_rename | **NAS claim_rename** | Recovery decision for the crashed op |
+|---|---|---|---|---|---|
+| after intent | pass | pass | pass | **pass** | restart from intent |
+| mid-copy (after 2 × 256 KB) | pass | pass | pass | **pass** | partial temp discarded, restart |
+| after copy | pass | pass | pass | **pass** | temp discarded, restart |
+| after tag | pass | pass | pass | **pass** | temp intact → resume at publish |
+| after link, before unlink | n/a | pass | n/a | n/a | final is ours (inode+SHA) → published, temp removed |
+| after placeholder create, before `claimed` | n/a | n/a | pass | **pass** | own 0-byte placeholder (by timestamp) removed → re-publish |
+| after `claimed` | n/a | n/a | pass | **pass** | own placeholder (by file ID) removed → re-publish |
+| after publish syscall, before journal | pass | pass | pass | **pass** | final is ours (file ID + SHA) → published |
+| after `published`, before commit | pass | pass | pass | **pass** | commit |
 
 Every case: all 3 ops terminal and `created`, no temp files, no half-written finals, no duplicate names.
 
-### Awkward situations
+### Awkward situations (identical results locally and on the NAS)
 | Situation | Result |
 |---|---|
+| (claim_rename) another program replaces our placeholder before our rename | **conflict**, their file kept, our temp removed |
 | File appears at destination between tag and publish | **conflict**, intruder untouched, our temp removed |
 | Source modified *during* the copy (between chunk 1 and 2) | **aborted_source_changed**, nothing published, temp removed |
 | Share drops mid-copy | **simulated only** (`ENOTCONN` raised in the write path, process exits); recovery from files alone → op completes `created`, no temp |
@@ -109,7 +119,7 @@ Every case: all 3 ops terminal and `created`, no temp files, no half-written fin
 
 Note: a tag-only user edit keeps the *audio* hash identical — **edit detection must use full-file SHA + inode**, the audio hash is only for "same recording" decisions.
 
-### Tag preservation (edit title only, diff every field)
+### Tag preservation (edit title only, diff every field) — same results locally and on the NAS
 Fixtures carry: custom tag, MusicBrainz ID, 2 artists (multi-value), album artist, embedded JPEG front cover, Chinese lyrics, ReplayGain track gain/peak + album gain, Chinese text. MP3 = ID3v2.4, FLAC = Vorbis + PICTURE, APE = APEv2 on a copy of the real NAS APE (no APE encoder exists here).
 
 | Format | Fields | mutagen (minimal edit) | beets `mediafile` |
@@ -135,6 +145,7 @@ MP3, FLAC, APE: deterministic; unchanged after a tag edit that changed the file 
 * **F5 — embedded tags can be actively wrong** (artist = song title), not just missing.
 * **F6 — APE + CUE "image" albums can't be matched by beets as-is**; the cue sheet is the track list and is GBK-encoded.
 * **F7 — plain `rename()` overwrites**; only `RENAME_EXCL` / `link()` / `O_EXCL` are safe.
+* **F7b — the NAS supports neither `RENAME_EXCL` nor hard links over SMB from macOS**; only `O_EXCL`. Atomic no-overwrite publish is not available from the Mac.
 * **F8 — audio hash cannot detect tag edits**; ownership/undo needs full SHA + inode.
 * **F9 — `mediafile` respells APE keys** (case only).
 * Carried over: folders named like files (`XXX.flac/`) exist — the walker uses `isfile()`, never the extension.
@@ -143,10 +154,10 @@ MP3, FLAC, APE: deterministic; unchanged after a tag edit that changed the file 
 
 | Item | Status | Needed from you |
 |---|---|---|
-| M0b on the NAS scratch folder | **Not run.** The brief's `<NAS_SCRATCH_PATH>` placeholder was never filled in, and the NAS is still mounted as guest, read-only. | A scratch folder path on the share + a read-write mount of it (DSM account auth was failing in the previous session). Then: `./venv/bin/python -I scripts/m0b_v2.py --dest <path> --label nas` |
-| Real SMB drop mid-copy | Simulated only | On the NAS run: start a large copy and disconnect Wi-Fi / unmount; recovery must work from the files |
-| NAS publish primitives | Unknown | The probe in the NAS run answers it. Risks: macOS smbfs may not support `RENAME_EXCL` or hard links, and SMB inode numbers may not be stable (would push recoveries to `ownership_uncertain` instead of `created`) |
-| AcoustID with your key | Not done | `export ACOUSTID_API_KEY=…` and re-run `scripts/m0a_v2.py` |
+| M0b on the NAS | **Done** in `music/_mlt_scratch` (created by me on your instruction; the only NAS location written). Earlier auth failures were the wrong user name (`<mac user>` vs `<DSM user>`) plus missing write permission on `music`. | — |
+| Real SMB drop mid-copy | Simulated only | Manual test: start a large apply to the NAS and pull the network; then run recovery |
+| NAS publish method | `claim_rename` chosen; residual window documented | Your decision (§6.7) |
+| AcoustID with your key | **Tried — rejected.** All 52 lookups returned `{"code": 4, "message": "invalid API key"}` (`results/m0a_result_userkey_invalid.json`). Likely a *user* key (for submissions) rather than an *application* key (needed for lookups). Results above are from beets' built-in application key. | Register an application at acoustid.org ("Register a new application"), put that key in `~/.zshrc` as `export ACOUSTID_API_KEY=…`, re-run `scripts/m0a_v2.py` |
 | APE encoding fixtures | No `mac` CLI (no Homebrew formula), ffmpeg can only decode APE | Accept using the real APE (done), or I can build Monkey's Audio from source if you want synthetic APE |
 | Sample folder list | `<SAMPLE_FOLDER_LIST>` not given | Used the 4 folders already in `m0/nas_sample/`. Still missing from the spec's list: Big5/GBK *mojibake tags*, Traditional Chinese release, live/remaster, an `.lrc` in the real collection |
 | Incident | During this session I ran one `touch` at the root of the read-only NAS mount to check writability; it failed with "Operation not permitted", nothing was written. Not repeated. | — |
@@ -159,7 +170,11 @@ MP3, FLAC, APE: deterministic; unchanged after a tag edit that changed the file 
 4. **Review is the main path, not the exception.** Classify with more than beets' recommendation: e.g. "medium + all tracks AcoustID-linked" is near-certain (Phil Collins), while "no AcoustID link + distance > 0.5" should be shown as *no real match* rather than a bad candidate.
 5. Before matching, add a **pre-processing stage**: cue-sheet parsing with encoding detection for image albums; tag-sanity checks (artist that equals a track title, missing album) with folder/filename-derived fallbacks for the search terms.
 6. **Evaluate extra metadata sources in M1** for Chinese releases (beets ships Discogs/Deezer/Spotify plugins); MusicBrainz alone will leave most of the collection unmatched.
-7. **Apply = journal-first protocol as implemented**: journal on local disk, temps in the destination dir with the `.mlt-` naming, publish with `RENAME_EXCL` → fallback `link()+unlink()` → if neither, **refuse to apply** to that destination (decide after the NAS probe).
+7. **Apply = journal-first protocol as implemented**: journal on local disk, temps in the destination dir with the `.mlt-` naming, publish with `RENAME_EXCL` → `link()+unlink()` → `claim_rename` → otherwise refuse. **For the NAS, choose one (open decision):**
+   * **(a) Accept `claim_rename`** — tested and passing; safe unless another program writes the *same file name* in the same folder during an apply. Simplest.
+   * **(b) Try SMB 3** (DSM → File Services → SMB → max protocol) and re-run the probe; may or may not unlock more primitives from macOS.
+   * **(c) Publish on the NAS itself** (small helper in Docker on the Synology, where the local filesystem offers a true no-overwrite rename) — strongest guarantee, more moving parts.
+   Recommendation: (a) for M1, with (c) only if the tool will run alongside other writers.
 8. Ownership classes `created / already_existed / ownership_uncertain`; **Undo only touches `created`**, and only if full SHA + inode still match.
 9. Write tags with **minimal mutagen edits** (only changed fields) — preserves APE key spelling and everything else; `mediafile` is acceptable for MP3/FLAC.
 10. Side files: `.lrc` is its own op keyed off the new stem; `.cue` is rewritten on a staged copy before publish, in its original encoding.
@@ -170,5 +185,6 @@ MP3, FLAC, APE: deterministic; unchanged after a tag edit that changed the file 
 cd ~/Projects/MP3LibraryTool/m0
 ./venv/bin/python -I scripts/m0a_v2.py                              # ~8 min (MusicBrainz rate limit)
 ./venv/bin/python -I scripts/m0b_v2.py --dest scratch/dest_local    # ~2 min
+./venv/bin/python -I scripts/m0b_v2.py --dest /Volumes/music/_mlt_scratch --label nas   # ~3 min; folder must exist
 ```
 The first-generation scripts (`m0a_beets_spike.py`, `m0b_nas_safety_spike.py`) are kept for history; their results are superseded.

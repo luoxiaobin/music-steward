@@ -113,7 +113,9 @@ def probe_publish(dest: Path) -> dict:
 
     a4 = d / "a4"
     a4.write_bytes(b"D")
+    ino4 = os.stat(a4).st_ino
     os.rename(a4, d / "c_plain")  # control
+    out["plain_rename_preserves_inode"] = os.stat(d / "c_plain").st_ino == ino4
     (d / "c2").write_bytes(b"victim")
     (d / "a5").write_bytes(b"E")
     os.rename(d / "a5", d / "c2")
@@ -132,6 +134,10 @@ def probe_publish(dest: Path) -> dict:
         method = "renamex_excl"
     elif out.get("hardlink_new") == "ok" and out.get("hardlink_onto_existing") == "refused EEXIST":
         method = "link_unlink"
+    elif out.get("o_excl_onto_existing") == "refused EEXIST" and out.get("plain_rename_preserves_inode"):
+        # weaker: O_EXCL claims the name, rename() replaces only our own empty
+        # placeholder; a small check-then-rename window remains (see report)
+        method = "claim_rename"
     else:
         method = "none"
     out["chosen_method"] = method
@@ -283,6 +289,25 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None, hooks: dict | N
                 os.link(temp, final)
                 maybe_crash("after_link_before_unlink", crash_at)
                 temp.unlink()
+            elif o["method"] == "claim_rename":
+                # 1) atomically claim the name with an empty O_EXCL placeholder
+                j.write({"op": op, "state": "claiming", "claim_ts": time.time()})
+                fd = os.open(final, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+                os.close(fd)
+                maybe_crash("after_claim_syscall", crash_at)
+                pino = final.stat().st_ino
+                j.write({"op": op, "state": "claimed", "placeholder_ino": pino})
+                maybe_crash("after_claimed_journal", crash_at)
+                if "after_claim" in hooks:
+                    hooks["after_claim"]()
+                # 2) replace ONLY our own placeholder (residual TOCTOU window here)
+                st = final.stat()
+                if st.st_ino != pino or st.st_size != 0:
+                    temp.unlink(missing_ok=True)
+                    j.write({"op": op, "state": "conflict", "ownership": "not_ours",
+                             "reason": "placeholder was replaced by someone else before rename"})
+                    return
+                os.rename(temp, final)
             else:
                 raise RuntimeError("no safe publish method on this destination")
         except FileExistsError:
@@ -352,6 +377,48 @@ def recover(j: Journal) -> list[dict]:
                     temp.unlink()
                 j.write({"op": op, "state": "intent", "recovered_from": "tagged-temp-missing"})
                 d["action"] = "temp missing/damaged -> restart op"
+        elif state in ("claiming", "claimed"):
+            temp_ok = te and sha_file(temp) == o["tagged_sha"]
+
+            def back_to_publish(why):
+                if temp_ok:
+                    j.write({"op": op, "state": "tagged", "recovered_from": state})
+                    d["action"] = why + " -> resume at publish"
+                else:
+                    if te:
+                        temp.unlink()
+                    j.write({"op": op, "state": "intent", "recovered_from": state})
+                    d["action"] = why + " -> temp damaged, restart op"
+            if not fe:
+                back_to_publish("no placeholder")
+            else:
+                fst = final.stat()
+                ours_placeholder = (
+                    fst.st_size == 0 and (
+                        (state == "claimed" and fst.st_ino == o.get("placeholder_ino")) or
+                        # crash between O_EXCL create and the 'claimed' record: we cannot
+                        # prove the inode; accept a 0-byte file created after 'claiming'
+                        (state == "claiming" and fst.st_mtime >= o["claim_ts"] - 2)))
+                if ours_placeholder:
+                    final.unlink()
+                    back_to_publish("own empty placeholder removed"
+                                    + (" (by timestamp, not inode)" if state == "claiming" else ""))
+                elif fst.st_ino == o["temp_ino"] and sha_file(final) == o["tagged_sha"]:
+                    j.write({"op": op, "state": "published", "final_ino": fst.st_ino,
+                             "final_sha": o["tagged_sha"], "recovered_from": state})
+                    d["action"] = "rename had completed (same inode + sha) -> mark published"
+                elif sha_file(final) == o["tagged_sha"]:
+                    if te:
+                        temp.unlink()
+                    j.write({"op": op, "state": "ownership_uncertain", "ownership": "uncertain",
+                             "reason": "final has our bytes but not our inode"})
+                    d["action"] = "ownership uncertain -> left alone"
+                else:
+                    if te:
+                        temp.unlink()
+                    j.write({"op": op, "state": "conflict", "ownership": "not_ours",
+                             "reason": "someone else's file at final name"})
+                    d["action"] = "conflict, temp removed"
         elif state == "published":
             d["action"] = "published -> commit"
             if te:
@@ -713,7 +780,8 @@ def side_files(dest: Path, method: str, run: str, jdir: Path) -> dict:
 
 # =========================================================== scenarios
 CRASH_POINTS = ["after_intent", "mid_copy", "after_copy", "after_tag",
-                "after_link_before_unlink", "after_publish_syscall", "after_published_journal"]
+                "after_link_before_unlink", "after_claim_syscall", "after_claimed_journal",
+                "after_publish_syscall", "after_published_journal"]
 
 
 def make_sources() -> list[Path]:
@@ -759,6 +827,9 @@ def scenario_crash(dest: Path, srcs: list[Path], method: str, jdir: Path) -> dic
     for cp in CRASH_POINTS:
         if cp == "after_link_before_unlink" and method != "link_unlink":
             res[cp] = {"skipped": f"only applies to link_unlink (method={method})"}
+            continue
+        if cp in ("after_claim_syscall", "after_claimed_journal") and method != "claim_rename":
+            res[cp] = {"skipped": f"only applies to claim_rename (method={method})"}
             continue
         run = uuid.uuid4().hex[:6]
         dd = dest / f"crash_{cp}"
@@ -898,6 +969,31 @@ def scenario_awkward(dest: Path, srcs: list[Path], method: str, jdir: Path) -> d
     return out
 
 
+def scenario_placeholder_swap(dest: Path, srcs: list[Path], jdir: Path) -> dict:
+    """claim_rename only: another writer replaces our empty placeholder after
+    the claim but before our rename. Must become a conflict, their file kept."""
+    run = uuid.uuid4().hex[:6]
+    dd = dest / "placeholder_swap"
+    dd.mkdir()
+    j = Journal(jdir / f"{run}.jsonl")
+    final = dd / srcs[0].name
+    plan_op(j, run, "p", srcs[0], final, {"title": "Mine"}, "claim_rename")
+    theirs = b"another program wrote here"
+
+    def swap():
+        tmp = dd / "other_tool.tmp"
+        tmp.write_bytes(theirs)
+        os.rename(tmp, final)  # what a careless tool does
+    run_all(j, hooks={"p": {"after_claim": swap}})
+    o = j.ops()["p"]
+    r = {"state": o["history"][-1], "theirs_kept": final.read_bytes() == theirs,
+         "no_temp_left": not list(dd.glob("*.mlt-*")),
+         "note": "detected because the check runs after the swap; a swap landing between "
+                 "the check and our rename() would be overwritten (residual window)"}
+    r["pass"] = r["state"] == "conflict" and r["theirs_kept"] and r["no_temp_left"]
+    return r
+
+
 def scenario_undo_after_crash(dest: Path, srcs: list[Path], method: str, jdir: Path) -> dict:
     """Crash right after publish syscall, recover, then undo: the recovered op
     must be classified 'created' and removed; a pre-existing file must stay."""
@@ -964,9 +1060,17 @@ def main():
         dl = dest / "link_unlink"
         dl.mkdir()
         rep["crash_injection_link_unlink"] = scenario_crash(dl, srcs, "link_unlink", jdir)
+    if method != "claim_rename" and rep["publish_probe"].get("o_excl_onto_existing") == "refused EEXIST":
+        print("[crash] also claim_rename", flush=True)
+        dc = dest / "claim_rename"
+        dc.mkdir()
+        rep["crash_injection_claim_rename"] = scenario_crash(dc, srcs, "claim_rename", jdir)
+        rep["placeholder_swap_claim_rename"] = scenario_placeholder_swap(dc, srcs, jdir)
     print("[awkward]", flush=True)
     rep["awkward"] = scenario_awkward(dest, srcs, method, jdir)
     rep["undo_after_crash"] = scenario_undo_after_crash(dest, srcs, method, jdir)
+    if method == "claim_rename":
+        rep["awkward"]["placeholder_replaced_before_rename"] = scenario_placeholder_swap(dest, srcs, jdir)
     print("[tags]", flush=True)
     fx = make_tagged_fixtures(SCRATCH / "tagfx")
     work = dest / "tags"
@@ -979,6 +1083,7 @@ def main():
     s = {
         "publish_method": method,
         "crash_injection_all_pass": all(v.get("pass", True) for v in rep["crash_injection"].values()),
+        "crash_injection_claim_rename_all_pass": all(v.get("pass", True) for v in rep["crash_injection_claim_rename"].values()) if "crash_injection_claim_rename" in rep else None,
         "crash_injection_link_unlink_all_pass": all(v.get("pass", True) for v in rep.get("crash_injection_link_unlink", {}).values()) if "crash_injection_link_unlink" in rep else None,
         **{f"awkward.{k}": v["pass"] for k, v in rep["awkward"].items()},
         "undo_after_crash": rep["undo_after_crash"]["pass"],
