@@ -8,7 +8,7 @@
 | Question | Answer | Confidence |
 |---|---|---|
 | Can beets be used as a library? | **Yes**, behind a harness that resets beets' process-wide state (or runs each job in its own worker process) and disables migration backups. | High |
-| Does matching work on your music? | **Mechanically yes, practically weak for Chinese releases.** 0 of 18 sample units matched confidently; the only correct top candidate was the Western 2-CD set. | Medium (small sample) |
+| Does matching work on your music? | **For albums mostly yes, for mainland releases and singles no.** Correct release on top for 5 of 7 albums (all HK/TW and Western ones, even with garbled tags); wrong for the 2 mainland albums and most singles. beets' own "strong" threshold marks nothing confident — the app needs its own rule. | Medium (11-folder sample) |
 | Can files be copied/tagged safely? | **Yes on local APFS**: journal-first protocol survives a crash at every step with no duplicates, no overwrite, no half-written final, every item accounted for. | High (local) |
 | …on the NAS? | **Yes, with a weaker publish method.** All crash points, awkward cases, tags, audio hash and side files pass on the NAS. | High (SMB drop still simulated) |
 | Publish method | Local APFS: `renamex_np(RENAME_EXCL)` or `link()+unlink()`. **NAS: neither is supported** (ENOTSUP); only `O_EXCL` create refuses to overwrite → **claim-then-rename**, which leaves a tiny check-then-rename window (§3). | High |
@@ -48,23 +48,34 @@ Schema `job / unit / candidate / mapping / single_track / single_candidate`; map
 ### 1.4 AcoustID
 * beets 2.14.1 uses a **module constant** `beetsplug.chroma.API_KEY` for lookups; config `acoustid.apikey` is only the *submission* key. The harness sets the constant per job and restores it afterwards.
 * Lookups use **your AcoustID application key** from `ACOUSTID_API_KEY` (recorded only as `Cs…dm`). A first key supplied was a *user* key and was rejected with `invalid API key` on every lookup (`results/m0a_result_userkey_invalid.json`) — the app must validate the key type at setup. Match results are identical to an earlier run with beets' built-in key: the key changes who asks, not what AcoustID knows.
-* 30 s generated tone → `status: ok`, 0 results (valid, empty). Real files: 52 requests, 52 `ok`, 51 with a fingerprint match, **only 26 linked to a MusicBrainz recording**.
+* 30 s generated tone → `status: ok`, 0 results (valid, empty). Real files: 129 requests, 129 `ok`, 123 with a fingerprint match, **74 linked to a MusicBrainz recording**.
 
 ### 1.6 Match quality (real files from `nas_sample/`, AcoustID + MusicBrainz)
 
-| Unit | Files | AcoustID-linked | Class | Top candidate | Distance | Correct? |
-|---|---|---|---|---|---|---|
-| 郑绪岚《情系红楼梦》FLAC | 11 | 0/11 | needs review | 夢現列車 / 豆屋 | 0.72 | **No** |
-| HIFI年代 怀念战友 (1 APE + CUE) | 1 | 0/1 | needs review | an unrelated release (differs run to run) | 0.90–0.95 | **No** |
-| Phil Collins *Love Songs* (2 CDs) | 25 | 25/25 | needs review (`medium`) | Love Songs (A Compilation… Old and New) | 0.21 | **Yes** |
-| 童丽 loose singles (per track) | 15 | 1/15 | 15 × needs review | other artists' recordings with similar titles (e.g. Greensleeves → John Coltrane) | 0.28–0.70 | none verifiably correct |
+Sample: 11 folders, ~2.2 GB, hand-picked from the NAS (`scripts/copy_samples_2.sh` for batch 2). AcoustID: 129 lookups, all `ok`, 123 fingerprint matches, **74 linked to a MusicBrainz recording**.
 
-"Confident" = beets `strong` (< 0.04). In practice **the only usable automatic result was the Western album**; for the Chinese material the *right* answer is effectively "no candidates", but beets always returns *something*, so distance alone would mislead the user.
+**Albums**
 
-Why (from the evidence, not guesswork):
-1. AcoustID recognises the Chinese tracks (scores 0.97–0.998) but **their fingerprints are not linked to any MusicBrainz recording** — MusicBrainz coverage, not fingerprinting, is the bottleneck.
-2. The 郑绪岚 FLACs have **broken embedded tags** (`artist` = `红豆曲`, a song title; no album) — text search starts from garbage.
-3. The APE album is **one image file + CUE**; beets sees 1 item vs 12-track releases.
+| Unit | Case | Files | AcoustID-linked | beets rec. | Top candidate | Distance | Correct? |
+|---|---|---|---|---|---|---|---|
+| 劉德華《真我的風采》 | Traditional, HK | 11 | 11/11 | medium | 真我的風采 / 劉德華 | **0.11** | **Yes** |
+| 成人兒歌 (Various Artists) | compilation, HK | 28 | 14/28 | medium | 成人兒歌 / Various Artists | **0.09** | **Yes** |
+| Phil Collins *Love Songs* | clean, 2 CDs | 25 | 25/25 | medium | Love Songs (A Compilation… Old and New) | 0.21 | **Yes** |
+| 蔡琴《老歌 (XRCD2)》 | remaster, partial (5 tracks) | 5 | 5/5 | none | 老歌 / 蔡琴 | 0.30 | **Yes** (5 of a longer release) |
+| 林子祥 *2004 XRCD Special* | **garbled GBK tags**, Traditional | 17 | 16/17 | none | 2004 XRCD Special / 林子祥 | 0.52 | **Yes** — found by fingerprint despite garbage text |
+| 郑绪岚《情系红楼梦》 | mainland, broken tags | 11 | 0/11 | none | 夢現列車 / 豆屋 | 0.72 | **No** |
+| HIFI年代 怀念战友 | 1 APE + GBK CUE | 1 | 0/1 | none | unrelated (varies per run) | 0.90–0.95 | **No** |
+
+**Singles (matched one by one)** — 34 files: 童丽 loose singles (15), `(Live)` tracks (4), tracks with `.lrc` (3), 张也 tracks incl. `(1)/(2)` names and a blank album (9+).
+Only a handful are plausibly right (e.g. 枉凝眉 → 张也, Lulle Lullay → Chantal & Marga, 0.14). Typical failures: **same title, different artist** — a cover or the original instead of this recording (万事如意 → 龚玥 instead of 张也; 常回家看看 *(Live)* by 毛阿敏 → 陈红's studio original at only **0.13**). A low distance on a single is therefore *not* safe on its own.
+
+Takeaways:
+1. **Hong Kong / Taiwan releases are well covered** (correct release on top for 4 of 4, incl. the garbled one); **mainland PRC releases are not** (AcoustID recognises them at 0.97–0.998 but has no MusicBrainz link).
+2. beets' `strong` threshold (0.04) marks *nothing* confident, yet the correct albums sit at 0.09–0.30 **with most tracks AcoustID-linked to that release**. A better "confident" rule: AcoustID links for most items **and** distance < ~0.15 (to be tuned in M1).
+3. **Garbled tags are survivable when fingerprints link** (林子祥), but they inflate the distance; decoding GBK before matching should bring such albums into the confident band.
+4. Broken tags (郑绪岚: artist = a song title) and APE+CUE images (beets sees 1 item vs a 12-track release) still fail.
+5. Singles need artist agreement, not just title: live versions and covers match the wrong recording.
+6. `(1)`/`(2)` file-name suffixes are **not** reliable duplicate markers — in `张也-单曲` there are no originals; they are the only copies.
 
 ## 3. M0b — safe copy and tag (`scripts/m0b_v2.py`)
 
@@ -141,7 +152,8 @@ MP3, FLAC, APE: deterministic; unchanged after a tag edit that changed the file 
 * **F1 — beets leaks state between jobs in one process** unless ~10 private globals are reset (§1.1).
 * **F2 — `Library(":memory:")` writes files.** With default config it creates 11 SQLite backups `:memory:-before-<table>-<migration>.bak` (53 KB each) in the CWD and prints to stdout. Requires `create_backup_before_migrations: no`. Python's audit hook did **not** see these writes (SQLite backup API is C) — directory snapshots are needed to catch this class of problem.
 * **F3 — MusicBrainz search is not reproducible** between calls. Plans must be built from **persisted** candidates, never by re-running the search.
-* **F4 — AcoustID knows the Chinese tracks but MusicBrainz doesn't.** Fingerprinting alone can't produce candidates for most of the collection.
+* **F4 — AcoustID knows mainland Chinese tracks but MusicBrainz doesn't link them**; Hong Kong/Taiwan releases are linked and match well.
+* **F4b — the collection, scanned read-only to 4 levels** (`scripts/scan_nas_candidates.py`): 10,371 folders with audio, **3,464 folders named like files**, 2,357 `.cue`, 3,703 `.lrc`, 223 folders with Traditional-only names, 140 live / 87 remaster markers; in a small, biased probe **25 of 63 MP3s had garbled GBK tags**. Garbled tags, cue sheets and file-named folders are common cases, not edge cases.
 * **F5 — embedded tags can be actively wrong** (artist = song title), not just missing.
 * **F6 — APE + CUE "image" albums can't be matched by beets as-is**; the cue sheet is the track list and is GBK-encoded.
 * **F7 — plain `rename()` overwrites**; only `RENAME_EXCL` / `link()` / `O_EXCL` are safe.
@@ -159,7 +171,7 @@ MP3, FLAC, APE: deterministic; unchanged after a tag edit that changed the file 
 | NAS publish method | `claim_rename` chosen; residual window documented | Your decision (§6.7) |
 | AcoustID with your key | **Done** with the application key (52/52 lookups `ok`). The first key (a user key) was rejected — kept as `results/m0a_result_userkey_invalid.json`. | Add `export ACOUSTID_API_KEY=…` to `~/.zshenv` so non-interactive shells (and Claude Code) see it |
 | APE encoding fixtures | No `mac` CLI (no Homebrew formula), ffmpeg can only decode APE | Accept using the real APE (done), or I can build Monkey's Audio from source if you want synthetic APE |
-| Sample folder list | `<SAMPLE_FOLDER_LIST>` not given | Used the 4 folders already in `m0/nas_sample/`. Still missing from the spec's list: Big5/GBK *mojibake tags*, Traditional Chinese release, live/remaster, an `.lrc` in the real collection |
+| Sample folder list | **Done** — found by a read-only NAS scan, approved by you, 7 folders/selections added (`scripts/copy_samples_2.sh`); every case in the spec's list is now covered | — |
 | Incident | During this session I ran one `touch` at the root of the read-only NAS mount to check writability; it failed with "Operation not permitted", nothing was written. Not repeated. | — |
 
 ## 6. Architecture decisions (proposed)
@@ -167,8 +179,8 @@ MP3, FLAC, APE: deterministic; unchanged after a tag edit that changed the file 
 1. **Use beets as a library**, pinned to 2.14.1, behind a single harness module. **Run each matching job in a short-lived worker process** (simplest isolation; the in-process reset also works and stays as defence). Re-run the leak test on any beets upgrade.
 2. Always construct `Library(":memory:", set_music_dir=False)` with `create_backup_before_migrations: no`, `BEETSDIR` = empty temp dir, `config.read(user=False)`.
 3. **Persist candidates** (the SQLite schema above) and build plans only from persisted data.
-4. **Review is the main path, not the exception.** Classify with more than beets' recommendation: e.g. "medium + all tracks AcoustID-linked" is near-certain (Phil Collins), while "no AcoustID link + distance > 0.5" should be shown as *no real match* rather than a bad candidate.
-5. Before matching, add a **pre-processing stage**: cue-sheet parsing with encoding detection for image albums; tag-sanity checks (artist that equals a track title, missing album) with folder/filename-derived fallbacks for the search terms.
+4. **Use our own confidence rule, not beets' recommendation**: most items AcoustID-linked to the candidate release **and** distance < ~0.15 → confident (would have auto-accepted 劉德華 and 成人兒歌, and Phil Collins with a slightly looser bound); "no AcoustID link + distance > 0.5" → shown as *no real match*, not as a bad candidate. Singles additionally require the artist to agree. Tune thresholds on a larger sample in M1.
+5. Before matching, add a **pre-processing stage**: **decode garbled GBK/Big5 tags**; cue-sheet parsing with encoding detection for image albums; tag-sanity checks (artist that equals a track title, missing album) with folder/filename-derived fallbacks for the search terms.
 6. **Evaluate extra metadata sources in M1** for Chinese releases (beets ships Discogs/Deezer/Spotify plugins); MusicBrainz alone will leave most of the collection unmatched.
 7. **Apply = journal-first protocol as implemented**: journal on local disk, temps in the destination dir with the `.mlt-` naming, publish with `RENAME_EXCL` → `link()+unlink()` → `claim_rename` → otherwise refuse. **For the NAS, choose one (open decision):**
    * **(a) Accept `claim_rename`** — tested and passing; safe unless another program writes the *same file name* in the same folder during an apply. Simplest.

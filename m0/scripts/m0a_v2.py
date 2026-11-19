@@ -328,8 +328,18 @@ def main():
         "album_chinese_flac": os.path.join(REAL, "album_chinese_flac"),
         "album_ape_format": os.path.join(REAL, "album_ape_format"),
         "album_clean_mp3_compilation (2 discs)": os.path.join(REAL, "album_clean_mp3_compilation"),
+        # batch 2 (scripts/copy_samples_2.sh)
+        "album_garbled_gbk_traditional_xrcd": os.path.join(REAL, "album_garbled_gbk_traditional_xrcd"),
+        "album_traditional_hk": os.path.join(REAL, "album_traditional_hk"),
+        "album_remaster_xrcd2": os.path.join(REAL, "album_remaster_xrcd2"),
+        "album_various_artists_hk": os.path.join(REAL, "album_various_artists_hk"),
     }
-    real_singles = {"singles_chinese_loose": os.path.join(REAL, "singles_chinese_loose")}
+    real_singles = {"singles_chinese_loose": os.path.join(REAL, "singles_chinese_loose"),
+                    "singles_live": os.path.join(REAL, "singles_live"),
+                    "singles_with_lrc": os.path.join(REAL, "singles_with_lrc"),
+                    "singles_dupes_blank_album": os.path.join(REAL, "singles_dupes_blank_album")}
+    real_albums = {k: v for k, v in real_albums.items() if os.path.isdir(v)}
+    real_singles = {k: v for k, v in real_singles.items() if os.path.isdir(v)}
     H.ACOUSTID_TRACE.clear()
     print("[1.6] matching real samples (MusicBrainz is rate-limited; takes a few minutes)", flush=True)
     real_job = H.run_job("real", SETTINGS["A"], real_albums, real_singles)

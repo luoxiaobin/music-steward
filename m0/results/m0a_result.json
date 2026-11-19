@@ -15,18 +15,18 @@
     "1.1_no_leakage": {
       "method": "Job A (plugins musicbrainz+chroma, strong_rec_thresh 0.04, countries CN, album weight 9.0, search_limit 5) then job B (musicbrainz only, 0.5, US, default weights, search_limit 2), sequentially in one Python process. Each in-process job is compared with the same job run in a brand-new process (state snapshot + full candidate output). All HTTP for this section goes through a record/replay cache so every run sees identical MusicBrainz/AcoustID responses (see server_nondeterminism_control).",
       "server_nondeterminism_control": {
-        "same_results_two_live_runs": false,
+        "same_results_two_live_runs": true,
         "top_album_ids_run1": {
           "01_clean_baseline": [
-            "446abb00-2ffb-38bb-b544-512c70df7c97",
-            "eca8996a-a637-3259-ba07-d2573c601a1b",
-            "4ae7e4df-dd1e-4624-bcd8-c9a0b8a66fab",
-            "c93e1d4c-89fa-3139-9c65-8542a39f07d1",
-            "2e0542d1-5c0b-4600-ab77-64870cc619de"
+            "31765b9f-e969-4257-855f-c7ea1f657b2a",
+            "96e230f3-7f79-4a84-9902-b6d8de499d6e",
+            "e50d234a-3737-4f57-a363-0ce3b083d80f",
+            "02fb1dd7-4256-40a8-a0a8-551314a0b5d4",
+            "b185d950-2cb4-4da3-809f-cd3efed1a2fc"
           ],
           "06_compilation": [
-            "0f4b21b8-6296-4820-b921-2977c86983f9",
-            "7e917011-ab60-41c3-a65f-1fe2638e29ae",
+            "68012214-a808-48e5-9428-72aeba3b4806",
+            "3b7a8210-85f7-4413-98db-479bc7c0f0aa",
             "e2efdc06-0fa7-4e9d-835c-2a99b255b4b6",
             "f42bca16-03a3-3373-9589-be16a4aa06b4",
             "0cd128af-de61-43d4-af44-de6880925135"
@@ -34,25 +34,25 @@
         },
         "top_album_ids_run2": {
           "01_clean_baseline": [
-            "27f534f7-12c5-4c56-8dda-39fbdad10c17",
+            "31765b9f-e969-4257-855f-c7ea1f657b2a",
+            "96e230f3-7f79-4a84-9902-b6d8de499d6e",
+            "e50d234a-3737-4f57-a363-0ce3b083d80f",
             "02fb1dd7-4256-40a8-a0a8-551314a0b5d4",
-            "6bb3793b-f991-378e-9bff-0bd3117f2298",
-            "c93e1d4c-89fa-3139-9c65-8542a39f07d1",
-            "81470366-b15a-4621-b391-10ba291e5067"
+            "b185d950-2cb4-4da3-809f-cd3efed1a2fc"
           ],
           "06_compilation": [
-            "0f4b21b8-6296-4820-b921-2977c86983f9",
             "68012214-a808-48e5-9428-72aeba3b4806",
-            "7e917011-ab60-41c3-a65f-1fe2638e29ae",
             "3b7a8210-85f7-4413-98db-479bc7c0f0aa",
-            "e2efdc06-0fa7-4e9d-835c-2a99b255b4b6"
+            "e2efdc06-0fa7-4e9d-835c-2a99b255b4b6",
+            "f42bca16-03a3-3373-9589-be16a4aa06b4",
+            "0cd128af-de61-43d4-af44-de6880925135"
           ]
         }
       },
       "http_cache": {
         "in_process": {
-          "hits": 24,
-          "misses": 16
+          "hits": 23,
+          "misses": 17
         },
         "fresh_B": {
           "hits": 6,
@@ -142,13 +142,13 @@
           "n_results": 0,
           "top_score": null,
           "top_recordings": [],
-          "elapsed_s": 0.22
+          "elapsed_s": 0.2
         }
       ],
-      "real_requests": 52,
-      "real_requests_status_ok": 52,
-      "real_requests_with_results": 51,
-      "real_requests_with_linked_mb_recordings": 26,
+      "real_requests": 129,
+      "real_requests_status_ok": 129,
+      "real_requests_with_results": 123,
+      "real_requests_with_linked_mb_recordings": 74,
       "finding": "AcoustID recognises nearly every real file (score ~0.97-0.99) but most fingerprints have no linked MusicBrainz recording, so chroma yields no candidates for them (compare real_requests_with_results vs real_requests_with_linked_mb_recordings).",
       "real_trace_sample": [
         {
@@ -162,7 +162,7 @@
           "n_results": 1,
           "top_score": 0.98440796,
           "top_recordings": [],
-          "elapsed_s": 0.25
+          "elapsed_s": 0.35
         },
         {
           "url": "http://api.acoustid.org/v2/lookup",
@@ -175,7 +175,7 @@
           "n_results": 1,
           "top_score": 0.955004,
           "top_recordings": [],
-          "elapsed_s": 0.22
+          "elapsed_s": 0.21
         },
         {
           "url": "http://api.acoustid.org/v2/lookup",
@@ -188,7 +188,7 @@
           "n_results": 1,
           "top_score": 0.99149525,
           "top_recordings": [],
-          "elapsed_s": 0.24
+          "elapsed_s": 0.21
         }
       ],
       "tone_job_acoustid_matched_items": 0
@@ -258,7 +258,7 @@
         "single_track",
         "single_candidate"
       ],
-      "mapping_rows": 256,
+      "mapping_rows": 561,
       "equal_after_reload": {
         "A": true,
         "B": true,
@@ -327,7 +327,7 @@
               "03. 晴雯歌 (郑绪岚 - 情系红楼梦) (8级别).flac": "豆屋/夢現列車/01-03 列車の音に乗せて.flac"
             }
           },
-          "elapsed_s": 5.4
+          "elapsed_s": 6.0
         },
         "album_ape_format": {
           "class": "needs_review",
@@ -336,42 +336,42 @@
           "acoustid_matched_items": 0,
           "n_candidates": 5,
           "top": {
-            "album": "Anyone Can Play Radiohead: A Tribute to Radiohead",
+            "album": "The Peel Sessions: Inner Nation",
             "artist": "Various Artists",
-            "year": 2001,
+            "year": 1995,
             "country": "GB",
-            "distance": 0.9471,
-            "album_id": "4c7d286f-dbe3-4446-87a9-cee2523b3922",
+            "distance": 0.9379,
+            "album_id": "baea8257-ee6e-4b6c-aadb-135b1fa087fe",
             "penalties": [
               [
                 "album",
-                0.37037
+                0.434783
               ],
               [
                 "country",
-                0.020576
+                0.024155
               ],
               [
                 "data_source",
-                0.041152
+                0.048309
               ],
               [
                 "missing_tracks",
-                0.444444
+                0.347826
               ],
               [
                 "tracks",
-                0.070547
+                0.082816
               ]
             ],
             "items_mapped": 1,
             "extra_items": 0,
-            "extra_tracks": 12,
+            "extra_tracks": 8,
             "rendered_destinations_sample": {
-              "伽菲珈而&姜苏.-.[HIFI年代1.-.怀念战友].专辑.(ape).ape": "Compilations/Anyone Can Play Radiohead_ A Tribute to Radiohead/01 Fitter Happier.ape"
+              "伽菲珈而&姜苏.-.[HIFI年代1.-.怀念战友].专辑.(ape).ape": "Compilations/The Peel Sessions_ Inner Nation/01 This Is the Army of Forgotten Souls.ape"
             }
           },
-          "elapsed_s": 7.2
+          "elapsed_s": 5.6
         },
         "album_clean_mp3_compilation (2 discs)": {
           "class": "needs_review",
@@ -413,7 +413,179 @@
               "CD 1/03 - Phil Collins - One more night.mp3": "Phil Collins/Love Songs (A Compilation... Old And New)/01-03 One More Night.mp3"
             }
           },
-          "elapsed_s": 12.4
+          "elapsed_s": 11.3
+        },
+        "album_garbled_gbk_traditional_xrcd": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "n_items": 17,
+          "acoustid_matched_items": 16,
+          "n_candidates": 10,
+          "top": {
+            "album": "2004 XRCD Special",
+            "artist": "林子祥",
+            "year": 2004,
+            "country": "HK",
+            "distance": 0.5175,
+            "album_id": "afc5e70a-c1f8-4474-be2e-62e416c52c2e",
+            "penalties": [
+              [
+                "album",
+                0.121212
+              ],
+              [
+                "artist",
+                0.054545
+              ],
+              [
+                "country",
+                0.010101
+              ],
+              [
+                "data_source",
+                0.020202
+              ],
+              [
+                "tracks",
+                0.311465
+              ]
+            ],
+            "items_mapped": 17,
+            "extra_items": 0,
+            "extra_tracks": 0,
+            "rendered_destinations_sample": {
+              "林子祥 - 人海中一個你.mp3": "林子祥/2004 XRCD Special/01-09 人海中一個你.mp3",
+              "林子祥 - 仍然記得個一次.mp3": "林子祥/2004 XRCD Special/01-10 仍然記得嗰一次.mp3",
+              "林子祥 - 似夢迷離.mp3": "林子祥/2004 XRCD Special/01-05 似夢迷離.mp3"
+            }
+          },
+          "elapsed_s": 11.4
+        },
+        "album_traditional_hk": {
+          "class": "needs_review",
+          "recommendation": "medium",
+          "n_items": 11,
+          "acoustid_matched_items": 11,
+          "n_candidates": 5,
+          "top": {
+            "album": "真我的風采",
+            "artist": "劉德華",
+            "year": 1992,
+            "country": "HK",
+            "distance": 0.1119,
+            "album_id": "f74066fe-356e-4bc7-ab81-bdb0a6cfdd07",
+            "penalties": [
+              [
+                "country",
+                0.012821
+              ],
+              [
+                "data_source",
+                0.025641
+              ],
+              [
+                "label",
+                0.010796
+              ],
+              [
+                "tracks",
+                0.062678
+              ]
+            ],
+            "items_mapped": 11,
+            "extra_items": 0,
+            "extra_tracks": 0,
+            "rendered_destinations_sample": {
+              "1992 - 真我的風采 (HK - wea;New Melody RECORDS 4509-91609-2;NMR-3001-C - 1992)/01. 謝謝你的愛.flac": "劉德華/真我的風采/01-01 謝謝你的愛.flac",
+              "1992 - 真我的風采 (HK - wea;New Melody RECORDS 4509-91609-2;NMR-3001-C - 1992)/02. 假裝.flac": "劉德華/真我的風采/01-02 假裝.flac",
+              "1992 - 真我的風采 (HK - wea;New Melody RECORDS 4509-91609-2;NMR-3001-C - 1992)/03. 真我的風采.flac": "劉德華/真我的風采/01-03 真我的風采.flac"
+            }
+          },
+          "elapsed_s": 6.8
+        },
+        "album_remaster_xrcd2": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "n_items": 5,
+          "acoustid_matched_items": 5,
+          "n_candidates": 5,
+          "top": {
+            "album": "老歌",
+            "artist": "蔡琴",
+            "year": 2007,
+            "country": "CA",
+            "distance": 0.2966,
+            "album_id": "d23ad463-a984-4694-8d36-8cba347a558f",
+            "penalties": [
+              [
+                "album",
+                0.046552
+              ],
+              [
+                "country",
+                0.017241
+              ],
+              [
+                "data_source",
+                0.034483
+              ],
+              [
+                "missing_tracks",
+                0.155172
+              ],
+              [
+                "tracks",
+                0.043103
+              ]
+            ],
+            "items_mapped": 5,
+            "extra_items": 0,
+            "extra_tracks": 5,
+            "rendered_destinations_sample": {
+              "1 痴痴的等.mp3": "蔡琴/老歌/01-01 痴痴的等.mp3",
+              "2 恨不相逢未嫁时.mp3": "蔡琴/老歌/01-10 恨不相逢未嫁時.mp3",
+              "3 红泪.mp3": "蔡琴/老歌/01-08 紅淚.mp3"
+            }
+          },
+          "elapsed_s": 8.8
+        },
+        "album_various_artists_hk": {
+          "class": "needs_review",
+          "recommendation": "medium",
+          "n_items": 28,
+          "acoustid_matched_items": 14,
+          "n_candidates": 4,
+          "top": {
+            "album": "成人兒歌",
+            "artist": "Various Artists",
+            "year": 2005,
+            "country": "HK",
+            "distance": 0.0942,
+            "album_id": "c017f636-3bda-4962-91bf-e1c500a5aef7",
+            "penalties": [
+              [
+                "country",
+                0.007143
+              ],
+              [
+                "data_source",
+                0.014286
+              ],
+              [
+                "tracks",
+                0.072727
+              ]
+            ],
+            "items_mapped": 28,
+            "extra_items": 0,
+            "extra_tracks": 0,
+            "rendered_destinations_sample": {
+              "01. 430穿梭機.flac": "Compilations/成人兒歌/01 430穿梭機.flac",
+              "02. IQ博士.flac": "Compilations/成人兒歌/02 IQ博士.flac",
+              "03. 超人的主題曲.flac": "Compilations/成人兒歌/03 超人的主題曲.flac"
+            }
+          },
+          "elapsed_s": 5.7
         }
       },
       "singles": {
@@ -581,11 +753,187 @@
             "distance": 0.3412505623031939,
             "recording_id": "77356745-7471-4c7a-a050-d3ae6cc2ce3e"
           }
+        },
+        "妈妈的吻 (Live).flac": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "媽媽的話",
+            "artist": "陳小春",
+            "distance": 0.42792022792022794,
+            "recording_id": "784e8244-4007-48f8-a8f5-b6d2cde9788b"
+          }
+        },
+        "常回家看看 (Live).flac": {
+          "class": "needs_review",
+          "recommendation": "medium",
+          "acoustid_matched": false,
+          "top": {
+            "title": "常回家看看",
+            "artist": "陈红",
+            "distance": 0.13015873015873017,
+            "recording_id": "4d564945-fcae-49d3-aa52-753af7a27e77"
+          }
+        },
+        "幸福之歌 (Live).mp3": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "1グラムの幸福",
+            "artist": "飯島真理",
+            "distance": 0.582962962962963,
+            "recording_id": "7210b2d5-b332-4488-8426-bcc67dfa9838"
+          }
+        },
+        "红墙连万家 (Live).flac": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "Live! Live! Live!",
+            "artist": "渡部歩",
+            "distance": 0.5799224291287781,
+            "recording_id": "2dc64003-de35-4838-9c56-fffec9e62808"
+          }
+        },
+        "Lulle Lullay And Lullabye.mp3": {
+          "class": "needs_review",
+          "recommendation": "medium",
+          "acoustid_matched": true,
+          "top": {
+            "title": "Lulle, Lullay and Lullabye",
+            "artist": "Chantal & Marga Etoile",
+            "distance": 0.14285714285714285,
+            "recording_id": "bf127ecf-2418-4b24-a625-fbe78de5d09a"
+          }
+        },
+        "Man In The Moon.flac": {
+          "class": "needs_review",
+          "recommendation": "medium",
+          "acoustid_matched": false,
+          "top": {
+            "title": "Man in the Moon",
+            "artist": "劉美君",
+            "distance": 0.14285714285714285,
+            "recording_id": "fa7b4afc-355d-43f8-8530-d09537b35b57"
+          }
+        },
+        "彩虹之上.flac": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": true,
+          "top": {
+            "title": "Over The Rainbow",
+            "artist": "Jane Monheit",
+            "distance": 0.5428571428571428,
+            "recording_id": "104f1680-098a-4f63-ab22-a2c68392b0bb"
+          }
+        },
+        "【民间小调】《沂蒙山小调》.mp3": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "小房间 (In This Room)",
+            "artist": "四葉草",
+            "distance": 0.5757575757575757,
+            "recording_id": "8aa3eaee-9c3b-4fc4-90e9-dba1c6bd0d23"
+          }
+        },
+        "一字对花.mp3": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "一對對 (聶風版)",
+            "artist": "鄭伊健",
+            "distance": 0.608989898989899,
+            "recording_id": "c3e0dd5e-9f9b-4652-b045-e7a8679e6a22"
+          }
+        },
+        "一朵鲜花鲜又鲜.flac": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "一朵鲜花鲜又鲜",
+            "artist": "宋祖英",
+            "distance": 0.5111111111111111,
+            "recording_id": "eecac379-34cb-46a3-b71f-71950e270e39"
+          }
+        },
+        "一梦约千年.mp3": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "千年淚",
+            "artist": "Tank",
+            "distance": 0.5051353874883286,
+            "recording_id": "95b64b63-b0c1-4bf1-ba3f-1d6100f20992"
+          }
+        },
+        "万事如意(2).flac": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "万事如意",
+            "artist": "龚玥",
+            "distance": 0.30612244897959184,
+            "recording_id": "4c08e9e1-874d-4d8b-b2ed-e6738893b55a"
+          }
+        },
+        "万事根本.flac": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "黃沙萬里（撒哈拉的故事）",
+            "artist": "徐小鳳",
+            "distance": 0.6883699685382226,
+            "recording_id": "7673f5d2-e063-4151-a50c-94bb50f362cc"
+          }
+        },
+        "三杯美酒敬亲人(1).mp3": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "亲密爱人",
+            "artist": "張敬軒",
+            "distance": 0.47513597513597516,
+            "recording_id": "7fd28394-c3df-4386-a0e7-77f91d4250f8"
+          }
+        },
+        "和谐颂(1).mp3": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "嫂子颂",
+            "artist": "韩磊",
+            "distance": 0.42328042328042326,
+            "recording_id": "4497042a-ffef-4403-9e09-7eda070226af"
+          }
+        },
+        "枉凝眉(1).flac": {
+          "class": "needs_review",
+          "recommendation": "none",
+          "acoustid_matched": false,
+          "top": {
+            "title": "枉凝眉 (Wan yi mei)",
+            "artist": "张也",
+            "distance": 0.37543859649122807,
+            "recording_id": "a4107839-a593-487c-94a2-4bfec6254332"
+          }
         }
       },
       "summary": {
         "confident": 0,
-        "needs_review": 18,
+        "needs_review": 38,
         "no_candidates": 0
       },
       "classification_rule": "confident = beets recommendation 'strong' (top distance < 0.04); needs_review = any candidates but not strong; no_candidates = nothing returned"
