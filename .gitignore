@@ -1,0 +1,21 @@
+# Local tooling
+.claude/
+.DS_Store
+__pycache__/
+*.pyc
+
+# Python env (recreate from m0/requirements.lock)
+m0/venv/
+
+# Real music copied from the NAS — never commit
+m0/nas_sample/
+m0/real_scratch/
+
+# Spike scratch dirs (regenerated on every run)
+m0/dest_local/
+m0/stage_incoming/
+m0/scratch/
+
+# Secrets
+.env
+*.key

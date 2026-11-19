@@ -1,0 +1,117 @@
+{
+  "criteria": {
+    "no_prompts": true,
+    "survives_save_reload": true,
+    "explicit_settings": true,
+    "no_side_effects": true,
+    "no_leakage": true
+  },
+  "per_fixture": {
+    "01_clean_baseline": {
+      "n_candidates_job_a": 5,
+      "n_candidates_job_b": 0,
+      "top_candidate": {
+        "fixture_paths": [
+          "/Users/<user>/Projects/MP3LibraryTool/m0/fixtures/01_clean_baseline/01 - Come Together.mp3",
+          "/Users/<user>/Projects/MP3LibraryTool/m0/fixtures/01_clean_baseline/02 - Something.mp3"
+        ],
+        "candidate_album": "Abbey Road",
+        "candidate_artist": "The Beatles",
+        "distance": 0.6054,
+        "n_tracks_mapped": 2,
+        "rendered_destination": "/Users/<user>/Music/Non-Album/The Beatles/Come Together.mp3"
+      },
+      "prompted": false,
+      "side_effect_on_source": false,
+      "fingerprint": {
+        "file": "01 - Come Together.mp3",
+        "duration": 2.04,
+        "fingerprint_len": 6
+      }
+    },
+    "02_mojibake_chinese": {
+      "n_candidates_job_a": 0,
+      "n_candidates_job_b": 0,
+      "top_candidate": null,
+      "prompted": false,
+      "side_effect_on_source": false,
+      "fingerprint": null
+    },
+    "03_chinese_simplified": {
+      "n_candidates_job_a": 0,
+      "n_candidates_job_b": 0,
+      "top_candidate": null,
+      "prompted": false,
+      "side_effect_on_source": false,
+      "fingerprint": null
+    },
+    "04_chinese_traditional": {
+      "n_candidates_job_a": 0,
+      "n_candidates_job_b": 0,
+      "top_candidate": null,
+      "prompted": false,
+      "side_effect_on_source": false,
+      "fingerprint": null
+    },
+    "05_multidisc": {
+      "n_candidates_job_a": 0,
+      "n_candidates_job_b": 0,
+      "top_candidate": null,
+      "prompted": false,
+      "side_effect_on_source": false,
+      "fingerprint": null
+    },
+    "06_compilation": {
+      "n_candidates_job_a": 0,
+      "n_candidates_job_b": 0,
+      "top_candidate": null,
+      "prompted": false,
+      "side_effect_on_source": false,
+      "fingerprint": null
+    },
+    "07_live_album": {
+      "n_candidates_job_a": 0,
+      "n_candidates_job_b": 0,
+      "top_candidate": null,
+      "prompted": false,
+      "side_effect_on_source": false,
+      "fingerprint": null
+    },
+    "08_untagged_loose": {
+      "n_candidates_job_a": 0,
+      "n_candidates_job_b": 0,
+      "top_candidate": null,
+      "prompted": false,
+      "side_effect_on_source": false,
+      "fingerprint": null
+    },
+    "09_flac_format": {
+      "n_candidates_job_a": 0,
+      "n_candidates_job_b": 0,
+      "top_candidate": null,
+      "prompted": false,
+      "side_effect_on_source": false,
+      "fingerprint": {
+        "file": "01 - flac-track.flac",
+        "duration": 2.0,
+        "fingerprint_len": 6
+      }
+    },
+    "10_side_files": {
+      "n_candidates_job_a": 0,
+      "n_candidates_job_b": 0,
+      "top_candidate": null,
+      "prompted": false,
+      "side_effect_on_source": false,
+      "fingerprint": null
+    }
+  },
+  "notes": [],
+  "match_quality_summary": {
+    "confident": 0,
+    "needs_review": 1,
+    "no_match": 9,
+    "total_groups": 10,
+    "caveat": "Fixtures are synthetic sine-tone audio with partly invented metadata; AcoustID fingerprint matches are expected to be empty (no real audio content), and MusicBrainz metadata matches only work for the fixtures that reuse real release metadata (Abbey Road, The Wall, Mandopop titles). This does NOT measure real match rates on Kevin's actual collection -- that requires running this script against real sample files copied from the NAS."
+  }
+}

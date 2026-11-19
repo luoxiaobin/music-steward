@@ -1,0 +1,10 @@
+clean_baseline	01_clean_baseline	well-tagged real-metadata baseline
+mojibake_chinese	02_mojibake_chinese	GBK bytes stored as if latin1 -> garbled text
+chinese_simplified	03_chinese_simplified	correctly-encoded simplified Chinese tags
+chinese_traditional	04_chinese_traditional	correctly-encoded traditional Chinese tags
+multidisc	05_multidisc	2-disc album, disc numbers in tags
+compilation	06_compilation	various-artists compilation
+live_album	07_live_album	live release naming
+untagged_loose	08_untagged_loose	no tags at all, rely on filename
+flac_format	09_flac_format	FLAC format tag-preservation fixture
+side_files	10_side_files	cover.jpg + .lrc + .cue companions

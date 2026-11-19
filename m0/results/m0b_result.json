@@ -1,0 +1,193 @@
+{
+  "safe_publish_probe": {
+    "hardlink_supported": true,
+    "link_refuses_overwrite": true,
+    "o_excl_refuses_overwrite": true
+  },
+  "sample_files_used": {
+    ".mp3": "/Users/<user>/Projects/MP3LibraryTool/m0/nas_sample/singles_chinese_loose/Susan\u8bf4.mp3",
+    ".flac": "/Users/<user>/Projects/MP3LibraryTool/m0/nas_sample/singles_chinese_loose/Nocturne.flac",
+    ".ape": "/Users/<user>/Projects/MP3LibraryTool/m0/nas_sample/album_ape_format/\u4f3d\u83f2\u73c8\u800c&\u59dc\u82cf.-.[HIFI\u5e74\u4ee31.-.\u6000\u5ff5\u6218\u53cb].\u4e13\u8f91.(ape).ape"
+  },
+  "crash_injection_mp3": {
+    "planned": {
+      "crash_signal_exit": 137,
+      "state_right_after_crash": {
+        "steps_done": [
+          "planned"
+        ],
+        "last_step": "planned",
+        "dest_final_exists": false,
+        "dest_partial_exists": false,
+        "no_duplicate_final_names": true
+      },
+      "state_after_rerun": {
+        "steps_done": [
+          "planned",
+          "staged",
+          "tagged",
+          "published",
+          "committed"
+        ],
+        "last_step": "committed",
+        "dest_final_exists": true,
+        "dest_partial_exists": false,
+        "no_duplicate_final_names": true
+      },
+      "exactly_one_final_file": true,
+      "no_orphan_part_files": true
+    },
+    "staged": {
+      "crash_signal_exit": 137,
+      "state_right_after_crash": {
+        "steps_done": [
+          "planned",
+          "staged"
+        ],
+        "last_step": "staged",
+        "dest_final_exists": false,
+        "dest_partial_exists": true,
+        "no_duplicate_final_names": true
+      },
+      "state_after_rerun": {
+        "steps_done": [
+          "planned",
+          "staged",
+          "tagged",
+          "published",
+          "committed"
+        ],
+        "last_step": "committed",
+        "dest_final_exists": true,
+        "dest_partial_exists": false,
+        "no_duplicate_final_names": true
+      },
+      "exactly_one_final_file": true,
+      "no_orphan_part_files": true
+    },
+    "tagged": {
+      "crash_signal_exit": 137,
+      "state_right_after_crash": {
+        "steps_done": [
+          "planned",
+          "staged",
+          "tagged"
+        ],
+        "last_step": "tagged",
+        "dest_final_exists": false,
+        "dest_partial_exists": true,
+        "no_duplicate_final_names": true
+      },
+      "state_after_rerun": {
+        "steps_done": [
+          "planned",
+          "staged",
+          "tagged",
+          "published",
+          "committed"
+        ],
+        "last_step": "committed",
+        "dest_final_exists": true,
+        "dest_partial_exists": false,
+        "no_duplicate_final_names": true
+      },
+      "exactly_one_final_file": true,
+      "no_orphan_part_files": true
+    },
+    "published": {
+      "crash_signal_exit": 137,
+      "state_right_after_crash": {
+        "steps_done": [
+          "planned",
+          "staged",
+          "tagged",
+          "published"
+        ],
+        "last_step": "published",
+        "dest_final_exists": true,
+        "dest_partial_exists": false,
+        "no_duplicate_final_names": true
+      },
+      "state_after_rerun": {
+        "steps_done": [
+          "planned",
+          "staged",
+          "tagged"
+        ],
+        "last_step": "tagged",
+        "dest_final_exists": true,
+        "dest_partial_exists": false,
+        "no_duplicate_final_names": true
+      },
+      "exactly_one_final_file": true,
+      "no_orphan_part_files": true
+    }
+  },
+  "conflicts_mp3": {
+    "dest_exists_at_publish": {
+      "detected_as_conflict": true,
+      "preexisting_file_untouched": true
+    },
+    "source_changed_during_copy": {
+      "detected": true
+    },
+    "identical_file_already_exists": {
+      "audio_hash_matches": true,
+      "classification": "already_existed"
+    },
+    "output_edited_before_undo": {
+      "edit_detected_by_audio_hash": true
+    }
+  },
+  "tag_roundtrip": {
+    "mp3": {
+      "format": ".mp3",
+      "n_fields_before": 7,
+      "n_fields_after": 7,
+      "fields_preserved": [
+        "TPE1",
+        "TALB",
+        "TXXX:ID",
+        "TRCK",
+        "TPOS",
+        "TCON"
+      ],
+      "fields_dropped_or_changed": [],
+      "title_changed": true,
+      "audio_unchanged": true
+    },
+    "flac": {
+      "format": ".flac",
+      "n_fields_before": 6,
+      "n_fields_after": 6,
+      "fields_preserved": [
+        "id",
+        "album",
+        "discnumber",
+        "artist",
+        "tracknumber"
+      ],
+      "fields_dropped_or_changed": [],
+      "title_changed": true,
+      "audio_unchanged": true
+    },
+    "ape": {
+      "format": ".ape",
+      "note": "No embedded APE tag on this file -- metadata for this album lives entirely in the sibling .cue sheet, which is itself GBK/GB2312-encoded, not UTF-8 (reads as mojibake without transcoding). Real finding: APE+cue albums need cue-sheet parsing with encoding detection, not mutagen tags."
+    }
+  },
+  "side_files": {
+    "cue_found": true,
+    "cue_referenced_files": [
+      "\u0664\ufffd\ufffd\ufffd\ufffd\ufffd&\ufffd\ufffd\ufffd\ufffd.-.[HIFI\ufffd\ufffd\ufffd1.-.\ufffd\ufffd\ufffd\ufffd\u057d\ufffd\ufffd].\u05e8\ufffd\ufffd.(ape).ape"
+    ],
+    "referenced_files_exist_at_dest": [
+      false
+    ],
+    "lrc_found": false
+  },
+  "caveats": [
+    "Run against LOCAL disk (dest_local/), not the real NAS -- we currently only have read-only NAS access. Hard-link support and real dropped-connection behavior must be re-verified once write access to the NAS is available.",
+    "Crash simulation uses os.fork() + os._exit(137) to mimic kill -9 at a precise point in the pipeline; this is a reasonable proxy for a real crash but not identical to e.g. a kernel panic or SMB session drop mid-syscall."
+  ]
+}
