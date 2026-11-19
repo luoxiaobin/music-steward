@@ -23,7 +23,7 @@ Evidence: `results/m0a_result.json` (summary), `results/m0a_raw_jobs.json` (ever
 | 1.1 | No leakage between two jobs in the same process | **Pass** (with full reset) · **Fail** with config-only reset |
 | 1.2 | No library file on disk / no side effects | **Pass** after one required setting (finding F2) |
 | 1.3 | Survives save → SQLite → reload | **Pass** — exact equality, 256 mapping rows |
-| 1.4 | Real AcoustID lookup made and parsed | **Pass (mechanism)** — but with beets' built-in app key, **not yours** (`ACOUSTID_API_KEY` not set) |
+| 1.4 | Real AcoustID lookup made and parsed | **Pass** — with your application key from `ACOUSTID_API_KEY` (logged redacted `Cs…dm`) |
 | 1.5 | APE fixtures | **No encoder available** → used the real APE+CUE album from the NAS sample |
 | 1.6 | Match quality on real files | 0 confident · 18 needs review · 0 no candidates (detail below) |
 | — | No prompts | **Pass** — only `tag_album`/`tag_item` are called; runs unattended |
@@ -47,7 +47,7 @@ Schema `job / unit / candidate / mapping / single_track / single_candidate`; map
 
 ### 1.4 AcoustID
 * beets 2.14.1 uses a **module constant** `beetsplug.chroma.API_KEY` for lookups; config `acoustid.apikey` is only the *submission* key. The harness sets the constant per job and restores it afterwards.
-* `ACOUSTID_API_KEY` was **not set** in this environment, so lookups used beets' built-in application key (logged redacted as `1v…En`). The code uses your key automatically once the variable is set; **criterion "lookup with your key" is still open.**
+* Lookups use **your AcoustID application key** from `ACOUSTID_API_KEY` (recorded only as `Cs…dm`). A first key supplied was a *user* key and was rejected with `invalid API key` on every lookup (`results/m0a_result_userkey_invalid.json`) — the app must validate the key type at setup. Match results are identical to an earlier run with beets' built-in key: the key changes who asks, not what AcoustID knows.
 * 30 s generated tone → `status: ok`, 0 results (valid, empty). Real files: 52 requests, 52 `ok`, 51 with a fingerprint match, **only 26 linked to a MusicBrainz recording**.
 
 ### 1.6 Match quality (real files from `nas_sample/`, AcoustID + MusicBrainz)
@@ -157,7 +157,7 @@ MP3, FLAC, APE: deterministic; unchanged after a tag edit that changed the file 
 | M0b on the NAS | **Done** in `music/_mlt_scratch` (created by me on your instruction; the only NAS location written). Earlier auth failures were the wrong user name (`<mac user>` vs `<DSM user>`) plus missing write permission on `music`. | — |
 | Real SMB drop mid-copy | Simulated only | Manual test: start a large apply to the NAS and pull the network; then run recovery |
 | NAS publish method | `claim_rename` chosen; residual window documented | Your decision (§6.7) |
-| AcoustID with your key | **Tried — rejected.** All 52 lookups returned `{"code": 4, "message": "invalid API key"}` (`results/m0a_result_userkey_invalid.json`). Likely a *user* key (for submissions) rather than an *application* key (needed for lookups). Results above are from beets' built-in application key. | Register an application at acoustid.org ("Register a new application"), put that key in `~/.zshrc` as `export ACOUSTID_API_KEY=…`, re-run `scripts/m0a_v2.py` |
+| AcoustID with your key | **Done** with the application key (52/52 lookups `ok`). The first key (a user key) was rejected — kept as `results/m0a_result_userkey_invalid.json`. | Add `export ACOUSTID_API_KEY=…` to `~/.zshenv` so non-interactive shells (and Claude Code) see it |
 | APE encoding fixtures | No `mac` CLI (no Homebrew formula), ffmpeg can only decode APE | Accept using the real APE (done), or I can build Monkey's Audio from source if you want synthetic APE |
 | Sample folder list | `<SAMPLE_FOLDER_LIST>` not given | Used the 4 folders already in `m0/nas_sample/`. Still missing from the spec's list: Big5/GBK *mojibake tags*, Traditional Chinese release, live/remaster, an `.lrc` in the real collection |
 | Incident | During this session I ran one `touch` at the root of the read-only NAS mount to check writability; it failed with "Operation not permitted", nothing was written. Not repeated. | — |

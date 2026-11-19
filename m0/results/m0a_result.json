@@ -1,11 +1,11 @@
 {
   "beets_version": "2.14.1",
-  "acoustid_key_source": "beets built-in app key (ACOUSTID_API_KEY not set)",
-  "acoustid_key": "1v…En (len 8)",
+  "acoustid_key_source": "env ACOUSTID_API_KEY",
+  "acoustid_key": "Cs…dm (len 10)",
   "criteria": {
     "no_leakage": true,
     "acoustid_real_lookup_parsed": true,
-    "acoustid_used_user_key": false,
+    "acoustid_used_user_key": true,
     "no_side_effects": true,
     "no_prompts": true,
     "explicit_settings": true,
@@ -18,15 +18,15 @@
         "same_results_two_live_runs": false,
         "top_album_ids_run1": {
           "01_clean_baseline": [
-            "982b992e-c783-43e3-a999-dae2123bd862",
-            "e50d234a-3737-4f57-a363-0ce3b083d80f",
-            "cf754b8b-fc50-47b5-b460-a94c61b2fef3",
-            "d6010be3-98f8-422c-a6c9-787e2e491e58",
-            "e3e99a28-628b-31a2-9579-36cd98d8bb64"
+            "446abb00-2ffb-38bb-b544-512c70df7c97",
+            "eca8996a-a637-3259-ba07-d2573c601a1b",
+            "4ae7e4df-dd1e-4624-bcd8-c9a0b8a66fab",
+            "c93e1d4c-89fa-3139-9c65-8542a39f07d1",
+            "2e0542d1-5c0b-4600-ab77-64870cc619de"
           ],
           "06_compilation": [
-            "68012214-a808-48e5-9428-72aeba3b4806",
-            "3b7a8210-85f7-4413-98db-479bc7c0f0aa",
+            "0f4b21b8-6296-4820-b921-2977c86983f9",
+            "7e917011-ab60-41c3-a65f-1fe2638e29ae",
             "e2efdc06-0fa7-4e9d-835c-2a99b255b4b6",
             "f42bca16-03a3-3373-9589-be16a4aa06b4",
             "0cd128af-de61-43d4-af44-de6880925135"
@@ -34,25 +34,25 @@
         },
         "top_album_ids_run2": {
           "01_clean_baseline": [
-            "fc48d851-5dd4-3080-9f7f-a57bbe5c4c61",
+            "27f534f7-12c5-4c56-8dda-39fbdad10c17",
+            "02fb1dd7-4256-40a8-a0a8-551314a0b5d4",
+            "6bb3793b-f991-378e-9bff-0bd3117f2298",
             "c93e1d4c-89fa-3139-9c65-8542a39f07d1",
-            "d767bd8f-d503-4a4f-be8a-e495f854db6f",
-            "8c6a00d5-8673-4aad-8192-5fe8649b5efa",
-            "b25a1e5d-3247-41ea-9920-f93c58a6e479"
+            "81470366-b15a-4621-b391-10ba291e5067"
           ],
           "06_compilation": [
+            "0f4b21b8-6296-4820-b921-2977c86983f9",
             "68012214-a808-48e5-9428-72aeba3b4806",
+            "7e917011-ab60-41c3-a65f-1fe2638e29ae",
             "3b7a8210-85f7-4413-98db-479bc7c0f0aa",
-            "e2efdc06-0fa7-4e9d-835c-2a99b255b4b6",
-            "f42bca16-03a3-3373-9589-be16a4aa06b4",
-            "0cd128af-de61-43d4-af44-de6880925135"
+            "e2efdc06-0fa7-4e9d-835c-2a99b255b4b6"
           ]
         }
       },
       "http_cache": {
         "in_process": {
-          "hits": 23,
-          "misses": 17
+          "hits": 24,
+          "misses": 16
         },
         "fresh_B": {
           "hits": 6,
@@ -66,7 +66,7 @@
       "negative_control_naive_reset": {
         "state_diff_vs_fresh_B": {
           "chroma_api_key": {
-            "in_process": "1v…En (len 8)",
+            "in_process": "Cs…dm (len 10)",
             "fresh_process": null
           },
           "chroma_cached_paths": {
@@ -128,12 +128,12 @@
       }
     },
     "1.4_acoustid": {
-      "key_source": "beets built-in app key (ACOUSTID_API_KEY not set)",
+      "key_source": "env ACOUSTID_API_KEY",
       "how_key_is_passed": "beetsplug.chroma.API_KEY (a module constant in beets 2.14.1, not a config option) is set from settings['acoustid_key'] by the harness and reset to the shipped default after every job. config acoustid.apikey is only the *user* submission key and is not used for lookups.",
       "tone_trace": [
         {
           "url": "http://api.acoustid.org/v2/lookup",
-          "client_key": "1v…En (len 8)",
+          "client_key": "Cs…dm (len 10)",
           "duration_s": 30,
           "fingerprint_chars": 126,
           "meta": "recordings releases",
@@ -142,7 +142,7 @@
           "n_results": 0,
           "top_score": null,
           "top_recordings": [],
-          "elapsed_s": 0.2
+          "elapsed_s": 0.22
         }
       ],
       "real_requests": 52,
@@ -153,7 +153,7 @@
       "real_trace_sample": [
         {
           "url": "http://api.acoustid.org/v2/lookup",
-          "client_key": "1v…En (len 8)",
+          "client_key": "Cs…dm (len 10)",
           "duration_s": 141,
           "fingerprint_chars": 3608,
           "meta": "recordings releases",
@@ -162,11 +162,11 @@
           "n_results": 1,
           "top_score": 0.98440796,
           "top_recordings": [],
-          "elapsed_s": 0.2
+          "elapsed_s": 0.25
         },
         {
           "url": "http://api.acoustid.org/v2/lookup",
-          "client_key": "1v…En (len 8)",
+          "client_key": "Cs…dm (len 10)",
           "duration_s": 251,
           "fingerprint_chars": 3608,
           "meta": "recordings releases",
@@ -179,7 +179,7 @@
         },
         {
           "url": "http://api.acoustid.org/v2/lookup",
-          "client_key": "1v…En (len 8)",
+          "client_key": "Cs…dm (len 10)",
           "duration_s": 177,
           "fingerprint_chars": 3671,
           "meta": "recordings releases",
@@ -188,7 +188,7 @@
           "n_results": 1,
           "top_score": 0.99149525,
           "top_recordings": [],
-          "elapsed_s": 0.23
+          "elapsed_s": 0.24
         }
       ],
       "tone_job_acoustid_matched_items": 0
@@ -371,7 +371,7 @@
               "伽菲珈而&姜苏.-.[HIFI年代1.-.怀念战友].专辑.(ape).ape": "Compilations/Anyone Can Play Radiohead_ A Tribute to Radiohead/01 Fitter Happier.ape"
             }
           },
-          "elapsed_s": 6.2
+          "elapsed_s": 7.2
         },
         "album_clean_mp3_compilation (2 discs)": {
           "class": "needs_review",
@@ -413,7 +413,7 @@
               "CD 1/03 - Phil Collins - One more night.mp3": "Phil Collins/Love Songs (A Compilation... Old And New)/01-03 One More Night.mp3"
             }
           },
-          "elapsed_s": 10.9
+          "elapsed_s": 12.4
         }
       },
       "singles": {
@@ -433,10 +433,10 @@
           "recommendation": "none",
           "acoustid_matched": false,
           "top": {
-            "title": "这一瞬间",
+            "title": "外面",
             "artist": "童丽",
-            "distance": 0.39453335142224044,
-            "recording_id": "a4fa0e2f-d5c6-4d45-8c1f-f3b7a01c80b1"
+            "distance": 0.37205984714873624,
+            "recording_id": "0bd04e1e-6327-4e98-a1fe-0492af3c9aab"
           }
         },
         "Because I Love You.flac": {
@@ -445,9 +445,9 @@
           "acoustid_matched": false,
           "top": {
             "title": "I Love You, I Love You, I Love You",
-            "artist": "Ronnie McDowell",
-            "distance": 0.4995562610229276,
-            "recording_id": "a47392d3-fc91-4616-81b3-7e3cbce5366f"
+            "artist": "Dimensional Fatality",
+            "distance": 0.48804353476283285,
+            "recording_id": "ef5db82e-2a99-4442-8b99-7ce6016f22b8"
           }
         },
         "Don't Keep Your Distance.flac": {
@@ -466,10 +466,10 @@
           "recommendation": "none",
           "acoustid_matched": false,
           "top": {
-            "title": "Home Home Home",
-            "artist": "Wandering Lucy",
-            "distance": 0.6987179487179487,
-            "recording_id": "eed857e3-6aed-41ba-aaf3-c1ac3af6e3b3"
+            "title": "Home, home, home",
+            "artist": "Duo de Pelikaan",
+            "distance": 0.5883000432841703,
+            "recording_id": "e25f81be-4b6c-4091-807c-50163694c062"
           }
         },
         "Greensleeves.flac": {
@@ -510,10 +510,10 @@
           "recommendation": "none",
           "acoustid_matched": false,
           "top": {
-            "title": "River, River",
-            "artist": "La Ponto Ensemblo",
-            "distance": 0.662962962962963,
-            "recording_id": "a086f42b-d407-4ab9-94d6-2104a78a257a"
+            "title": "River River",
+            "artist": "Fixity",
+            "distance": 0.5576597295708408,
+            "recording_id": "78c125b2-9d3a-4b33-8f42-d9178daa0a19"
           }
         },
         "Nocturne.flac": {

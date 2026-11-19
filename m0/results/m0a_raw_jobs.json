@@ -14,7 +14,7 @@
     "album": 9.0
    },
    "mb_search_limit": 5,
-   "acoustid_key": "1v…En (len 8)"
+   "acoustid_key": "Cs…dm (len 10)"
   },
   "reset": "naive",
   "state_at_start": {
@@ -39,7 +39,7 @@
    "distance_weight_album": 9.0,
    "distance_weight_track_title": 3.0,
    "chroma_cached_paths": 0,
-   "chroma_api_key": "1v…En (len 8)"
+   "chroma_api_key": "Cs…dm (len 10)"
   },
   "state_at_end": {
    "loaded_plugins": [
@@ -63,7 +63,7 @@
    "distance_weight_album": 9.0,
    "distance_weight_track_title": 3.0,
    "chroma_cached_paths": 5,
-   "chroma_api_key": "1v…En (len 8)"
+   "chroma_api_key": "Cs…dm (len 10)"
   },
   "fs_events": [
    [
@@ -165,17 +165,17 @@
     "kind": "album",
     "n_items": 2,
     "acoustid_matched_items": 0,
-    "elapsed_s": 6.6,
+    "elapsed_s": 8.0,
     "recommendation": "none",
     "candidates": [
      {
       "rank": 0,
       "data_source": "MusicBrainz",
-      "album_id": "fc48d851-5dd4-3080-9f7f-a57bbe5c4c61",
+      "album_id": "e50d234a-3737-4f57-a363-0ce3b083d80f",
       "album": "Abbey Road",
       "artist": "The Beatles",
-      "year": 1998,
-      "country": "JP",
+      "year": 1992,
+      "country": "XE",
       "distance": 0.5,
       "penalties": [
        [
@@ -199,7 +199,7 @@
        {
         "item_path": "01 - Come Together.mp3",
         "recording_id": "485bbe7f-d0f7-4ffe-8adb-0f1093dd2dbf",
-        "release_track_id": "1eac3c74-7a58-36ea-b526-3291215dce17",
+        "release_track_id": "b5714878-4c4b-406f-ba94-b17eb7ed5f1d",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
@@ -209,7 +209,7 @@
        {
         "item_path": "02 - Something.mp3",
         "recording_id": "b849acd4-0638-49ea-8e40-7391613d4890",
-        "release_track_id": "ea897563-4ccf-3f89-a2f7-d20931948b7e",
+        "release_track_id": "ed9c909f-5d1c-4fbe-ae71-44584a00a971",
         "track_index": 2,
         "medium": 1,
         "medium_index": 2,
@@ -243,11 +243,11 @@
      {
       "rank": 1,
       "data_source": "MusicBrainz",
-      "album_id": "c93e1d4c-89fa-3139-9c65-8542a39f07d1",
+      "album_id": "72db542f-9bcc-4fc4-9191-6a487c1d4853",
       "album": "Abbey Road",
       "artist": "The Beatles",
-      "year": 2009,
-      "country": "XE",
+      "year": 1992,
+      "country": "GB",
       "distance": 0.5,
       "penalties": [
        [
@@ -271,7 +271,7 @@
        {
         "item_path": "01 - Come Together.mp3",
         "recording_id": "485bbe7f-d0f7-4ffe-8adb-0f1093dd2dbf",
-        "release_track_id": "7e3cf155-ebf2-30d8-8e40-c1ded3ffeb85",
+        "release_track_id": "ec30a292-8481-40b4-b10f-75a279993c77",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
@@ -281,7 +281,7 @@
        {
         "item_path": "02 - Something.mp3",
         "recording_id": "b849acd4-0638-49ea-8e40-7391613d4890",
-        "release_track_id": "a7bfe64c-2510-35d6-aac0-28c87b2b1235",
+        "release_track_id": "468290dd-eceb-40b2-a851-162cf46c9ae0",
         "track_index": 2,
         "medium": 1,
         "medium_index": 2,
@@ -312,35 +312,35 @@
      {
       "rank": 2,
       "data_source": "MusicBrainz",
-      "album_id": "d767bd8f-d503-4a4f-be8a-e495f854db6f",
+      "album_id": "d6010be3-98f8-422c-a6c9-787e2e491e58",
       "album": "Abbey Road",
       "artist": "The Beatles",
       "year": 1969,
-      "country": "XW",
-      "distance": 0.5206489675516224,
+      "country": "GB",
+      "distance": 0.5,
       "penalties": [
        [
         "country",
-        0.014749
+        0.015152
        ],
        [
         "data_source",
-        0.029499
+        0.030303
        ],
        [
         "missing_tracks",
-        0.424779
+        0.409091
        ],
        [
         "tracks",
-        0.051622
+        0.045455
        ]
       ],
       "mapping": [
        {
         "item_path": "01 - Come Together.mp3",
         "recording_id": "485bbe7f-d0f7-4ffe-8adb-0f1093dd2dbf",
-        "release_track_id": "187894fc-cc38-403c-a209-307cd4d3cc29",
+        "release_track_id": "af19bbfd-fb14-3d15-a6aa-8072cf06775a",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
@@ -350,12 +350,12 @@
        {
         "item_path": "02 - Something.mp3",
         "recording_id": "b849acd4-0638-49ea-8e40-7391613d4890",
-        "release_track_id": "0b3c4456-8772-482a-99e9-1a5379c82c79",
-        "track_index": 16,
+        "release_track_id": "1745aa16-a379-3623-93f1-43702101ce29",
+        "track_index": 2,
         "medium": 1,
-        "medium_index": 16,
+        "medium_index": 2,
         "title": "Something",
-        "track_distance": 0.5
+        "track_distance": 0.375
        }
       ],
       "extra_items": [],
@@ -363,54 +363,53 @@
        "a92380e6-f10d-4407-aceb-5825b17fed5a",
        "de896c41-463d-4eaa-8fe4-d826e2afa0f8",
        "15127932-c879-466e-b0f8-a1c5022d16e7",
+       "a9a83384-3da3-4c84-af6d-33fcdb1c3e27",
        "440f60e8-0b25-4ec4-abb1-c6beec624ab0",
        "1e1d1f33-346c-4f9a-ad05-03aa715c2f37",
        "474546e9-0b30-4881-9269-c6c1c8bbf07b",
+       "d057c75d-04eb-438f-be0b-74f629f2953c",
        "99c004fb-ba87-41be-afd4-e0157b40516a",
        "65ca55c8-d857-4a3b-9246-835b1e54fe4d",
        "c19db4d3-6640-4732-a0b2-e358ed80c5c4",
        "3d7f2000-123d-4cac-862b-e04ead24c5f2",
-       "5ad78393-77c2-451e-beb1-074df7e06e57",
-       "ed8d1b3b-8757-447a-baba-3efe027f2765",
-       "d057c75d-04eb-438f-be0b-74f629f2953c",
        "daaee15a-8a4c-4275-a7c1-5b6211f0ec69",
-       "de896c41-463d-4eaa-8fe4-d826e2afa0f8",
-       "a9a83384-3da3-4c84-af6d-33fcdb1c3e27"
+       "5ad78393-77c2-451e-beb1-074df7e06e57",
+       "ed8d1b3b-8757-447a-baba-3efe027f2765"
       ],
       "rendered_destinations": null
      },
      {
       "rank": 3,
       "data_source": "MusicBrainz",
-      "album_id": "8c6a00d5-8673-4aad-8192-5fe8649b5efa",
+      "album_id": "ffd6ebf5-10c1-3cca-915e-04c0aba926f3",
       "album": "Abbey Road",
       "artist": "The Beatles",
-      "year": 2019,
-      "country": "XE",
-      "distance": 0.6518987341772151,
+      "year": 1969,
+      "country": "US",
+      "distance": 0.5,
       "penalties": [
        [
         "country",
-        0.010549
+        0.015152
        ],
        [
         "data_source",
-        0.021097
+        0.030303
        ],
        [
         "missing_tracks",
-        0.588608
+        0.409091
        ],
        [
         "tracks",
-        0.031646
+        0.045455
        ]
       ],
       "mapping": [
        {
         "item_path": "01 - Come Together.mp3",
-        "recording_id": "23c9d649-d761-470e-88d5-05615eafea86",
-        "release_track_id": "ec3a2f93-8ded-40f2-b17f-a93a82b66d12",
+        "recording_id": "485bbe7f-d0f7-4ffe-8adb-0f1093dd2dbf",
+        "release_track_id": "24244f30-c3cf-307f-ab56-f03a59a848b1",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
@@ -419,8 +418,8 @@
        },
        {
         "item_path": "02 - Something.mp3",
-        "recording_id": "13927568-01f4-4c2f-8348-2ea5d3088689",
-        "release_track_id": "fbd67562-4519-4a2f-9d02-f35242259a3b",
+        "recording_id": "b849acd4-0638-49ea-8e40-7391613d4890",
+        "release_track_id": "8071bf5e-90b3-3b6a-8b1b-af9b04d26567",
         "track_index": 2,
         "medium": 1,
         "medium_index": 2,
@@ -430,122 +429,113 @@
       ],
       "extra_items": [],
       "extra_tracks": [
-       "87f3a51a-4545-43b3-97aa-b3317ce40687",
-       "b897a4f1-0312-4ca3-bca3-2209629e2aac",
-       "b00dbaea-565c-4e8c-b864-e765e6e8f22a",
-       "c6b8d004-957d-4637-a01b-ee84eed2470a",
-       "2685a315-282a-4dc3-98c5-31b71f3dedfc",
-       "6508d801-c799-4eb9-b96c-89fd1e96b554",
-       "15832e20-4273-47f9-8fe8-1d99de5867fa",
-       "7d75fbe8-a848-4b89-82af-69326afc4202",
-       "f5f541a1-fff3-49f8-b8cd-148d35d89c59",
-       "1a910833-4319-4282-903b-cbaad5a9dd55",
-       "9992422a-1bc3-4271-93ef-3e5939ab26b2",
-       "9cf269e6-4b82-46ec-ad44-86197c156fb0",
-       "093ac3c7-686f-4393-8842-6122ae7a33cd",
-       "8e927a1b-2e0d-4e54-b3d5-d03c13b2123a",
-       "b01fd42f-2c49-482c-bad4-bb4ee2110c33",
-       "6e110048-5c88-4366-b5bc-9593c294f66e",
-       "2847c343-0568-444f-9347-88126de0d041",
-       "5da5f2a5-dfc9-41d1-8bd0-cc9c6a9afaef",
-       "bb77ada8-1fee-4423-9cad-c8485d5415a6",
-       "8efe94a2-587a-42b3-a095-fe7be2463a04",
-       "8e09c8a2-439b-4f6d-897b-29556287d3de",
-       "18e0882f-e127-47f7-a634-da1d13b1a1fd",
-       "f63a9610-bfd9-4c4d-a96b-1bd707279b96",
-       "6ac26473-a1ed-4037-ab9f-d2c07ca5aeec",
-       "2fb516b0-c708-47c5-ad56-deb3b5e68ed8",
-       "f4992aa0-77c1-42e7-afa8-1db8fb81694b",
-       "732d5246-f2d9-4336-88c4-61042fa728c5",
-       "abb41dca-612a-40c8-8b58-f9c68142aa4e",
-       "795c2a7a-5524-4a4d-a9a3-9b0691742340",
-       "3383afc5-5c68-4dd6-b14c-c4371201d0c8",
-       "2a403dc9-a466-45a3-9478-39cde1289b37"
+       "a92380e6-f10d-4407-aceb-5825b17fed5a",
+       "de896c41-463d-4eaa-8fe4-d826e2afa0f8",
+       "15127932-c879-466e-b0f8-a1c5022d16e7",
+       "a9a83384-3da3-4c84-af6d-33fcdb1c3e27",
+       "440f60e8-0b25-4ec4-abb1-c6beec624ab0",
+       "1e1d1f33-346c-4f9a-ad05-03aa715c2f37",
+       "474546e9-0b30-4881-9269-c6c1c8bbf07b",
+       "d057c75d-04eb-438f-be0b-74f629f2953c",
+       "99c004fb-ba87-41be-afd4-e0157b40516a",
+       "65ca55c8-d857-4a3b-9246-835b1e54fe4d",
+       "c19db4d3-6640-4732-a0b2-e358ed80c5c4",
+       "3d7f2000-123d-4cac-862b-e04ead24c5f2",
+       "daaee15a-8a4c-4275-a7c1-5b6211f0ec69",
+       "5ad78393-77c2-451e-beb1-074df7e06e57",
+       "ed8d1b3b-8757-447a-baba-3efe027f2765"
       ],
       "rendered_destinations": null
      },
      {
       "rank": 4,
       "data_source": "MusicBrainz",
-      "album_id": "b25a1e5d-3247-41ea-9920-f93c58a6e479",
+      "album_id": "d23f0ad2-f0d5-4714-9fb0-ed80189799d3",
       "album": "Abbey Road",
       "artist": "The Beatles",
       "year": 2019,
-      "country": "JP",
-      "distance": 0.6518987341772151,
+      "country": "XW",
+      "distance": 0.6772191185599007,
       "penalties": [
        [
         "country",
-        0.010549
+        0.009311
        ],
        [
         "data_source",
-        0.021097
+        0.018622
        ],
        [
         "missing_tracks",
-        0.588608
+        0.636872
        ],
        [
         "tracks",
-        0.031646
+        0.012415
        ]
       ],
       "mapping": [
        {
         "item_path": "01 - Come Together.mp3",
-        "recording_id": "23c9d649-d761-470e-88d5-05615eafea86",
-        "release_track_id": "7c0fcafa-aa08-423d-8afc-8320eff4f705",
+        "recording_id": "24e7d0bc-1f5f-46a2-8e61-085a23104e34",
+        "release_track_id": "86d8e9be-cdbf-470f-bbf9-22769e9f4a6e",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
         "title": "Come Together",
-        "track_distance": 0.375
+        "track_distance": 0.16666666666666666
        },
        {
         "item_path": "02 - Something.mp3",
-        "recording_id": "13927568-01f4-4c2f-8348-2ea5d3088689",
-        "release_track_id": "2bd11b30-5472-4463-a8e0-acd20ea662f3",
+        "recording_id": "9dca2a96-76e1-428e-b83d-994385d721f5",
+        "release_track_id": "3444e10b-cbce-4f62-9437-9f344106293f",
         "track_index": 2,
         "medium": 1,
         "medium_index": 2,
         "title": "Something",
-        "track_distance": 0.375
+        "track_distance": 0.16666666666666666
        }
       ],
       "extra_items": [],
       "extra_tracks": [
-       "87f3a51a-4545-43b3-97aa-b3317ce40687",
-       "b897a4f1-0312-4ca3-bca3-2209629e2aac",
-       "b00dbaea-565c-4e8c-b864-e765e6e8f22a",
-       "c6b8d004-957d-4637-a01b-ee84eed2470a",
-       "2685a315-282a-4dc3-98c5-31b71f3dedfc",
-       "6508d801-c799-4eb9-b96c-89fd1e96b554",
-       "15832e20-4273-47f9-8fe8-1d99de5867fa",
-       "7d75fbe8-a848-4b89-82af-69326afc4202",
-       "f5f541a1-fff3-49f8-b8cd-148d35d89c59",
-       "1a910833-4319-4282-903b-cbaad5a9dd55",
-       "9992422a-1bc3-4271-93ef-3e5939ab26b2",
-       "9cf269e6-4b82-46ec-ad44-86197c156fb0",
-       "093ac3c7-686f-4393-8842-6122ae7a33cd",
-       "8e927a1b-2e0d-4e54-b3d5-d03c13b2123a",
-       "b01fd42f-2c49-482c-bad4-bb4ee2110c33",
-       "6e110048-5c88-4366-b5bc-9593c294f66e",
-       "2847c343-0568-444f-9347-88126de0d041",
-       "5da5f2a5-dfc9-41d1-8bd0-cc9c6a9afaef",
-       "bb77ada8-1fee-4423-9cad-c8485d5415a6",
-       "8efe94a2-587a-42b3-a095-fe7be2463a04",
-       "8e09c8a2-439b-4f6d-897b-29556287d3de",
-       "18e0882f-e127-47f7-a634-da1d13b1a1fd",
-       "f63a9610-bfd9-4c4d-a96b-1bd707279b96",
-       "6ac26473-a1ed-4037-ab9f-d2c07ca5aeec",
-       "2fb516b0-c708-47c5-ad56-deb3b5e68ed8",
-       "f4992aa0-77c1-42e7-afa8-1db8fb81694b",
-       "732d5246-f2d9-4336-88c4-61042fa728c5",
-       "abb41dca-612a-40c8-8b58-f9c68142aa4e",
-       "795c2a7a-5524-4a4d-a9a3-9b0691742340",
-       "3383afc5-5c68-4dd6-b14c-c4371201d0c8",
-       "2a403dc9-a466-45a3-9478-39cde1289b37"
+       "ad1b44ea-c0b2-49cd-a840-92aa5e4405b8",
+       "9dcd8bbb-53ee-4839-aac2-caa182b96fa6",
+       "93c6a4b3-1b29-41b2-9cb4-77ee26959e6c",
+       "69632776-2a5b-42fb-b86e-b42da56da533",
+       "074ad98f-c882-4009-9bed-fed7aa64d89e",
+       "909974db-2e9e-419b-bca7-09de1bedd8ce",
+       "bea22462-0217-4bb4-a254-7f211bb6aaaa",
+       "9fd0daac-d62d-4e3d-b9d9-338359236b69",
+       "ec4f2e1e-d952-40d4-a19b-079edb0df8e5",
+       "8af9d532-2fe0-4f9a-bce6-f5b794d2f38f",
+       "19f22df1-cd8f-4dd7-b1ce-9863f437c398",
+       "b368ab29-999f-4bcd-b3a5-be8d073ee505",
+       "3325b2e4-89b3-44c9-8048-7442b736727d",
+       "bfd4fd43-0961-4052-8d34-495dee48c7a7",
+       "93fa4b7d-852b-4e9b-83bd-cadda62a81b2",
+       "8fe0e2d5-21f1-4e77-a54d-740859a50286",
+       "b7441f8d-12bd-46a5-9ba2-3d9274d4fd36",
+       "c8221961-e967-4bc1-88e6-adbcb4d41bd2",
+       "890e2f01-c863-4089-a020-03c32e364ba1",
+       "aeed4f9e-c0b8-4e29-9893-d49e1028297b",
+       "8d593c02-441d-4128-9d10-d2d55ed34e34",
+       "b9cfcb2e-8ae5-4e6a-a31b-276cdd10e596",
+       "2e889dc3-d814-4eed-b0cd-548f2bb7355c",
+       "ab0a543a-2843-4886-8a7b-a404b8618ad1",
+       "2d08b254-e652-416b-9b20-b41391c62c03",
+       "2c572322-bd3b-458f-98c6-b6b3bef3121f",
+       "a70b0be2-0bf0-4c94-9998-ad17f5d15a9c",
+       "fd5f8160-1d40-49b2-ba3c-290c273f2e4b",
+       "cfcb43f4-003b-4d49-8c73-271eaf44dfcd",
+       "9edc52c8-1f26-4c8c-a151-bf67ffc758d9",
+       "d605e669-7cb0-4ee2-bf00-00207dfa748d",
+       "0da5d5ad-fb3b-4969-8b06-0a8b63ec599a",
+       "1f4a2019-7598-4886-aef8-ee4ae3f58657",
+       "f4ce7fce-270e-4344-9a6f-0e5195f8bed0",
+       "728643c5-8fe2-42e5-897f-6441f931e704",
+       "8de8e35a-03ea-439d-b526-68f0820d0d85",
+       "bd500e98-5593-4aa0-8ac8-820c33a56214",
+       "beca2251-cbf7-4ca2-ac54-8aa4dab32f9d"
       ],
       "rendered_destinations": null
      }
@@ -555,11 +545,94 @@
     "kind": "album",
     "n_items": 3,
     "acoustid_matched_items": 0,
-    "elapsed_s": 6.3,
+    "elapsed_s": 7.9,
     "recommendation": "none",
     "candidates": [
      {
       "rank": 0,
+      "data_source": "MusicBrainz",
+      "album_id": "0f4b21b8-6296-4820-b921-2977c86983f9",
+      "album": "Now That’s What I Call Music!",
+      "artist": "Various Artists",
+      "year": 1998,
+      "country": null,
+      "distance": 0.6198212618380685,
+      "penalties": [
+       [
+        "data_source",
+        0.031746
+       ],
+       [
+        "missing_tracks",
+        0.428571
+       ],
+       [
+        "tracks",
+        0.13456
+       ],
+       [
+        "year",
+        0.024943
+       ]
+      ],
+      "mapping": [
+       {
+        "item_path": "01 - Artist A.mp3",
+        "recording_id": "8a925d6f-49b8-4571-a013-f027ee572d36",
+        "release_track_id": "73c1eb62-4bc4-4718-a55a-59e4f400aeda",
+        "track_index": 1,
+        "medium": 1,
+        "medium_index": 1,
+        "title": "Together Again",
+        "track_distance": 0.6970588235294117
+       },
+       {
+        "item_path": "02 - Artist B.mp3",
+        "recording_id": "57a2b620-ba3a-4930-9c04-d46efa2d779c",
+        "release_track_id": "a2dc2f5f-3bd5-49e9-8d5e-859800cce4ce",
+        "track_index": 2,
+        "medium": 1,
+        "medium_index": 2,
+        "title": "As Long as You Love Me",
+        "track_distance": 0.707563025210084
+       },
+       {
+        "item_path": "03 - Artist C.mp3",
+        "recording_id": "a98e5696-1fee-4f82-9485-b308f7961bee",
+        "release_track_id": "f941f472-959f-4e27-92e8-7b87c6aab4db",
+        "track_index": 3,
+        "medium": 1,
+        "medium_index": 3,
+        "title": "The Way",
+        "track_distance": 0.7147058823529411
+       }
+      ],
+      "extra_items": [],
+      "extra_tracks": [
+       "74f57a08-cb01-4852-83db-60c4273b4207",
+       "f7e40c6e-3c42-4e93-b228-4a25d5f3d989",
+       "e8f5b5a8-1247-419f-bbb2-16f9ed308837",
+       "afaf9b75-3d21-4067-8267-41cdf66a96bb",
+       "48342b60-5d82-40cb-a9b9-0032afa45a68",
+       "8ff4f281-2c0d-443c-b1bf-83ce6167f6bb",
+       "5deaa027-ba57-4657-940c-7d40d23cc941",
+       "b944f19c-0a0c-4278-a613-c72ae8932232",
+       "f53a5256-7e84-457f-9b44-07b1d3f3351d",
+       "aaf7fdfb-3729-47ce-bc53-fb81f9407aee",
+       "5268ded7-3c3c-465b-805f-cb14e407ec2d",
+       "9e2ad5bc-c6f9-40d2-a36f-3122ee2072a3",
+       "bd75ee6c-a6c5-4c76-b062-bfd698fc2868",
+       "90f7b7f3-3815-4344-95ca-98b28b5591a5",
+       "5c1bc116-d8d4-409d-bd81-8cbda2e14dbe"
+      ],
+      "rendered_destinations": {
+       "01 - Artist A.mp3": "Compilations/Now That’s What I Call Music!/01 Together Again.mp3",
+       "02 - Artist B.mp3": "Compilations/Now That’s What I Call Music!/02 As Long as You Love Me.mp3",
+       "03 - Artist C.mp3": "Compilations/Now That’s What I Call Music!/03 The Way.mp3"
+      }
+     },
+     {
+      "rank": 1,
       "data_source": "MusicBrainz",
       "album_id": "68012214-a808-48e5-9428-72aeba3b4806",
       "album": "Now That’s What I Call Music",
@@ -639,14 +712,105 @@
        "3a1a6e53-1894-46aa-8500-9b0e0e4016b9",
        "b39b7227-c271-4ab8-912b-cb1fe2fc0e5e"
       ],
-      "rendered_destinations": {
-       "01 - Artist A.mp3": "Compilations/Now That’s What I Call Music/01 Tubthumping.mp3",
-       "02 - Artist B.mp3": "Compilations/Now That’s What I Call Music/02 Bitch.mp3",
-       "03 - Artist C.mp3": "Compilations/Now That’s What I Call Music/03 Alone.mp3"
-      }
+      "rendered_destinations": null
      },
      {
-      "rank": 1,
+      "rank": 2,
+      "data_source": "MusicBrainz",
+      "album_id": "7e917011-ab60-41c3-a65f-1fe2638e29ae",
+      "album": "Now That’s What I Call Music",
+      "artist": "Various Artists",
+      "year": 2018,
+      "country": "GB",
+      "distance": 0.7070362652052056,
+      "penalties": [
+       [
+        "country",
+        0.011682
+       ],
+       [
+        "data_source",
+        0.023364
+       ],
+       [
+        "missing_tracks",
+        0.567757
+       ],
+       [
+        "tracks",
+        0.103146
+       ],
+       [
+        "year",
+        0.001087
+       ]
+      ],
+      "mapping": [
+       {
+        "item_path": "01 - Artist A.mp3",
+        "recording_id": "ceda1798-b60e-43d8-9942-66da50d17b46",
+        "release_track_id": "6547aa89-d6d1-4b5b-b98b-6dbac8052030",
+        "track_index": 17,
+        "medium": 2,
+        "medium_index": 1,
+        "title": "Candy Girl",
+        "track_distance": 0.7270588235294118
+       },
+       {
+        "item_path": "02 - Artist B.mp3",
+        "recording_id": "311eb9c2-6134-4ec0-afa0-f9da9cc2a3c6",
+        "release_track_id": "533fe8b2-4d79-4564-8555-b1dbdf8106e4",
+        "track_index": 2,
+        "medium": 1,
+        "medium_index": 2,
+        "title": "Is There Something I Should Know",
+        "track_distance": 0.7355555555555555
+       },
+       {
+        "item_path": "03 - Artist C.mp3",
+        "recording_id": "4abdd671-d2f0-42cf-b350-6e7b72cf12a0",
+        "release_track_id": "a2559e6e-e51f-4f28-9a67-194b40d4002e",
+        "track_index": 19,
+        "medium": 2,
+        "medium_index": 3,
+        "title": "Let’s Stay Together",
+        "track_distance": 0.7447058823529411
+       }
+      ],
+      "extra_items": [],
+      "extra_tracks": [
+       "4010de72-311f-4868-b955-2940f3da433c",
+       "fa7a5f63-2129-431e-8385-aa437d09bea2",
+       "923c8318-ae9f-457e-ab71-91cada7226fc",
+       "a80f865a-2562-4a64-8285-5c1ce6bca1ee",
+       "47a30e99-13f3-4569-b31b-02a397034c24",
+       "395e480f-9677-4cee-b607-0809a9c74b06",
+       "282e6dc3-9953-422a-9f5a-7e3b3d43671e",
+       "f3a870a2-694b-479e-8b1b-1b881c645597",
+       "c589b499-94c2-47dd-9247-fdc478478231",
+       "25c03055-9001-4fbc-a41f-1754ddd0388d",
+       "a6d2e84c-416b-44fe-9b70-1c97d3ba94f4",
+       "78c2a211-1c63-48f1-ad20-28b70eb98491",
+       "f96f224a-6996-420b-a476-a674d27271a1",
+       "92f55048-544f-446f-80ca-276e01e6951e",
+       "4ce17508-1654-4e94-991e-f252e63137b3",
+       "08cb31bb-5ecd-4a53-b62b-c14e407db393",
+       "392ba41f-67d0-4cd9-9525-be9c3408b1b4",
+       "699d68ca-8019-48d9-a422-c09d7d42befb",
+       "79e7457f-b127-418e-b8e0-20a306957614",
+       "3e8f6736-bab4-489a-828c-18067222a350",
+       "367bc6d6-8659-4457-9730-67978a9c8337",
+       "6e5c252b-a34e-4167-acdf-bc9ddc2eeee5",
+       "69981f41-0370-4b48-a56a-667973aa54b0",
+       "1c19fbb9-edce-49e1-a934-de6071dd7964",
+       "f1d471a4-0506-4e2c-8314-5f5be4b5d578",
+       "a9ef4f82-f051-4816-bbe6-2c21f6ea8ad3",
+       "b4119270-856e-4c78-82e5-4731418d8132"
+      ],
+      "rendered_destinations": null
+     },
+     {
+      "rank": 3,
       "data_source": "MusicBrainz",
       "album_id": "3b7a8210-85f7-4413-98db-479bc7c0f0aa",
       "album": "Now That’s What I Call Music",
@@ -741,7 +905,7 @@
       "rendered_destinations": null
      },
      {
-      "rank": 2,
+      "rank": 4,
       "data_source": "MusicBrainz",
       "album_id": "e2efdc06-0fa7-4e9d-835c-2a99b255b4b6",
       "album": "Now That’s What I Call Music",
@@ -834,206 +998,6 @@
        "b4119270-856e-4c78-82e5-4731418d8132"
       ],
       "rendered_destinations": null
-     },
-     {
-      "rank": 3,
-      "data_source": "MusicBrainz",
-      "album_id": "f42bca16-03a3-3373-9589-be16a4aa06b4",
-      "album": "Now That’s What I Call Music",
-      "artist": "Various Artists",
-      "year": 1983,
-      "country": "GB",
-      "distance": 0.7265914059603411,
-      "penalties": [
-       [
-        "country",
-        0.011682
-       ],
-       [
-        "data_source",
-        0.023364
-       ],
-       [
-        "missing_tracks",
-        0.567757
-       ],
-       [
-        "tracks",
-        0.103683
-       ],
-       [
-        "year",
-        0.020104
-       ]
-      ],
-      "mapping": [
-       {
-        "item_path": "01 - Artist A.mp3",
-        "recording_id": "ceda1798-b60e-43d8-9942-66da50d17b46",
-        "release_track_id": "1696b6d3-b02a-36c3-ae7e-29875fcc9819",
-        "track_index": 17,
-        "medium": 2,
-        "medium_index": 1,
-        "title": "Candy Girl",
-        "track_distance": 0.7270588235294118
-       },
-       {
-        "item_path": "02 - Artist B.mp3",
-        "recording_id": "08cb31bb-5ecd-4a53-b62b-c14e407db393",
-        "release_track_id": "6696e58f-d8f4-3950-90e7-686cde315553",
-        "track_index": 18,
-        "medium": 2,
-        "medium_index": 2,
-        "title": "Big Apple (Metro mix)",
-        "track_distance": 0.7270588235294118
-       },
-       {
-        "item_path": "03 - Artist C.mp3",
-        "recording_id": "fa7a5f63-2129-431e-8385-aa437d09bea2",
-        "release_track_id": "40011638-89d7-30be-a378-44c6bfef2e6e",
-        "track_index": 3,
-        "medium": 1,
-        "medium_index": 3,
-        "title": "Red Red Wine",
-        "track_distance": 0.7647058823529411
-       }
-      ],
-      "extra_items": [],
-      "extra_tracks": [
-       "4010de72-311f-4868-b955-2940f3da433c",
-       "311eb9c2-6134-4ec0-afa0-f9da9cc2a3c6",
-       "923c8318-ae9f-457e-ab71-91cada7226fc",
-       "a80f865a-2562-4a64-8285-5c1ce6bca1ee",
-       "47a30e99-13f3-4569-b31b-02a397034c24",
-       "395e480f-9677-4cee-b607-0809a9c74b06",
-       "282e6dc3-9953-422a-9f5a-7e3b3d43671e",
-       "f3a870a2-694b-479e-8b1b-1b881c645597",
-       "c589b499-94c2-47dd-9247-fdc478478231",
-       "25c03055-9001-4fbc-a41f-1754ddd0388d",
-       "a6d2e84c-416b-44fe-9b70-1c97d3ba94f4",
-       "78c2a211-1c63-48f1-ad20-28b70eb98491",
-       "f96f224a-6996-420b-a476-a674d27271a1",
-       "92f55048-544f-446f-80ca-276e01e6951e",
-       "63ab4375-735e-4679-af57-743869d637b1",
-       "4abdd671-d2f0-42cf-b350-6e7b72cf12a0",
-       "392ba41f-67d0-4cd9-9525-be9c3408b1b4",
-       "699d68ca-8019-48d9-a422-c09d7d42befb",
-       "79e7457f-b127-418e-b8e0-20a306957614",
-       "3e8f6736-bab4-489a-828c-18067222a350",
-       "367bc6d6-8659-4457-9730-67978a9c8337",
-       "6e5c252b-a34e-4167-acdf-bc9ddc2eeee5",
-       "69981f41-0370-4b48-a56a-667973aa54b0",
-       "1c19fbb9-edce-49e1-a934-de6071dd7964",
-       "f1d471a4-0506-4e2c-8314-5f5be4b5d578",
-       "a9ef4f82-f051-4816-bbe6-2c21f6ea8ad3",
-       "b4119270-856e-4c78-82e5-4731418d8132"
-      ],
-      "rendered_destinations": null
-     },
-     {
-      "rank": 4,
-      "data_source": "MusicBrainz",
-      "album_id": "0cd128af-de61-43d4-af44-de6880925135",
-      "album": "Now That’s What I Call Music!",
-      "artist": "Various Artists",
-      "year": 1999,
-      "country": "IL",
-      "distance": 0.7671740907035025,
-      "penalties": [
-       [
-        "country",
-        0.009653
-       ],
-       [
-        "data_source",
-        0.019305
-       ],
-       [
-        "missing_tracks",
-        0.642857
-       ],
-       [
-        "tracks",
-        0.080344
-       ],
-       [
-        "year",
-        0.015015
-       ]
-      ],
-      "mapping": [
-       {
-        "item_path": "01 - Artist A.mp3",
-        "recording_id": "5cbfd195-aeb8-4c81-b6a5-c35fc565f0fd",
-        "release_track_id": "af3abcf2-ceb2-4ff9-8506-d6d49b001179",
-        "track_index": 1,
-        "medium": 1,
-        "medium_index": 1,
-        "title": "Bailamos",
-        "track_distance": 0.676078431372549
-       },
-       {
-        "item_path": "02 - Artist B.mp3",
-        "recording_id": "bb43f799-654e-4b90-bebc-f91805c021ff",
-        "release_track_id": "1d194eb7-3885-4825-841a-0941dc46262e",
-        "track_index": 22,
-        "medium": 2,
-        "medium_index": 2,
-        "title": "Mi chico latino",
-        "track_distance": 0.6986425339366515
-       },
-       {
-        "item_path": "03 - Artist C.mp3",
-        "recording_id": "b34c9152-3dc1-4164-b11c-0f8e62527dd0",
-        "release_track_id": "110cfb71-4b05-4fe0-980c-404f0d2cb5c3",
-        "track_index": 3,
-        "medium": 1,
-        "medium_index": 3,
-        "title": "Crazy (The Stop remix)",
-        "track_distance": 0.7061990950226245
-       }
-      ],
-      "extra_items": [],
-      "extra_tracks": [
-       "4eef9bfd-80f3-4b10-9817-341bc1c9f054",
-       "ae91eb81-2a3c-4295-924b-80156a2499e4",
-       "0d055164-a3cc-4009-b2e2-5337cde4046b",
-       "6a17d355-4b9c-4b2f-a782-9bc25f8e0f57",
-       "bcb51cb4-6d51-46c8-b2a1-efe1135a4464",
-       "5b036d5e-70ee-4c1d-b17a-6206ba0dde79",
-       "abc955d5-d68c-4a08-a964-3ea9e287356c",
-       "55739218-1e87-4e5f-b6fd-858765e953b8",
-       "d1fca7bc-017c-44d1-9486-e9090a2d97a9",
-       "58e45486-bfca-4c19-88d9-a87a282866b0",
-       "989b5f2b-13cc-41bc-b7a5-3d5b03241e10",
-       "c1f3271d-46b5-487f-8b64-5cf64bd99c53",
-       "3fb1802c-2de6-40eb-be90-f8c48a24d228",
-       "7cb85403-034e-4549-985b-956e35f99b47",
-       "e7a17a47-8694-4a75-b3bd-4c4a92844105",
-       "0441ad23-6bc2-46ef-83d7-7269bcb66969",
-       "ced1e91f-23a4-40f1-a919-176068359c85",
-       "e24e9515-e639-4d63-a285-391bf16d5478",
-       "d48db0f4-fab6-4d18-bc1f-aec43772af96",
-       "0eba2796-58a6-4284-9158-e4ae4d009ecb",
-       "e9dbdfce-cdbb-4a48-b95c-e316fffc187e",
-       "2a93defa-ffcc-4046-81b0-8a8a4c6b7d54",
-       "a4b355b9-a10f-42ea-a662-c75e2b2cdb2c",
-       "78a88f5d-0098-4958-b819-e454b83167dd",
-       "7cc30a2d-b840-48f9-8489-73536ca7b811",
-       "db9a5e01-43eb-44fa-95c8-150839d9ba18",
-       "70d99714-fdfc-49c0-9aab-1debe3276dd1",
-       "55ed1f4f-fe60-4be3-ba3b-4f589d2460bc",
-       "c07b628b-2f51-4a80-be88-03d23b4734aa",
-       "a1a4e180-a602-4104-afed-b5fcc1c06271",
-       "2e606c1e-3f7c-4700-891f-460dc4848dd0",
-       "d3842a78-ac75-42c0-bede-49fa269fccf4",
-       "6c4ffe28-2bdc-43cd-9a5c-d451ec29c2ac",
-       "ddc3dd92-4149-4f42-99ff-4883eb48bdb7",
-       "b9366e4d-6a36-4bd7-aaa7-135a861868d7",
-       "b76095a3-0d7f-4418-90d2-6830ecb0dc6e",
-       "214e9f65-64c9-46eb-ad65-e15e32660aec"
-      ],
-      "rendered_destinations": null
      }
     ]
    }
@@ -1075,7 +1039,7 @@
    "distance_weight_album": 9.0,
    "distance_weight_track_title": 3.0,
    "chroma_cached_paths": 5,
-   "chroma_api_key": "1v…En (len 8)"
+   "chroma_api_key": "Cs…dm (len 10)"
   },
   "state_at_end": {
    "loaded_plugins": [
@@ -1099,7 +1063,7 @@
    "distance_weight_album": 9.0,
    "distance_weight_track_title": 3.0,
    "chroma_cached_paths": 5,
-   "chroma_api_key": "1v…En (len 8)"
+   "chroma_api_key": "Cs…dm (len 10)"
   },
   "fs_events": [],
   "fs_diff": {},
@@ -1135,7 +1099,7 @@
     "album": 9.0
    },
    "mb_search_limit": 5,
-   "acoustid_key": "1v…En (len 8)"
+   "acoustid_key": "Cs…dm (len 10)"
   },
   "reset": "full",
   "state_at_start": {
@@ -1160,7 +1124,7 @@
    "distance_weight_album": 9.0,
    "distance_weight_track_title": 3.0,
    "chroma_cached_paths": 0,
-   "chroma_api_key": "1v…En (len 8)"
+   "chroma_api_key": "Cs…dm (len 10)"
   },
   "state_at_end": {
    "loaded_plugins": [
@@ -1184,7 +1148,7 @@
    "distance_weight_album": 9.0,
    "distance_weight_track_title": 3.0,
    "chroma_cached_paths": 5,
-   "chroma_api_key": "1v…En (len 8)"
+   "chroma_api_key": "Cs…dm (len 10)"
   },
   "fs_events": [
    [
@@ -1240,11 +1204,11 @@
      {
       "rank": 0,
       "data_source": "MusicBrainz",
-      "album_id": "fc48d851-5dd4-3080-9f7f-a57bbe5c4c61",
+      "album_id": "e50d234a-3737-4f57-a363-0ce3b083d80f",
       "album": "Abbey Road",
       "artist": "The Beatles",
-      "year": 1998,
-      "country": "JP",
+      "year": 1992,
+      "country": "XE",
       "distance": 0.5,
       "penalties": [
        [
@@ -1268,7 +1232,7 @@
        {
         "item_path": "01 - Come Together.mp3",
         "recording_id": "485bbe7f-d0f7-4ffe-8adb-0f1093dd2dbf",
-        "release_track_id": "1eac3c74-7a58-36ea-b526-3291215dce17",
+        "release_track_id": "b5714878-4c4b-406f-ba94-b17eb7ed5f1d",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
@@ -1278,7 +1242,7 @@
        {
         "item_path": "02 - Something.mp3",
         "recording_id": "b849acd4-0638-49ea-8e40-7391613d4890",
-        "release_track_id": "ea897563-4ccf-3f89-a2f7-d20931948b7e",
+        "release_track_id": "ed9c909f-5d1c-4fbe-ae71-44584a00a971",
         "track_index": 2,
         "medium": 1,
         "medium_index": 2,
@@ -1312,11 +1276,11 @@
      {
       "rank": 1,
       "data_source": "MusicBrainz",
-      "album_id": "c93e1d4c-89fa-3139-9c65-8542a39f07d1",
+      "album_id": "72db542f-9bcc-4fc4-9191-6a487c1d4853",
       "album": "Abbey Road",
       "artist": "The Beatles",
-      "year": 2009,
-      "country": "XE",
+      "year": 1992,
+      "country": "GB",
       "distance": 0.5,
       "penalties": [
        [
@@ -1340,7 +1304,7 @@
        {
         "item_path": "01 - Come Together.mp3",
         "recording_id": "485bbe7f-d0f7-4ffe-8adb-0f1093dd2dbf",
-        "release_track_id": "7e3cf155-ebf2-30d8-8e40-c1ded3ffeb85",
+        "release_track_id": "ec30a292-8481-40b4-b10f-75a279993c77",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
@@ -1350,7 +1314,7 @@
        {
         "item_path": "02 - Something.mp3",
         "recording_id": "b849acd4-0638-49ea-8e40-7391613d4890",
-        "release_track_id": "a7bfe64c-2510-35d6-aac0-28c87b2b1235",
+        "release_track_id": "468290dd-eceb-40b2-a851-162cf46c9ae0",
         "track_index": 2,
         "medium": 1,
         "medium_index": 2,
@@ -1381,35 +1345,35 @@
      {
       "rank": 2,
       "data_source": "MusicBrainz",
-      "album_id": "d767bd8f-d503-4a4f-be8a-e495f854db6f",
+      "album_id": "d6010be3-98f8-422c-a6c9-787e2e491e58",
       "album": "Abbey Road",
       "artist": "The Beatles",
       "year": 1969,
-      "country": "XW",
-      "distance": 0.5206489675516224,
+      "country": "GB",
+      "distance": 0.5,
       "penalties": [
        [
         "country",
-        0.014749
+        0.015152
        ],
        [
         "data_source",
-        0.029499
+        0.030303
        ],
        [
         "missing_tracks",
-        0.424779
+        0.409091
        ],
        [
         "tracks",
-        0.051622
+        0.045455
        ]
       ],
       "mapping": [
        {
         "item_path": "01 - Come Together.mp3",
         "recording_id": "485bbe7f-d0f7-4ffe-8adb-0f1093dd2dbf",
-        "release_track_id": "187894fc-cc38-403c-a209-307cd4d3cc29",
+        "release_track_id": "af19bbfd-fb14-3d15-a6aa-8072cf06775a",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
@@ -1419,12 +1383,12 @@
        {
         "item_path": "02 - Something.mp3",
         "recording_id": "b849acd4-0638-49ea-8e40-7391613d4890",
-        "release_track_id": "0b3c4456-8772-482a-99e9-1a5379c82c79",
-        "track_index": 16,
+        "release_track_id": "1745aa16-a379-3623-93f1-43702101ce29",
+        "track_index": 2,
         "medium": 1,
-        "medium_index": 16,
+        "medium_index": 2,
         "title": "Something",
-        "track_distance": 0.5
+        "track_distance": 0.375
        }
       ],
       "extra_items": [],
@@ -1432,54 +1396,53 @@
        "a92380e6-f10d-4407-aceb-5825b17fed5a",
        "de896c41-463d-4eaa-8fe4-d826e2afa0f8",
        "15127932-c879-466e-b0f8-a1c5022d16e7",
+       "a9a83384-3da3-4c84-af6d-33fcdb1c3e27",
        "440f60e8-0b25-4ec4-abb1-c6beec624ab0",
        "1e1d1f33-346c-4f9a-ad05-03aa715c2f37",
        "474546e9-0b30-4881-9269-c6c1c8bbf07b",
+       "d057c75d-04eb-438f-be0b-74f629f2953c",
        "99c004fb-ba87-41be-afd4-e0157b40516a",
        "65ca55c8-d857-4a3b-9246-835b1e54fe4d",
        "c19db4d3-6640-4732-a0b2-e358ed80c5c4",
        "3d7f2000-123d-4cac-862b-e04ead24c5f2",
-       "5ad78393-77c2-451e-beb1-074df7e06e57",
-       "ed8d1b3b-8757-447a-baba-3efe027f2765",
-       "d057c75d-04eb-438f-be0b-74f629f2953c",
        "daaee15a-8a4c-4275-a7c1-5b6211f0ec69",
-       "de896c41-463d-4eaa-8fe4-d826e2afa0f8",
-       "a9a83384-3da3-4c84-af6d-33fcdb1c3e27"
+       "5ad78393-77c2-451e-beb1-074df7e06e57",
+       "ed8d1b3b-8757-447a-baba-3efe027f2765"
       ],
       "rendered_destinations": null
      },
      {
       "rank": 3,
       "data_source": "MusicBrainz",
-      "album_id": "8c6a00d5-8673-4aad-8192-5fe8649b5efa",
+      "album_id": "ffd6ebf5-10c1-3cca-915e-04c0aba926f3",
       "album": "Abbey Road",
       "artist": "The Beatles",
-      "year": 2019,
-      "country": "XE",
-      "distance": 0.6518987341772151,
+      "year": 1969,
+      "country": "US",
+      "distance": 0.5,
       "penalties": [
        [
         "country",
-        0.010549
+        0.015152
        ],
        [
         "data_source",
-        0.021097
+        0.030303
        ],
        [
         "missing_tracks",
-        0.588608
+        0.409091
        ],
        [
         "tracks",
-        0.031646
+        0.045455
        ]
       ],
       "mapping": [
        {
         "item_path": "01 - Come Together.mp3",
-        "recording_id": "23c9d649-d761-470e-88d5-05615eafea86",
-        "release_track_id": "ec3a2f93-8ded-40f2-b17f-a93a82b66d12",
+        "recording_id": "485bbe7f-d0f7-4ffe-8adb-0f1093dd2dbf",
+        "release_track_id": "24244f30-c3cf-307f-ab56-f03a59a848b1",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
@@ -1488,8 +1451,8 @@
        },
        {
         "item_path": "02 - Something.mp3",
-        "recording_id": "13927568-01f4-4c2f-8348-2ea5d3088689",
-        "release_track_id": "fbd67562-4519-4a2f-9d02-f35242259a3b",
+        "recording_id": "b849acd4-0638-49ea-8e40-7391613d4890",
+        "release_track_id": "8071bf5e-90b3-3b6a-8b1b-af9b04d26567",
         "track_index": 2,
         "medium": 1,
         "medium_index": 2,
@@ -1499,122 +1462,113 @@
       ],
       "extra_items": [],
       "extra_tracks": [
-       "87f3a51a-4545-43b3-97aa-b3317ce40687",
-       "b897a4f1-0312-4ca3-bca3-2209629e2aac",
-       "b00dbaea-565c-4e8c-b864-e765e6e8f22a",
-       "c6b8d004-957d-4637-a01b-ee84eed2470a",
-       "2685a315-282a-4dc3-98c5-31b71f3dedfc",
-       "6508d801-c799-4eb9-b96c-89fd1e96b554",
-       "15832e20-4273-47f9-8fe8-1d99de5867fa",
-       "7d75fbe8-a848-4b89-82af-69326afc4202",
-       "f5f541a1-fff3-49f8-b8cd-148d35d89c59",
-       "1a910833-4319-4282-903b-cbaad5a9dd55",
-       "9992422a-1bc3-4271-93ef-3e5939ab26b2",
-       "9cf269e6-4b82-46ec-ad44-86197c156fb0",
-       "093ac3c7-686f-4393-8842-6122ae7a33cd",
-       "8e927a1b-2e0d-4e54-b3d5-d03c13b2123a",
-       "b01fd42f-2c49-482c-bad4-bb4ee2110c33",
-       "6e110048-5c88-4366-b5bc-9593c294f66e",
-       "2847c343-0568-444f-9347-88126de0d041",
-       "5da5f2a5-dfc9-41d1-8bd0-cc9c6a9afaef",
-       "bb77ada8-1fee-4423-9cad-c8485d5415a6",
-       "8efe94a2-587a-42b3-a095-fe7be2463a04",
-       "8e09c8a2-439b-4f6d-897b-29556287d3de",
-       "18e0882f-e127-47f7-a634-da1d13b1a1fd",
-       "f63a9610-bfd9-4c4d-a96b-1bd707279b96",
-       "6ac26473-a1ed-4037-ab9f-d2c07ca5aeec",
-       "2fb516b0-c708-47c5-ad56-deb3b5e68ed8",
-       "f4992aa0-77c1-42e7-afa8-1db8fb81694b",
-       "732d5246-f2d9-4336-88c4-61042fa728c5",
-       "abb41dca-612a-40c8-8b58-f9c68142aa4e",
-       "795c2a7a-5524-4a4d-a9a3-9b0691742340",
-       "3383afc5-5c68-4dd6-b14c-c4371201d0c8",
-       "2a403dc9-a466-45a3-9478-39cde1289b37"
+       "a92380e6-f10d-4407-aceb-5825b17fed5a",
+       "de896c41-463d-4eaa-8fe4-d826e2afa0f8",
+       "15127932-c879-466e-b0f8-a1c5022d16e7",
+       "a9a83384-3da3-4c84-af6d-33fcdb1c3e27",
+       "440f60e8-0b25-4ec4-abb1-c6beec624ab0",
+       "1e1d1f33-346c-4f9a-ad05-03aa715c2f37",
+       "474546e9-0b30-4881-9269-c6c1c8bbf07b",
+       "d057c75d-04eb-438f-be0b-74f629f2953c",
+       "99c004fb-ba87-41be-afd4-e0157b40516a",
+       "65ca55c8-d857-4a3b-9246-835b1e54fe4d",
+       "c19db4d3-6640-4732-a0b2-e358ed80c5c4",
+       "3d7f2000-123d-4cac-862b-e04ead24c5f2",
+       "daaee15a-8a4c-4275-a7c1-5b6211f0ec69",
+       "5ad78393-77c2-451e-beb1-074df7e06e57",
+       "ed8d1b3b-8757-447a-baba-3efe027f2765"
       ],
       "rendered_destinations": null
      },
      {
       "rank": 4,
       "data_source": "MusicBrainz",
-      "album_id": "b25a1e5d-3247-41ea-9920-f93c58a6e479",
+      "album_id": "d23f0ad2-f0d5-4714-9fb0-ed80189799d3",
       "album": "Abbey Road",
       "artist": "The Beatles",
       "year": 2019,
-      "country": "JP",
-      "distance": 0.6518987341772151,
+      "country": "XW",
+      "distance": 0.6772191185599007,
       "penalties": [
        [
         "country",
-        0.010549
+        0.009311
        ],
        [
         "data_source",
-        0.021097
+        0.018622
        ],
        [
         "missing_tracks",
-        0.588608
+        0.636872
        ],
        [
         "tracks",
-        0.031646
+        0.012415
        ]
       ],
       "mapping": [
        {
         "item_path": "01 - Come Together.mp3",
-        "recording_id": "23c9d649-d761-470e-88d5-05615eafea86",
-        "release_track_id": "7c0fcafa-aa08-423d-8afc-8320eff4f705",
+        "recording_id": "24e7d0bc-1f5f-46a2-8e61-085a23104e34",
+        "release_track_id": "86d8e9be-cdbf-470f-bbf9-22769e9f4a6e",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
         "title": "Come Together",
-        "track_distance": 0.375
+        "track_distance": 0.16666666666666666
        },
        {
         "item_path": "02 - Something.mp3",
-        "recording_id": "13927568-01f4-4c2f-8348-2ea5d3088689",
-        "release_track_id": "2bd11b30-5472-4463-a8e0-acd20ea662f3",
+        "recording_id": "9dca2a96-76e1-428e-b83d-994385d721f5",
+        "release_track_id": "3444e10b-cbce-4f62-9437-9f344106293f",
         "track_index": 2,
         "medium": 1,
         "medium_index": 2,
         "title": "Something",
-        "track_distance": 0.375
+        "track_distance": 0.16666666666666666
        }
       ],
       "extra_items": [],
       "extra_tracks": [
-       "87f3a51a-4545-43b3-97aa-b3317ce40687",
-       "b897a4f1-0312-4ca3-bca3-2209629e2aac",
-       "b00dbaea-565c-4e8c-b864-e765e6e8f22a",
-       "c6b8d004-957d-4637-a01b-ee84eed2470a",
-       "2685a315-282a-4dc3-98c5-31b71f3dedfc",
-       "6508d801-c799-4eb9-b96c-89fd1e96b554",
-       "15832e20-4273-47f9-8fe8-1d99de5867fa",
-       "7d75fbe8-a848-4b89-82af-69326afc4202",
-       "f5f541a1-fff3-49f8-b8cd-148d35d89c59",
-       "1a910833-4319-4282-903b-cbaad5a9dd55",
-       "9992422a-1bc3-4271-93ef-3e5939ab26b2",
-       "9cf269e6-4b82-46ec-ad44-86197c156fb0",
-       "093ac3c7-686f-4393-8842-6122ae7a33cd",
-       "8e927a1b-2e0d-4e54-b3d5-d03c13b2123a",
-       "b01fd42f-2c49-482c-bad4-bb4ee2110c33",
-       "6e110048-5c88-4366-b5bc-9593c294f66e",
-       "2847c343-0568-444f-9347-88126de0d041",
-       "5da5f2a5-dfc9-41d1-8bd0-cc9c6a9afaef",
-       "bb77ada8-1fee-4423-9cad-c8485d5415a6",
-       "8efe94a2-587a-42b3-a095-fe7be2463a04",
-       "8e09c8a2-439b-4f6d-897b-29556287d3de",
-       "18e0882f-e127-47f7-a634-da1d13b1a1fd",
-       "f63a9610-bfd9-4c4d-a96b-1bd707279b96",
-       "6ac26473-a1ed-4037-ab9f-d2c07ca5aeec",
-       "2fb516b0-c708-47c5-ad56-deb3b5e68ed8",
-       "f4992aa0-77c1-42e7-afa8-1db8fb81694b",
-       "732d5246-f2d9-4336-88c4-61042fa728c5",
-       "abb41dca-612a-40c8-8b58-f9c68142aa4e",
-       "795c2a7a-5524-4a4d-a9a3-9b0691742340",
-       "3383afc5-5c68-4dd6-b14c-c4371201d0c8",
-       "2a403dc9-a466-45a3-9478-39cde1289b37"
+       "ad1b44ea-c0b2-49cd-a840-92aa5e4405b8",
+       "9dcd8bbb-53ee-4839-aac2-caa182b96fa6",
+       "93c6a4b3-1b29-41b2-9cb4-77ee26959e6c",
+       "69632776-2a5b-42fb-b86e-b42da56da533",
+       "074ad98f-c882-4009-9bed-fed7aa64d89e",
+       "909974db-2e9e-419b-bca7-09de1bedd8ce",
+       "bea22462-0217-4bb4-a254-7f211bb6aaaa",
+       "9fd0daac-d62d-4e3d-b9d9-338359236b69",
+       "ec4f2e1e-d952-40d4-a19b-079edb0df8e5",
+       "8af9d532-2fe0-4f9a-bce6-f5b794d2f38f",
+       "19f22df1-cd8f-4dd7-b1ce-9863f437c398",
+       "b368ab29-999f-4bcd-b3a5-be8d073ee505",
+       "3325b2e4-89b3-44c9-8048-7442b736727d",
+       "bfd4fd43-0961-4052-8d34-495dee48c7a7",
+       "93fa4b7d-852b-4e9b-83bd-cadda62a81b2",
+       "8fe0e2d5-21f1-4e77-a54d-740859a50286",
+       "b7441f8d-12bd-46a5-9ba2-3d9274d4fd36",
+       "c8221961-e967-4bc1-88e6-adbcb4d41bd2",
+       "890e2f01-c863-4089-a020-03c32e364ba1",
+       "aeed4f9e-c0b8-4e29-9893-d49e1028297b",
+       "8d593c02-441d-4128-9d10-d2d55ed34e34",
+       "b9cfcb2e-8ae5-4e6a-a31b-276cdd10e596",
+       "2e889dc3-d814-4eed-b0cd-548f2bb7355c",
+       "ab0a543a-2843-4886-8a7b-a404b8618ad1",
+       "2d08b254-e652-416b-9b20-b41391c62c03",
+       "2c572322-bd3b-458f-98c6-b6b3bef3121f",
+       "a70b0be2-0bf0-4c94-9998-ad17f5d15a9c",
+       "fd5f8160-1d40-49b2-ba3c-290c273f2e4b",
+       "cfcb43f4-003b-4d49-8c73-271eaf44dfcd",
+       "9edc52c8-1f26-4c8c-a151-bf67ffc758d9",
+       "d605e669-7cb0-4ee2-bf00-00207dfa748d",
+       "0da5d5ad-fb3b-4969-8b06-0a8b63ec599a",
+       "1f4a2019-7598-4886-aef8-ee4ae3f58657",
+       "f4ce7fce-270e-4344-9a6f-0e5195f8bed0",
+       "728643c5-8fe2-42e5-897f-6441f931e704",
+       "8de8e35a-03ea-439d-b526-68f0820d0d85",
+       "bd500e98-5593-4aa0-8ac8-820c33a56214",
+       "beca2251-cbf7-4ca2-ac54-8aa4dab32f9d"
       ],
       "rendered_destinations": null
      }
@@ -1629,6 +1583,89 @@
     "candidates": [
      {
       "rank": 0,
+      "data_source": "MusicBrainz",
+      "album_id": "0f4b21b8-6296-4820-b921-2977c86983f9",
+      "album": "Now That’s What I Call Music!",
+      "artist": "Various Artists",
+      "year": 1998,
+      "country": null,
+      "distance": 0.6198212618380685,
+      "penalties": [
+       [
+        "data_source",
+        0.031746
+       ],
+       [
+        "missing_tracks",
+        0.428571
+       ],
+       [
+        "tracks",
+        0.13456
+       ],
+       [
+        "year",
+        0.024943
+       ]
+      ],
+      "mapping": [
+       {
+        "item_path": "01 - Artist A.mp3",
+        "recording_id": "8a925d6f-49b8-4571-a013-f027ee572d36",
+        "release_track_id": "73c1eb62-4bc4-4718-a55a-59e4f400aeda",
+        "track_index": 1,
+        "medium": 1,
+        "medium_index": 1,
+        "title": "Together Again",
+        "track_distance": 0.6970588235294117
+       },
+       {
+        "item_path": "02 - Artist B.mp3",
+        "recording_id": "57a2b620-ba3a-4930-9c04-d46efa2d779c",
+        "release_track_id": "a2dc2f5f-3bd5-49e9-8d5e-859800cce4ce",
+        "track_index": 2,
+        "medium": 1,
+        "medium_index": 2,
+        "title": "As Long as You Love Me",
+        "track_distance": 0.707563025210084
+       },
+       {
+        "item_path": "03 - Artist C.mp3",
+        "recording_id": "a98e5696-1fee-4f82-9485-b308f7961bee",
+        "release_track_id": "f941f472-959f-4e27-92e8-7b87c6aab4db",
+        "track_index": 3,
+        "medium": 1,
+        "medium_index": 3,
+        "title": "The Way",
+        "track_distance": 0.7147058823529411
+       }
+      ],
+      "extra_items": [],
+      "extra_tracks": [
+       "74f57a08-cb01-4852-83db-60c4273b4207",
+       "f7e40c6e-3c42-4e93-b228-4a25d5f3d989",
+       "e8f5b5a8-1247-419f-bbb2-16f9ed308837",
+       "afaf9b75-3d21-4067-8267-41cdf66a96bb",
+       "48342b60-5d82-40cb-a9b9-0032afa45a68",
+       "8ff4f281-2c0d-443c-b1bf-83ce6167f6bb",
+       "5deaa027-ba57-4657-940c-7d40d23cc941",
+       "b944f19c-0a0c-4278-a613-c72ae8932232",
+       "f53a5256-7e84-457f-9b44-07b1d3f3351d",
+       "aaf7fdfb-3729-47ce-bc53-fb81f9407aee",
+       "5268ded7-3c3c-465b-805f-cb14e407ec2d",
+       "9e2ad5bc-c6f9-40d2-a36f-3122ee2072a3",
+       "bd75ee6c-a6c5-4c76-b062-bfd698fc2868",
+       "90f7b7f3-3815-4344-95ca-98b28b5591a5",
+       "5c1bc116-d8d4-409d-bd81-8cbda2e14dbe"
+      ],
+      "rendered_destinations": {
+       "01 - Artist A.mp3": "Compilations/Now That’s What I Call Music!/01 Together Again.mp3",
+       "02 - Artist B.mp3": "Compilations/Now That’s What I Call Music!/02 As Long as You Love Me.mp3",
+       "03 - Artist C.mp3": "Compilations/Now That’s What I Call Music!/03 The Way.mp3"
+      }
+     },
+     {
+      "rank": 1,
       "data_source": "MusicBrainz",
       "album_id": "68012214-a808-48e5-9428-72aeba3b4806",
       "album": "Now That’s What I Call Music",
@@ -1708,14 +1745,105 @@
        "3a1a6e53-1894-46aa-8500-9b0e0e4016b9",
        "b39b7227-c271-4ab8-912b-cb1fe2fc0e5e"
       ],
-      "rendered_destinations": {
-       "01 - Artist A.mp3": "Compilations/Now That’s What I Call Music/01 Tubthumping.mp3",
-       "02 - Artist B.mp3": "Compilations/Now That’s What I Call Music/02 Bitch.mp3",
-       "03 - Artist C.mp3": "Compilations/Now That’s What I Call Music/03 Alone.mp3"
-      }
+      "rendered_destinations": null
      },
      {
-      "rank": 1,
+      "rank": 2,
+      "data_source": "MusicBrainz",
+      "album_id": "7e917011-ab60-41c3-a65f-1fe2638e29ae",
+      "album": "Now That’s What I Call Music",
+      "artist": "Various Artists",
+      "year": 2018,
+      "country": "GB",
+      "distance": 0.7070362652052056,
+      "penalties": [
+       [
+        "country",
+        0.011682
+       ],
+       [
+        "data_source",
+        0.023364
+       ],
+       [
+        "missing_tracks",
+        0.567757
+       ],
+       [
+        "tracks",
+        0.103146
+       ],
+       [
+        "year",
+        0.001087
+       ]
+      ],
+      "mapping": [
+       {
+        "item_path": "01 - Artist A.mp3",
+        "recording_id": "ceda1798-b60e-43d8-9942-66da50d17b46",
+        "release_track_id": "6547aa89-d6d1-4b5b-b98b-6dbac8052030",
+        "track_index": 17,
+        "medium": 2,
+        "medium_index": 1,
+        "title": "Candy Girl",
+        "track_distance": 0.7270588235294118
+       },
+       {
+        "item_path": "02 - Artist B.mp3",
+        "recording_id": "311eb9c2-6134-4ec0-afa0-f9da9cc2a3c6",
+        "release_track_id": "533fe8b2-4d79-4564-8555-b1dbdf8106e4",
+        "track_index": 2,
+        "medium": 1,
+        "medium_index": 2,
+        "title": "Is There Something I Should Know",
+        "track_distance": 0.7355555555555555
+       },
+       {
+        "item_path": "03 - Artist C.mp3",
+        "recording_id": "4abdd671-d2f0-42cf-b350-6e7b72cf12a0",
+        "release_track_id": "a2559e6e-e51f-4f28-9a67-194b40d4002e",
+        "track_index": 19,
+        "medium": 2,
+        "medium_index": 3,
+        "title": "Let’s Stay Together",
+        "track_distance": 0.7447058823529411
+       }
+      ],
+      "extra_items": [],
+      "extra_tracks": [
+       "4010de72-311f-4868-b955-2940f3da433c",
+       "fa7a5f63-2129-431e-8385-aa437d09bea2",
+       "923c8318-ae9f-457e-ab71-91cada7226fc",
+       "a80f865a-2562-4a64-8285-5c1ce6bca1ee",
+       "47a30e99-13f3-4569-b31b-02a397034c24",
+       "395e480f-9677-4cee-b607-0809a9c74b06",
+       "282e6dc3-9953-422a-9f5a-7e3b3d43671e",
+       "f3a870a2-694b-479e-8b1b-1b881c645597",
+       "c589b499-94c2-47dd-9247-fdc478478231",
+       "25c03055-9001-4fbc-a41f-1754ddd0388d",
+       "a6d2e84c-416b-44fe-9b70-1c97d3ba94f4",
+       "78c2a211-1c63-48f1-ad20-28b70eb98491",
+       "f96f224a-6996-420b-a476-a674d27271a1",
+       "92f55048-544f-446f-80ca-276e01e6951e",
+       "4ce17508-1654-4e94-991e-f252e63137b3",
+       "08cb31bb-5ecd-4a53-b62b-c14e407db393",
+       "392ba41f-67d0-4cd9-9525-be9c3408b1b4",
+       "699d68ca-8019-48d9-a422-c09d7d42befb",
+       "79e7457f-b127-418e-b8e0-20a306957614",
+       "3e8f6736-bab4-489a-828c-18067222a350",
+       "367bc6d6-8659-4457-9730-67978a9c8337",
+       "6e5c252b-a34e-4167-acdf-bc9ddc2eeee5",
+       "69981f41-0370-4b48-a56a-667973aa54b0",
+       "1c19fbb9-edce-49e1-a934-de6071dd7964",
+       "f1d471a4-0506-4e2c-8314-5f5be4b5d578",
+       "a9ef4f82-f051-4816-bbe6-2c21f6ea8ad3",
+       "b4119270-856e-4c78-82e5-4731418d8132"
+      ],
+      "rendered_destinations": null
+     },
+     {
+      "rank": 3,
       "data_source": "MusicBrainz",
       "album_id": "3b7a8210-85f7-4413-98db-479bc7c0f0aa",
       "album": "Now That’s What I Call Music",
@@ -1810,7 +1938,7 @@
       "rendered_destinations": null
      },
      {
-      "rank": 2,
+      "rank": 4,
       "data_source": "MusicBrainz",
       "album_id": "e2efdc06-0fa7-4e9d-835c-2a99b255b4b6",
       "album": "Now That’s What I Call Music",
@@ -1901,206 +2029,6 @@
        "f1d471a4-0506-4e2c-8314-5f5be4b5d578",
        "a9ef4f82-f051-4816-bbe6-2c21f6ea8ad3",
        "b4119270-856e-4c78-82e5-4731418d8132"
-      ],
-      "rendered_destinations": null
-     },
-     {
-      "rank": 3,
-      "data_source": "MusicBrainz",
-      "album_id": "f42bca16-03a3-3373-9589-be16a4aa06b4",
-      "album": "Now That’s What I Call Music",
-      "artist": "Various Artists",
-      "year": 1983,
-      "country": "GB",
-      "distance": 0.7265914059603411,
-      "penalties": [
-       [
-        "country",
-        0.011682
-       ],
-       [
-        "data_source",
-        0.023364
-       ],
-       [
-        "missing_tracks",
-        0.567757
-       ],
-       [
-        "tracks",
-        0.103683
-       ],
-       [
-        "year",
-        0.020104
-       ]
-      ],
-      "mapping": [
-       {
-        "item_path": "01 - Artist A.mp3",
-        "recording_id": "ceda1798-b60e-43d8-9942-66da50d17b46",
-        "release_track_id": "1696b6d3-b02a-36c3-ae7e-29875fcc9819",
-        "track_index": 17,
-        "medium": 2,
-        "medium_index": 1,
-        "title": "Candy Girl",
-        "track_distance": 0.7270588235294118
-       },
-       {
-        "item_path": "02 - Artist B.mp3",
-        "recording_id": "08cb31bb-5ecd-4a53-b62b-c14e407db393",
-        "release_track_id": "6696e58f-d8f4-3950-90e7-686cde315553",
-        "track_index": 18,
-        "medium": 2,
-        "medium_index": 2,
-        "title": "Big Apple (Metro mix)",
-        "track_distance": 0.7270588235294118
-       },
-       {
-        "item_path": "03 - Artist C.mp3",
-        "recording_id": "fa7a5f63-2129-431e-8385-aa437d09bea2",
-        "release_track_id": "40011638-89d7-30be-a378-44c6bfef2e6e",
-        "track_index": 3,
-        "medium": 1,
-        "medium_index": 3,
-        "title": "Red Red Wine",
-        "track_distance": 0.7647058823529411
-       }
-      ],
-      "extra_items": [],
-      "extra_tracks": [
-       "4010de72-311f-4868-b955-2940f3da433c",
-       "311eb9c2-6134-4ec0-afa0-f9da9cc2a3c6",
-       "923c8318-ae9f-457e-ab71-91cada7226fc",
-       "a80f865a-2562-4a64-8285-5c1ce6bca1ee",
-       "47a30e99-13f3-4569-b31b-02a397034c24",
-       "395e480f-9677-4cee-b607-0809a9c74b06",
-       "282e6dc3-9953-422a-9f5a-7e3b3d43671e",
-       "f3a870a2-694b-479e-8b1b-1b881c645597",
-       "c589b499-94c2-47dd-9247-fdc478478231",
-       "25c03055-9001-4fbc-a41f-1754ddd0388d",
-       "a6d2e84c-416b-44fe-9b70-1c97d3ba94f4",
-       "78c2a211-1c63-48f1-ad20-28b70eb98491",
-       "f96f224a-6996-420b-a476-a674d27271a1",
-       "92f55048-544f-446f-80ca-276e01e6951e",
-       "63ab4375-735e-4679-af57-743869d637b1",
-       "4abdd671-d2f0-42cf-b350-6e7b72cf12a0",
-       "392ba41f-67d0-4cd9-9525-be9c3408b1b4",
-       "699d68ca-8019-48d9-a422-c09d7d42befb",
-       "79e7457f-b127-418e-b8e0-20a306957614",
-       "3e8f6736-bab4-489a-828c-18067222a350",
-       "367bc6d6-8659-4457-9730-67978a9c8337",
-       "6e5c252b-a34e-4167-acdf-bc9ddc2eeee5",
-       "69981f41-0370-4b48-a56a-667973aa54b0",
-       "1c19fbb9-edce-49e1-a934-de6071dd7964",
-       "f1d471a4-0506-4e2c-8314-5f5be4b5d578",
-       "a9ef4f82-f051-4816-bbe6-2c21f6ea8ad3",
-       "b4119270-856e-4c78-82e5-4731418d8132"
-      ],
-      "rendered_destinations": null
-     },
-     {
-      "rank": 4,
-      "data_source": "MusicBrainz",
-      "album_id": "0cd128af-de61-43d4-af44-de6880925135",
-      "album": "Now That’s What I Call Music!",
-      "artist": "Various Artists",
-      "year": 1999,
-      "country": "IL",
-      "distance": 0.7671740907035025,
-      "penalties": [
-       [
-        "country",
-        0.009653
-       ],
-       [
-        "data_source",
-        0.019305
-       ],
-       [
-        "missing_tracks",
-        0.642857
-       ],
-       [
-        "tracks",
-        0.080344
-       ],
-       [
-        "year",
-        0.015015
-       ]
-      ],
-      "mapping": [
-       {
-        "item_path": "01 - Artist A.mp3",
-        "recording_id": "5cbfd195-aeb8-4c81-b6a5-c35fc565f0fd",
-        "release_track_id": "af3abcf2-ceb2-4ff9-8506-d6d49b001179",
-        "track_index": 1,
-        "medium": 1,
-        "medium_index": 1,
-        "title": "Bailamos",
-        "track_distance": 0.676078431372549
-       },
-       {
-        "item_path": "02 - Artist B.mp3",
-        "recording_id": "bb43f799-654e-4b90-bebc-f91805c021ff",
-        "release_track_id": "1d194eb7-3885-4825-841a-0941dc46262e",
-        "track_index": 22,
-        "medium": 2,
-        "medium_index": 2,
-        "title": "Mi chico latino",
-        "track_distance": 0.6986425339366515
-       },
-       {
-        "item_path": "03 - Artist C.mp3",
-        "recording_id": "b34c9152-3dc1-4164-b11c-0f8e62527dd0",
-        "release_track_id": "110cfb71-4b05-4fe0-980c-404f0d2cb5c3",
-        "track_index": 3,
-        "medium": 1,
-        "medium_index": 3,
-        "title": "Crazy (The Stop remix)",
-        "track_distance": 0.7061990950226245
-       }
-      ],
-      "extra_items": [],
-      "extra_tracks": [
-       "4eef9bfd-80f3-4b10-9817-341bc1c9f054",
-       "ae91eb81-2a3c-4295-924b-80156a2499e4",
-       "0d055164-a3cc-4009-b2e2-5337cde4046b",
-       "6a17d355-4b9c-4b2f-a782-9bc25f8e0f57",
-       "bcb51cb4-6d51-46c8-b2a1-efe1135a4464",
-       "5b036d5e-70ee-4c1d-b17a-6206ba0dde79",
-       "abc955d5-d68c-4a08-a964-3ea9e287356c",
-       "55739218-1e87-4e5f-b6fd-858765e953b8",
-       "d1fca7bc-017c-44d1-9486-e9090a2d97a9",
-       "58e45486-bfca-4c19-88d9-a87a282866b0",
-       "989b5f2b-13cc-41bc-b7a5-3d5b03241e10",
-       "c1f3271d-46b5-487f-8b64-5cf64bd99c53",
-       "3fb1802c-2de6-40eb-be90-f8c48a24d228",
-       "7cb85403-034e-4549-985b-956e35f99b47",
-       "e7a17a47-8694-4a75-b3bd-4c4a92844105",
-       "0441ad23-6bc2-46ef-83d7-7269bcb66969",
-       "ced1e91f-23a4-40f1-a919-176068359c85",
-       "e24e9515-e639-4d63-a285-391bf16d5478",
-       "d48db0f4-fab6-4d18-bc1f-aec43772af96",
-       "0eba2796-58a6-4284-9158-e4ae4d009ecb",
-       "e9dbdfce-cdbb-4a48-b95c-e316fffc187e",
-       "2a93defa-ffcc-4046-81b0-8a8a4c6b7d54",
-       "a4b355b9-a10f-42ea-a662-c75e2b2cdb2c",
-       "78a88f5d-0098-4958-b819-e454b83167dd",
-       "7cc30a2d-b840-48f9-8489-73536ca7b811",
-       "db9a5e01-43eb-44fa-95c8-150839d9ba18",
-       "70d99714-fdfc-49c0-9aab-1debe3276dd1",
-       "55ed1f4f-fe60-4be3-ba3b-4f589d2460bc",
-       "c07b628b-2f51-4a80-be88-03d23b4734aa",
-       "a1a4e180-a602-4104-afed-b5fcc1c06271",
-       "2e606c1e-3f7c-4700-891f-460dc4848dd0",
-       "d3842a78-ac75-42c0-bede-49fa269fccf4",
-       "6c4ffe28-2bdc-43cd-9a5c-d451ec29c2ac",
-       "ddc3dd92-4149-4f42-99ff-4883eb48bdb7",
-       "b9366e4d-6a36-4bd7-aaa7-135a861868d7",
-       "b76095a3-0d7f-4418-90d2-6830ecb0dc6e",
-       "214e9f65-64c9-46eb-ad65-e15e32660aec"
       ],
       "rendered_destinations": null
      }
@@ -2174,10 +2102,6 @@
    [
     "open-write",
     "/Users/<user>/Projects/MP3LibraryTool/m0/scratch/http_cache.json"
-   ],
-   [
-    "open-write",
-    "/Users/<user>/Projects/MP3LibraryTool/m0/scratch/http_cache.json"
    ]
   ],
   "fs_diff": {},
@@ -2185,37 +2109,37 @@
    "01_clean_baseline": {
     "kind": "album",
     "n_items": 2,
-    "elapsed_s": 3.5,
+    "elapsed_s": 4.5,
     "recommendation": "none",
     "candidates": [
      {
       "rank": 0,
       "data_source": "MusicBrainz",
-      "album_id": "e50d234a-3737-4f57-a363-0ce3b083d80f",
+      "album_id": "b25a1e5d-3247-41ea-9920-f93c58a6e479",
       "album": "Abbey Road",
       "artist": "The Beatles",
-      "year": 1992,
-      "country": "XE",
-      "distance": 0.6133333333333334,
+      "year": 2019,
+      "country": "JP",
+      "distance": 0.754653130287648,
       "penalties": [
        [
         "country",
-        0.02
+        0.01269
        ],
        [
         "missing_tracks",
-        0.54
+        0.708122
        ],
        [
         "tracks",
-        0.053333
+        0.033841
        ]
       ],
       "mapping": [
        {
         "item_path": "01 - Come Together.mp3",
-        "recording_id": "485bbe7f-d0f7-4ffe-8adb-0f1093dd2dbf",
-        "release_track_id": "b5714878-4c4b-406f-ba94-b17eb7ed5f1d",
+        "recording_id": "23c9d649-d761-470e-88d5-05615eafea86",
+        "release_track_id": "7c0fcafa-aa08-423d-8afc-8320eff4f705",
         "track_index": 1,
         "medium": 1,
         "medium_index": 1,
@@ -2224,8 +2148,8 @@
        },
        {
         "item_path": "02 - Something.mp3",
-        "recording_id": "b849acd4-0638-49ea-8e40-7391613d4890",
-        "release_track_id": "ed9c909f-5d1c-4fbe-ae71-44584a00a971",
+        "recording_id": "13927568-01f4-4c2f-8348-2ea5d3088689",
+        "release_track_id": "2bd11b30-5472-4463-a8e0-acd20ea662f3",
         "track_index": 2,
         "medium": 1,
         "medium_index": 2,
@@ -2235,21 +2159,37 @@
       ],
       "extra_items": [],
       "extra_tracks": [
-       "a92380e6-f10d-4407-aceb-5825b17fed5a",
-       "de896c41-463d-4eaa-8fe4-d826e2afa0f8",
-       "15127932-c879-466e-b0f8-a1c5022d16e7",
-       "a9a83384-3da3-4c84-af6d-33fcdb1c3e27",
-       "440f60e8-0b25-4ec4-abb1-c6beec624ab0",
-       "1e1d1f33-346c-4f9a-ad05-03aa715c2f37",
-       "474546e9-0b30-4881-9269-c6c1c8bbf07b",
-       "d057c75d-04eb-438f-be0b-74f629f2953c",
-       "99c004fb-ba87-41be-afd4-e0157b40516a",
-       "65ca55c8-d857-4a3b-9246-835b1e54fe4d",
-       "c19db4d3-6640-4732-a0b2-e358ed80c5c4",
-       "3d7f2000-123d-4cac-862b-e04ead24c5f2",
-       "daaee15a-8a4c-4275-a7c1-5b6211f0ec69",
-       "5ad78393-77c2-451e-beb1-074df7e06e57",
-       "ed8d1b3b-8757-447a-baba-3efe027f2765"
+       "87f3a51a-4545-43b3-97aa-b3317ce40687",
+       "b897a4f1-0312-4ca3-bca3-2209629e2aac",
+       "b00dbaea-565c-4e8c-b864-e765e6e8f22a",
+       "c6b8d004-957d-4637-a01b-ee84eed2470a",
+       "2685a315-282a-4dc3-98c5-31b71f3dedfc",
+       "6508d801-c799-4eb9-b96c-89fd1e96b554",
+       "15832e20-4273-47f9-8fe8-1d99de5867fa",
+       "7d75fbe8-a848-4b89-82af-69326afc4202",
+       "f5f541a1-fff3-49f8-b8cd-148d35d89c59",
+       "1a910833-4319-4282-903b-cbaad5a9dd55",
+       "9992422a-1bc3-4271-93ef-3e5939ab26b2",
+       "9cf269e6-4b82-46ec-ad44-86197c156fb0",
+       "093ac3c7-686f-4393-8842-6122ae7a33cd",
+       "8e927a1b-2e0d-4e54-b3d5-d03c13b2123a",
+       "b01fd42f-2c49-482c-bad4-bb4ee2110c33",
+       "6e110048-5c88-4366-b5bc-9593c294f66e",
+       "2847c343-0568-444f-9347-88126de0d041",
+       "5da5f2a5-dfc9-41d1-8bd0-cc9c6a9afaef",
+       "bb77ada8-1fee-4423-9cad-c8485d5415a6",
+       "8efe94a2-587a-42b3-a095-fe7be2463a04",
+       "8e09c8a2-439b-4f6d-897b-29556287d3de",
+       "18e0882f-e127-47f7-a634-da1d13b1a1fd",
+       "f63a9610-bfd9-4c4d-a96b-1bd707279b96",
+       "6ac26473-a1ed-4037-ab9f-d2c07ca5aeec",
+       "2fb516b0-c708-47c5-ad56-deb3b5e68ed8",
+       "f4992aa0-77c1-42e7-afa8-1db8fb81694b",
+       "732d5246-f2d9-4336-88c4-61042fa728c5",
+       "abb41dca-612a-40c8-8b58-f9c68142aa4e",
+       "795c2a7a-5524-4a4d-a9a3-9b0691742340",
+       "3383afc5-5c68-4dd6-b14c-c4371201d0c8",
+       "2a403dc9-a466-45a3-9478-39cde1289b37"
       ],
       "rendered_destinations": {
        "01 - Come Together.mp3": "The Beatles/Abbey Road/01-01 Come Together.mp3",
@@ -2345,7 +2285,7 @@
    "06_compilation": {
     "kind": "album",
     "n_items": 3,
-    "elapsed_s": 2.7,
+    "elapsed_s": 2.2,
     "recommendation": "none",
     "candidates": [
      {
@@ -2553,7 +2493,7 @@
     "album": 9.0
    },
    "mb_search_limit": 5,
-   "acoustid_key": "1v…En (len 8)"
+   "acoustid_key": "Cs…dm (len 10)"
   },
   "reset": "full",
   "state_at_start": {
@@ -2578,7 +2518,7 @@
    "distance_weight_album": 9.0,
    "distance_weight_track_title": 3.0,
    "chroma_cached_paths": 0,
-   "chroma_api_key": "1v…En (len 8)"
+   "chroma_api_key": "Cs…dm (len 10)"
   },
   "state_at_end": {
    "loaded_plugins": [
@@ -2602,7 +2542,7 @@
    "distance_weight_album": 9.0,
    "distance_weight_track_title": 3.0,
    "chroma_cached_paths": 1,
-   "chroma_api_key": "1v…En (len 8)"
+   "chroma_api_key": "Cs…dm (len 10)"
   },
   "fs_events": [
    [
@@ -2620,7 +2560,7 @@
     "kind": "album",
     "n_items": 1,
     "acoustid_matched_items": 0,
-    "elapsed_s": 5.8,
+    "elapsed_s": 5.5,
     "recommendation": "none",
     "candidates": [
      {
@@ -2948,7 +2888,7 @@
     "album": 9.0
    },
    "mb_search_limit": 5,
-   "acoustid_key": "1v…En (len 8)"
+   "acoustid_key": "Cs…dm (len 10)"
   },
   "reset": "full",
   "state_at_start": {
@@ -2973,7 +2913,7 @@
    "distance_weight_album": 9.0,
    "distance_weight_track_title": 3.0,
    "chroma_cached_paths": 0,
-   "chroma_api_key": "1v…En (len 8)"
+   "chroma_api_key": "Cs…dm (len 10)"
   },
   "state_at_end": {
    "loaded_plugins": [
@@ -2997,7 +2937,7 @@
    "distance_weight_album": 9.0,
    "distance_weight_track_title": 3.0,
    "chroma_cached_paths": 78,
-   "chroma_api_key": "1v…En (len 8)"
+   "chroma_api_key": "Cs…dm (len 10)"
   },
   "fs_events": [
    [
@@ -3990,7 +3930,7 @@
     "kind": "album",
     "n_items": 1,
     "acoustid_matched_items": 0,
-    "elapsed_s": 6.2,
+    "elapsed_s": 7.2,
     "recommendation": "none",
     "candidates": [
      {
@@ -4360,7 +4300,7 @@
     "kind": "album",
     "n_items": 25,
     "acoustid_matched_items": 25,
-    "elapsed_s": 10.9,
+    "elapsed_s": 12.4,
     "recommendation": "medium",
     "candidates": [
      {
@@ -6657,38 +6597,38 @@
       "candidates": [
        {
         "rank": 0,
-        "recording_id": "a4fa0e2f-d5c6-4d45-8c1f-f3b7a01c80b1",
-        "title": "这一瞬间",
+        "recording_id": "0bd04e1e-6327-4e98-a1fe-0492af3c9aab",
+        "title": "外面",
         "artist": "童丽",
-        "distance": 0.39453335142224044
+        "distance": 0.37205984714873624
        },
        {
         "rank": 1,
-        "recording_id": "fa2153e2-db48-4f1b-b708-bd73c093e5e9",
-        "title": "重相逢",
+        "recording_id": "58662e82-baa7-4729-a005-0ef2aed07342",
+        "title": "桃花朵朵開",
         "artist": "童丽",
-        "distance": 0.43090417401528497
+        "distance": 0.3777777777777778
        },
        {
         "rank": 2,
-        "recording_id": "806f00ef-0d6c-4317-8ba6-b97fc4cbd500",
-        "title": "月儿弯弯照九州",
+        "recording_id": "ccf5755c-db2a-4781-b9ca-df01e36d019f",
+        "title": "庭院深深",
         "artist": "童丽",
-        "distance": 0.4720297151408261
+        "distance": 0.49029570840681935
        },
        {
         "rank": 3,
-        "recording_id": "71f53fe1-6a7f-463e-ac5d-51055fc77a86",
-        "title": "都是你",
+        "recording_id": "9e0bef70-50ea-4034-b06e-36a365a32be3",
+        "title": "知音",
         "artist": "童丽",
-        "distance": 0.5315179306290416
+        "distance": 0.5208512639623749
        },
        {
         "rank": 4,
-        "recording_id": "c729c134-57f6-4cdc-983a-393d346d46c1",
-        "title": "二月里来",
+        "recording_id": "80149828-3faf-4059-81de-37406aefdd8d",
+        "title": "失恋追想曲",
         "artist": "童丽",
-        "distance": 0.6388888888888888
+        "distance": 0.6111111111111112
        }
       ]
      },
@@ -6698,10 +6638,10 @@
       "candidates": [
        {
         "rank": 0,
-        "recording_id": "a47392d3-fc91-4616-81b3-7e3cbce5366f",
+        "recording_id": "ef5db82e-2a99-4442-8b99-7ce6016f22b8",
         "title": "I Love You, I Love You, I Love You",
-        "artist": "Ronnie McDowell",
-        "distance": 0.4995562610229276
+        "artist": "Dimensional Fatality",
+        "distance": 0.48804353476283285
        },
        {
         "rank": 1,
@@ -6780,38 +6720,38 @@
       "candidates": [
        {
         "rank": 0,
+        "recording_id": "e25f81be-4b6c-4091-807c-50163694c062",
+        "title": "Home, home, home",
+        "artist": "Duo de Pelikaan",
+        "distance": 0.5883000432841703
+       },
+       {
+        "rank": 1,
         "recording_id": "eed857e3-6aed-41ba-aaf3-c1ac3af6e3b3",
         "title": "Home Home Home",
         "artist": "Wandering Lucy",
         "distance": 0.6987179487179487
        },
        {
-        "rank": 1,
-        "recording_id": "93f203ff-7582-43d0-a034-d4dacfaceee5",
-        "title": "Home, Home Home",
-        "artist": "rådiövölnå",
-        "distance": 0.7055555555555555
-       },
-       {
         "rank": 2,
-        "recording_id": "d698009e-b891-4edf-a74d-b66edff099d8",
+        "recording_id": "b840be91-1d27-4b04-897c-2158ba4b5487",
         "title": "Home Home Home",
-        "artist": "Stranger Cole & Ken Boothe",
-        "distance": 0.712962962962963
+        "artist": "The Skatalites",
+        "distance": 0.6987179487179487
        },
        {
         "rank": 3,
-        "recording_id": "3a406049-9a30-47e9-b472-d59e358053d3",
-        "title": "Home Home Home",
-        "artist": "The Yarmouth Shantymen",
-        "distance": 0.7166666666666667
-       },
-       {
-        "rank": 4,
         "recording_id": "5e227bb1-b0c3-4404-851e-dc7cc21e21aa",
         "title": "Home, Home, Home",
         "artist": "Ken Boothe",
         "distance": 0.7253086419753086
+       },
+       {
+        "rank": 4,
+        "recording_id": "d6073fc0-ee34-406b-971a-39317b9122e1",
+        "title": "Home, Home, Home",
+        "artist": "Derrick Harriott",
+        "distance": 0.7351851851851853
        }
       ]
      },
@@ -6944,31 +6884,31 @@
       "candidates": [
        {
         "rank": 0,
-        "recording_id": "a086f42b-d407-4ab9-94d6-2104a78a257a",
-        "title": "River, River",
-        "artist": "La Ponto Ensemblo",
-        "distance": 0.662962962962963
+        "recording_id": "78c125b2-9d3a-4b33-8f42-d9178daa0a19",
+        "title": "River River",
+        "artist": "Fixity",
+        "distance": 0.5576597295708408
        },
        {
         "rank": 1,
-        "recording_id": "19c2d15e-3b94-4ea5-8320-f76ae5c8d2e8",
-        "title": "River, River",
-        "artist": "Matthew \"Doc\" Dunn",
-        "distance": 0.6904761904761905
+        "recording_id": "a266e0c1-2f18-4e39-be21-01730006a703",
+        "title": "River River",
+        "artist": "Rita Moreno",
+        "distance": 0.6777777777777777
        },
        {
         "rank": 2,
-        "recording_id": "95e7af79-f2d5-4a7a-91d5-cafb357867e3",
-        "title": "River River",
-        "artist": "Qadasi & Maqhinga",
-        "distance": 0.696078431372549
+        "recording_id": "885e25df-333e-4ce8-a1d0-79ff0cd9a6a6",
+        "title": "River, River",
+        "artist": "Richard McLester",
+        "distance": 0.704830099941211
        },
        {
         "rank": 3,
-        "recording_id": "3f0d1a76-67f5-4017-8d0f-055856b92613",
+        "recording_id": "899c69e5-0724-4d1d-b945-68c1485d1ed4",
         "title": "River River",
-        "artist": "Spencer Krug",
-        "distance": 0.702020202020202
+        "artist": "Fixity",
+        "distance": 0.7222222222222222
        },
        {
         "rank": 4,
@@ -7115,10 +7055,10 @@
        },
        {
         "rank": 1,
-        "recording_id": "2f579668-8a8e-42ba-bfd5-b234d0cf4ed4",
-        "title": "my love my love my love",
-        "artist": "yung kai",
-        "distance": 0.6640211640211641
+        "recording_id": "012cf134-7424-48b7-9ba7-096466fca437",
+        "title": "My Love, My Love, My Love",
+        "artist": "Shy Kids",
+        "distance": 0.5370370370370371
        },
        {
         "rank": 2,
@@ -7197,23 +7137,23 @@
        },
        {
         "rank": 1,
-        "recording_id": "10d82df4-455e-4ac6-9f3c-e4ec141462e8",
-        "title": "You’re No Good",
-        "artist": "ESG",
-        "distance": 0.5185185185185186
-       },
-       {
-        "rank": 2,
         "recording_id": "fda8a640-5fa7-4cff-9d8f-a141d9a3d26e",
         "title": "You’re No Good",
         "artist": "Linda Ronstadt",
         "distance": 0.5213675213675214
        },
        {
-        "rank": 3,
-        "recording_id": "03e58062-32dc-459f-bed2-24afae09a893",
+        "rank": 2,
+        "recording_id": "68826695-e4f8-4171-9f8e-1cc8622f1a31",
         "title": "You’re No Good",
-        "artist": "Reba McEntire",
+        "artist": "Linda Ronstadt",
+        "distance": 0.5213675213675214
+       },
+       {
+        "rank": 3,
+        "recording_id": "97989d3b-a9e6-43b9-b97d-0eb036f802a5",
+        "title": "You’re No Good",
+        "artist": "Betty Everett",
         "distance": 0.537037037037037
        },
        {
