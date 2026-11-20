@@ -6,6 +6,15 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 
 ## [Unreleased]
 
+### Added
+- User documentation: a complete install and first-run path in the README, a [User guide](docs/USER_GUIDE.md),
+  [Recovery and safety](docs/RECOVERY.md), [Configuration](docs/CONFIGURATION.md) (naming defaults with examples,
+  credentials, data locations, what is sent online) and [Architecture](docs/ARCHITECTURE.md). (Codex review)
+
+### Fixed
+- Documentation accuracy: what the app reads and writes, NAS publishing marked experimental with its residual
+  limitation, beets' license (MIT), the process model, milestone status.
+
 ### Changed
 - CI: GitHub Actions updated to actions/checkout v7 and actions/setup-python v7 (Node.js 20 is deprecated on runners).
 
