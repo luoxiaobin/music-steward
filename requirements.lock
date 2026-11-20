@@ -10,7 +10,6 @@ iniconfig==2.3.1
 jellyfish==1.3.0
 lap==0.5.14
 mediafile==0.17.0
--e git+https://github.com/luoxiaobin/MP3LibraryTool.git@0f5ceee67ffb08008fb607f73bc027ff60cd2715#egg=music_steward
 mutagen==1.48.1
 numpy==2.5.5
 oauthlib==4.0.1
