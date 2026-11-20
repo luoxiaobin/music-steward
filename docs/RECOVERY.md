@@ -20,17 +20,30 @@ What Music Steward guarantees, what it does not, and what to do when something i
 | The app quit, crashed, or the Mac lost power | Recognition: the album being matched is redone next time. Apply: possibly one temporary file `.<name>.mlt-<run>-<op>.tmp…` in the destination | Apply: **Resume** — it reads the journal, cleans up temporary files and continues |
 | The NAS or drive disconnected during a **scan** | The scan stops and marks **nothing** as removed | Reconnect, scan again |
 | …during **recognition** | Affected albums show *Error* with the reason | Reconnect, **Recognize folder** again (errors are retried) |
-| …during **apply** | Affected files are marked failed; no partial file under a final name | Reconnect, **Resume** |
+| …during **apply** | Files that hit the error are marked **failed**; no partial file under a final name | Reconnect, then **apply the same plan again** (below) — Resume does not retry failed files |
 
 Tested on 329 albums of a real collection: Ctrl-C and a hard kill during recognition, both resumed with **0 albums
 redone and 0 left stuck**; Ctrl-C and a hard kill during a 14 GB apply, both resumed, with **every source file
 unchanged** and undo removing every copy (see [PLAN.md item 19](PLAN.md)).
 
-### Resume, not Apply again
+### Resume or apply again?
 
-After an interruption use **Resume** on that run. Applying the same plan again starts a *second* run: files the first
-run already published are reported as "already exists" (identical) or blocked (different), which is safe but
-confusing, and undo then needs both runs.
+A run's files end in one of two kinds of state:
+
+* **Not started yet** — the run was stopped, or the app quit or crashed. **Resume** on that run (or
+  `music-steward resume <run>`) finishes these. Use Resume whenever the run was *interrupted*.
+* **Failed** — the file was attempted and hit an error (drive or NAS disconnected, disk full, a tag write that failed).
+  A failed file is final for that run: **Resume does not retry it.** The run's summary lists failed files with the
+  reason.
+
+To retry failed files, fix the cause (reconnect, free space), then **apply the same plan again**. That starts a second
+run: files the first run already published are recognized as identical and reported as "already existed" (left
+alone); the failed files are copied. Two things to know:
+
+* **Undo then needs both runs** — the second run's undo removes only the files *it* copied; undo the first run as well
+  to remove everything.
+* If a file is reported as blocked ("a different file is already there"), something else wrote that name in the
+  meantime; check it before removing it yourself.
 
 ## Conflicts are reported, never resolved by overwriting
 

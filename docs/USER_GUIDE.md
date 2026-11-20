@@ -122,7 +122,9 @@ Click **Review plan → Build plan**. Building a plan writes nothing. The plan s
 
 Click **Apply · copy N files**. Each file is copied, tagged (the copy only), verified (the audio bytes must be
 identical to the original) and only then given its final name. A progress bar shows files, size, speed and time
-left. **Stop** halts after the current file; **Resume** later continues. See [Recovery and safety](RECOVERY.md).
+left. **Stop** halts after the current file; **Resume** later continues. Files that *failed* (for example the drive
+disconnected) are not retried by Resume: fix the cause and apply the same plan again. See
+[Recovery and safety](RECOVERY.md#resume-or-apply-again).
 
 ## 9. Check the result
 
