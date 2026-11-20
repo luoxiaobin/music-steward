@@ -441,13 +441,36 @@ function renderUnitDetail(d) {
         "The files themselves are unchanged.") : null),
     list];
   if (chosen && chosen.tracks.length) {
+    const player = h("audio", { id: "unitPlayer", controls: true, preload: "none", style: "width:100%" });
+    const nowPlaying = h("div", { class: "muted small", id: "nowPlaying" }, "Press ▶ to listen to a track.");
+    player.addEventListener("error", () => { nowPlaying.textContent = "This track could not be played (preview failed)."; });
+    const srcFor = t => {
+      if (d.kind === "cue") {
+        const sl = (d.cue_slices || {})[String(t.cue_track)];
+        return sl ? `/api/preview/${d.audio_file_id}?start=${sl[0]}&dur=${sl[1] || ""}` : null;
+      }
+      const f = files[t.file_id];
+      if (!f) return null;
+      const ext = (f.relpath.split(".").pop() || "").toLowerCase();
+      return ["mp3", "m4a", "aac", "flac", "wav", "ogg", "opus"].includes(ext) ? `/api/audio/${f.id}` : `/api/preview/${f.id}`;
+    };
+    const play = (t, label) => {
+      const src = srcFor(t);
+      if (!src) return;
+      nowPlaying.textContent = `Preparing ${label}…`;
+      player.src = src;
+      player.play().then(() => { nowPlaying.textContent = `Playing ${label}`; }).catch(() => {});
+    };
     const rows = chosen.tracks.map(t => h("tr", {},
+      h("td", { class: "playcol" }, srcFor(t) ? h("button", { type: "button", class: "playbtn", "aria-label": "Play",
+        onclick: () => play(t, t.label || `${t.medium_index ?? t.track_index}. ${t.title}`) }, "▶") : null),
       h("td", { class: "mono" }, t.label || (files[t.file_id]?.relpath || "").split("/").pop()),
       h("td", {}, `${chosen.mediums > 1 ? t.medium + "-" : ""}${t.medium_index ?? t.track_index}. ${t.title}`),
       chosen.source === "Local" ? h("td", { class: "muted" }, "own info")
         : h("td", { class: t.track_distance > 0.3 ? "warn" : "ok" }, t.track_distance > 0.3 ? `check (${t.track_distance.toFixed(2)})` : "✓")));
     parts.push(h("div", {}, h("h3", {}, "Track mapping"), h("table", { class: "kv" },
-      h("thead", {}, h("tr", {}, h("th", {}, "Source file"), h("th", {}, "Release track"), h("th", {}, "Check"))), h("tbody", {}, rows))));
+      h("thead", {}, h("tr", {}, h("th", {}, ""), h("th", {}, "Source file"), h("th", {}, "Release track"), h("th", {}, "Check"))), h("tbody", {}, rows))));
+    parts[parts.length - 1].insertBefore(h("div", { class: "playerbox" }, player, nowPlaying), parts[parts.length - 1].children[1]);
   }
   // ---- Edit fields (only for the accepted release) ----
   const accepted = d.decision && d.decision.action === "accept" && d.decision.candidate_id === chosen?.id;
@@ -656,7 +679,9 @@ async function selectFile(f, tr) {
       h("li", { class: "small mono" }, s.relpath.split("/").pop(), s.matches_track ? h("span", { class: "muted" }, "  (goes with this track)") : null)))));
   parts.push(h("div", {}, h("h3", {}, "Preview"),
     d.playable ? h("audio", { controls: true, preload: "none", src: `/api/audio/${d.id}` })
-               : h("p", { class: "muted small" }, `Preview unavailable for ${(d.codec || d.ext).toUpperCase()} in the browser.`)));
+      : d.probe_status === "ok" ? [h("audio", { controls: true, preload: "none", src: `/api/preview/${d.id}` }),
+          h("p", { class: "muted xsmall" }, `${(d.codec || d.ext).toUpperCase()} is converted to a preview when you press play (first time takes a few seconds).`)]
+      : h("p", { class: "muted small" }, "Preview unavailable: this file could not be read.")));
   document.getElementById("details").replaceChildren(...parts.filter(Boolean));
 }
 function selectAlbum(a, tr) {

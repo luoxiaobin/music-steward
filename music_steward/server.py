@@ -156,6 +156,16 @@ class App:
         d.pop("root")
         return d
 
+    def preview_path(self, con, fid, start=None, dur=None) -> str | None:
+        """A playable MP3 of an audio file (or of one cue track inside it) -- for formats the
+        browser cannot play, and for tracks inside a cue image."""
+        from . import preview
+        r = con.execute("SELECT f.fs_relpath, f.kind, f.audio_offset, r.path AS root FROM file f JOIN root r "
+                        "ON r.id=f.root_id WHERE f.id=? AND f.removed_at IS NULL", (fid,)).fetchone()
+        if not r or r["kind"] != "audio":
+            return None
+        return str(preview.make(os.path.join(r["root"], r["fs_relpath"]), start, dur, r["audio_offset"] or 0))
+
     def audio_path(self, con, fid) -> str | None:
         r = con.execute("SELECT f.fs_relpath, f.ext, f.kind, r.path AS root FROM file f JOIN root r "
                         "ON r.id=f.root_id WHERE f.id=? AND f.removed_at IS NULL", (fid,)).fetchone()
@@ -589,6 +599,20 @@ def make_handler(app: App, port_ref: dict):
                 if m:
                     d = app.file_detail(con, int(m.group(1)))
                     return self._json(d) if d else self._json({"error": "not found"}, 404)
+                m = re.fullmatch(r"/api/preview/(\d+)", u.path)
+                if m:
+                    try:
+                        start = float(q["start"]) if q.get("start") else None
+                        dur = float(q["dur"]) if q.get("dur") else None
+                    except ValueError:
+                        return self._json({"error": "bad start/dur"}, 400)
+                    try:
+                        p = app.preview_path(con, int(m.group(1)), start, dur)
+                    except Exception as e:  # noqa: BLE001 -- conversion failed: say why, no traceback
+                        return self._json({"error": f"preview failed: {e}"}, 500)
+                    if not p:
+                        return self._send(HTTPStatus.NOT_FOUND, b"")
+                    return self._range(p)
                 m = re.fullmatch(r"/api/audio/(\d+)", u.path)
                 if m:
                     p = app.audio_path(con, int(m.group(1)))

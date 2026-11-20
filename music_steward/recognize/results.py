@@ -137,6 +137,21 @@ def units(con: sqlite3.Connection, root_id: int, folder: str = "") -> list[dict]
     return out
 
 
+def _cue_slices(con: sqlite3.Connection, u: dict) -> dict:
+    """{cue track number: [start, length]} from the cue sheet (read-only)."""
+    import os
+    from .. import cue as cuemod
+    try:
+        c = con.execute("SELECT f.fs_relpath, r.path AS root FROM file f JOIN root r ON r.id=f.root_id WHERE f.id=?",
+                        (u["cue_file_id"],)).fetchone()
+        audio = con.execute("SELECT duration FROM file WHERE id=?", (json.loads(u["file_ids"])[0],)).fetchone()
+        sheet = cuemod.parse(os.path.join(c["root"], c["fs_relpath"]))
+        f = cuemod.with_lengths(max(sheet.files, key=lambda x: len(x.tracks)), audio["duration"])
+        return {t.number: [t.start, t.length] for t in f.tracks}
+    except (OSError, TypeError, ValueError):
+        return {}
+
+
 def unit_detail(con: sqlite3.Connection, unit_id: int) -> dict | None:
     r = con.execute("SELECT * FROM unit WHERE id=?", (unit_id,)).fetchone()
     if not r:
@@ -165,6 +180,9 @@ def unit_detail(con: sqlite3.Connection, unit_id: int) -> dict | None:
                 "SELECT * FROM cand_track WHERE candidate_id=? ORDER BY medium, medium_index", (c["id"],))]
         cands.append(c)
     u["candidates"] = cands
+    if u["kind"] == "cue":
+        u["cue_slices"] = _cue_slices(con, u)        # where each cue track sits in the image (preview)
+        u["audio_file_id"] = ids[0]
     if u["kind"] == "cue" and cands:
         u["n_cue_tracks"] = max(len(c["tracks"]) for c in cands)
     for c in cands:

@@ -153,3 +153,9 @@ body.resizing{cursor:col-resize;user-select:none}
 .colmenu-pop{position:absolute;right:0;top:110%;z-index:5;background:var(--panel);border:1px solid var(--line);border-radius:10px;
   padding:10px 12px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:180px}
 .colmenu-pop label{display:block;margin:3px 0;white-space:nowrap}
+
+.playerbox{margin:6px 0 8px}
+.playcol{width:30px}
+.playbtn{border:1px solid var(--btn-line);background:var(--panel);border-radius:50%;width:26px;height:26px;cursor:pointer;
+  font-size:11px;line-height:1;color:var(--accent)}
+.playbtn:hover{background:var(--accent-soft)}
