@@ -87,7 +87,11 @@ async function renderPlan(id) {
       h("div", { style: "margin-left:auto;display:flex;gap:8px;flex-wrap:wrap" },
         h("button", { type: "button", class: "btn", onclick: () => { P.planId = null; renderPlanBuilder(); } }, "New plan"),
         applyBtn)),
-    busy ? h("p", { class: "muted" }, job.total ? `${job.kind}: ${job.done} / ${job.total}…` : `${job.kind}…`) : null,
+    busy ? progressCard(job, ok) : null,
+    !busy && job.result && ["apply", "resume"].includes(job.kind) && job.result.status === "stopped"
+      ? h("div", { class: "card banner" }, h("strong", {}, "Stopped. "), job.result.abort_reason) : null,
+    doneForYou(s, dups),
+    previewTree(ok.concat(items.filter(i => i.kind === "cue_new" && i.status === "ok" && !ok.includes(i)))),
     h("div", { class: "cards" },
       h("div", { class: "card" }, h("div", { class: "lbl" }, "Source root"), h("div", { class: "mono", style: "margin-top:6px" }, S.root.path),
         h("div", { class: "muted small" }, "Read-only · never modified")),
@@ -132,6 +136,72 @@ async function renderPlan(id) {
     h("div", { class: "card muted small" }, "Frozen in this plan: source sizes and modification times, tag values, destination paths. " +
       "A source that changes before Apply is skipped and reported. Copies are verified (audio unchanged) before they appear under their final name.")
   ].filter(Boolean));
+}
+
+// ---- apply progress: bytes done (items run in plan order), ETA, Stop
+function progressCard(job, ok) {
+  const doneN = job.done || 0, total = job.total || ok.length;
+  const bytes = ok.reduce((a, i) => a + (i.src_size || 0), 0);
+  const doneB = job.kind === "apply" ? ok.slice(0, doneN).reduce((a, i) => a + (i.src_size || 0), 0) : 0;
+  const frac = job.kind === "apply" && bytes ? doneB / bytes : (total ? doneN / total : 0);
+  const el = (Date.now() / 1000) - (job.started || Date.now() / 1000);
+  const eta = frac > 0.02 ? Math.max(0, el / frac - el) : null;
+  const mins = x => x < 90 ? `${Math.round(x)} s` : `${Math.round(x / 60)} min`;
+  return h("div", { class: "card" },
+    h("div", { style: "display:flex;gap:12px;align-items:center;flex-wrap:wrap" },
+      h("strong", {}, job.kind === "apply" ? "Copying" : job.kind === "resume" ? "Resuming" : "Undoing"),
+      h("span", { class: "muted small" }, `${doneN} / ${total} files` +
+        (job.kind === "apply" && bytes ? ` · ${fmtSize(doneB)} of ${fmtSize(bytes)}` : "") +
+        (el > 3 && doneB ? ` · ${fmtSize(doneB / el)}/s` : "") + (eta != null ? ` · about ${mins(eta)} left` : "")),
+      ["apply", "resume"].includes(job.kind) ? h("button", { type: "button", class: "btn", style: "margin-left:auto",
+        onclick: async e => { e.target.disabled = true; e.target.textContent = "Stopping after this file…";
+                              const r = await post("/api/stop", {}); if (r.error) tell(r.error); } }, "Stop") : null),
+    h("div", { class: "pbar" }, h("div", { style: `width:${Math.round(frac * 100)}%` })),
+    h("p", { class: "muted xsmall" }, "Stopping is safe: finished files stay, nothing half-written is left, and Resume continues."));
+}
+
+// ---- what the plan decided on your behalf (your naming rules), with the albums concerned
+function doneForYou(s, dups) {
+  const notes = s.notes || [];
+  const groups = [
+    ["artist_merged", "Artist names unified", n => `${n.label}: “${n.from}” → “${n.to}” (the album's own name)`],
+    ["script", "Written in Simplified Chinese", n => `${n.from} → ${n.to}`],
+    ["original_year", "Original release year used", n => `${n.label}: ${n.from} → ${n.to}`]];
+  const dupUnits = [...new Map(dups.map(i => [i.unit_id, i])).values()];
+  const rowsOf = (list, fmt) => h("ul", { class: "small" }, list.slice(0, 100).map(x => h("li", {}, fmt(x))),
+    list.length > 100 ? h("li", { class: "muted" }, `+ ${list.length - 100} more`) : null);
+  const parts = groups.map(([t, title, fmt]) => {
+    const list = notes.filter(n => n.type === t);
+    return list.length ? h("details", {}, h("summary", {}, h("strong", {}, `${title} `), h("span", { class: "badge b-unid" }, list.length)),
+      rowsOf(list, fmt)) : null;
+  }).filter(Boolean);
+  if (dupUnits.length) parts.push(h("details", {}, h("summary", {}, h("strong", {}, "Duplicate albums copied once "),
+    h("span", { class: "badge b-unid" }, dupUnits.length)), rowsOf(dupUnits, i => `${i.src_rel.split("/").slice(-2, -1)[0]} — ${i.note}`)));
+  if (s.album_cues) parts.push(h("div", { class: "small" }, h("strong", {}, "Album cue sheets written "),
+    h("span", { class: "badge b-unid" }, s.album_cues), h("span", { class: "muted" }, "  for albums of separate track files")));
+  return parts.length ? h("div", { class: "card" }, h("h2", { class: "h2" }, "Done for you ",
+    h("span", { class: "muted small", style: "font-weight:400" }, "your naming rules, applied in this plan")), ...parts) : null;
+}
+
+// ---- the organized result as a folder tree: Artist / Album / files
+function previewTree(list) {
+  const tree = new Map();
+  for (const i of list) {
+    const parts = i.dest_rel.split("/"), file = parts.pop(), album = parts.pop() || "", artist = parts.join("/") || "";
+    if (!tree.has(artist)) tree.set(artist, new Map());
+    const a = tree.get(artist);
+    if (!a.has(album)) a.set(album, []);
+    a.get(album).push(file);
+  }
+  const artists = [...tree.keys()].sort((x, y) => x.localeCompare(y, "zh"));
+  const nAlb = artists.reduce((n, a) => n + tree.get(a).size, 0);
+  return h("div", { class: "card" }, h("h2", { class: "h2" }, "Result preview ",
+      h("span", { class: "muted small", style: "font-weight:400" }, `${artists.length} artists · ${nAlb} albums — how the destination will look`)),
+    h("div", { class: "tree" }, artists.map(a => h("details", {},
+      h("summary", {}, h("span", { class: "strong" }, `📁 ${a}`), h("span", { class: "muted small" }, `  ${tree.get(a).size} album${tree.get(a).size > 1 ? "s" : ""}`)),
+      [...tree.get(a).keys()].sort().map(al => h("details", { class: "tree-album" },
+        h("summary", {}, `📁 ${al}`, h("span", { class: "muted small" }, `  ${tree.get(a).get(al).length} files`)),
+        h("ul", { class: "mono small" }, tree.get(a).get(al).sort().map(f => h("li", {}, f)))))))));
 }
 
 function pollPlan(id) {

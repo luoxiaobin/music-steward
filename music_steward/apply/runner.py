@@ -16,7 +16,7 @@ def journal_dir() -> Path:
     return Path(dbmod.DEFAULT_DB).parent / "journal"
 
 
-def apply(con: sqlite3.Connection, plan_id: int, progress=None, journal_root: Path | None = None) -> dict:
+def apply(con: sqlite3.Connection, plan_id: int, progress=None, journal_root: Path | None = None, stop=None) -> dict:
     p = load(con, plan_id)
     dest = Path(p["dest_root"])
     dest.mkdir(parents=True, exist_ok=True)
@@ -34,7 +34,7 @@ def apply(con: sqlite3.Connection, plan_id: int, progress=None, journal_root: Pa
             continue
         protocol.plan_op(j, run_key, f"i{it['seq']}", Path(it["src"]), dest / it["dest_rel"], it["kind"],
                          it["codec"], it["tags"], method, it["src_size"], it["src_mtime_ns"])
-    protocol.run_all(j, progress=progress)
+    protocol.run_all(j, progress=progress, stop=stop)
     return finish(con, rid)
 
 
@@ -53,11 +53,11 @@ def finish(con, run_id) -> dict:
     return summary
 
 
-def resume(con, run_id) -> dict:
+def resume(con, run_id, progress=None, stop=None) -> dict:
     r = con.execute("SELECT * FROM run WHERE id=?", (run_id,)).fetchone()
     j = protocol.Journal(Path(r["journal"]))
     decisions = protocol.recover(j)
-    protocol.run_all(j)
+    protocol.run_all(j, progress=progress, stop=stop)
     return {"recovered": decisions, **finish(con, run_id)}
 
 

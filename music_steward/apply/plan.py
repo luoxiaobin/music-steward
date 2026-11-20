@@ -176,18 +176,29 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
         q += " AND (u.folder=? OR (u.folder >= ? AND u.folder < ?))"
         args += (scope, scope + "/", scope + "/￿")
     root_path = con.execute("SELECT path FROM root WHERE id=?", (root_id,)).fetchone()["path"]
-    items, prepared = [], []
+    items, prepared, notes = [], [], []
     for u in con.execute(q, args).fetchall():
         c = dict(con.execute("SELECT * FROM candidate WHERE id=?", (u["candidate_id"],)).fetchone())
         tracks = {t["file_id"]: dict(t) for t in con.execute("SELECT * FROM cand_track WHERE candidate_id=?", (c["id"],))}
         ov = json.loads(u["overrides_json"] or "{}")
+        before = {"album": c["album"], "artist": c["artist"], "year": c["year"]}
         # the album's first release year, not a reissue's (user decision 2026-11-19)
         if c.get("original_year") and (not c["year"] or c["original_year"] < c["year"]):
             c["year"] = c["original_year"]
         if (c.get("source") or "") != "Local":
             _prefer_own_artist(con, u, c, tracks)
+        if c.get("_artist_from"):
+            notes.append({"unit_id": u["id"], "label": u["label"], "type": "artist_merged",
+                          "from": c["_artist_from"], "to": c["artist"]})
         rule = script_rule()   # catalogue/own-info names only; the user's own edits stay as typed
+        pre = (c["album"], c["artist"])
         c["album"], c["artist"] = _script(c["album"], rule), _script(c["artist"], rule)
+        if (c["album"], c["artist"]) != pre:
+            notes.append({"unit_id": u["id"], "label": u["label"], "type": "script",
+                          "from": " / ".join(x for x in pre if x), "to": " / ".join(x for x in (c["album"], c["artist"]) if x)})
+        if before["year"] and c["year"] != before["year"]:
+            notes.append({"unit_id": u["id"], "label": u["label"], "type": "original_year",
+                          "from": before["year"], "to": c["year"]})
         c["_script"] = rule
         for t in tracks.values():
             t["artist"] = _script(t["artist"], rule)
@@ -290,7 +301,10 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                "blocked": sum(i["status"] not in ("ok", "duplicate_source") for i in items),
                "duplicate_albums_skipped": len(dup_units),
                "bytes": sum(i["size"] for i in items if i["status"] == "ok"),
-               "albums": len({i["unit_id"] for i in items}), "script": script_rule()}
+               "albums": len({i["unit_id"] for i in items}), "script": script_rule(),
+               "album_cues": sum(i["kind"] == "cue_new" and i["status"] == "ok" for i in items),
+               "changes": {t: sum(n["type"] == t for n in notes) for t in ("artist_merged", "script", "original_year")},
+               "notes": notes[:1000]}
     pid = con.execute("INSERT INTO plan(created_at, dest_root, root_id, scope, summary_json) VALUES(?,?,?,?,?)",
                       (time.time(), str(dest), root_id, scope, json.dumps(summary))).lastrowid
     con.executemany("INSERT INTO plan_item VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",

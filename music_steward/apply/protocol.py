@@ -288,9 +288,12 @@ def recover(j: Journal) -> list[dict]:
     return out
 
 
-def run_all(j: Journal, crash_at: str | None = None, crash_op: str | None = None, progress=None):
+def run_all(j: Journal, crash_at: str | None = None, crash_op: str | None = None, progress=None, stop=None):
+    """stop: a threading.Event -- checked between files; the rest stay 'intent' (Resume continues)."""
     ops = [(op, o) for op, o in j.ops().items() if o["history"][-1] not in TERMINAL]
     for i, (op, o) in enumerate(ops, 1):
+        if stop is not None and stop.is_set():
+            break
         try:
             execute_op(j, o, crash_at if op == crash_op else None)
         except Exception as e:  # one bad file must not stop the run; the journal says what happened

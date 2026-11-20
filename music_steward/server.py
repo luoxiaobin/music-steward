@@ -201,9 +201,13 @@ class App:
                 elif kind in ("apply", "undo", "resume"):
                     from .apply import runner
                     n = int(path)
-                    res = {"status": "complete", **(runner.apply(con, n, progress=prog) if kind == "apply"
+                    res = {"status": "complete", **(runner.apply(con, n, progress=prog, stop=self._stop) if kind == "apply"
                                                     else runner.undo(con, n) if kind == "undo"
-                                                    else runner.resume(con, n))}
+                                                    else runner.resume(con, n, progress=prog, stop=self._stop))}
+                    if kind in ("apply", "resume") and self._stop.is_set():
+                        left = (res.get("states") or {}).get("intent", 0)
+                        res.update(status="stopped", abort_reason=f"stopped by you; {left} files not copied yet "
+                                                                 "(Resume continues the run)")
                     if res.get("error"):
                         res["status"], res["abort_reason"] = "error", res["error"]
                 elif kind == "recognize_unit":
@@ -235,8 +239,8 @@ class App:
         return {"started": True}
 
     def stop_job(self) -> dict:
-        if not self.scan_state.get("running") or self.scan_state.get("kind") != "recognize":
-            return {"error": "only a running recognition can be stopped"}
+        if not self.scan_state.get("running") or self.scan_state.get("kind") not in ("recognize", "apply", "resume"):
+            return {"error": "only a running recognition or apply can be stopped"}
         self._stop.set()
         return {"stopping": True}
 

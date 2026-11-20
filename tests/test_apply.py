@@ -278,3 +278,23 @@ def test_ape_copy_fingerprint_ignores_tags_and_catches_audio_changes(tmp_path):
     raw[i] ^= 1                                         # one audio bit
     p.write_bytes(bytes(raw))
     assert copy_audio_fingerprint(str(p), ".ape", "ape") != f0
+
+
+def test_stop_between_files_then_resume_finishes(accepted, con, tmp_path):
+    """Stop (UI) halts apply after the current file; nothing half-written; Resume completes the run."""
+    import threading
+    from music_steward.apply import runner
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    stop = threading.Event()
+    seen = []
+
+    def progress(i, n):
+        seen.append(i)
+        if i == 1:
+            stop.set()
+    r = runner.apply(con, pid, progress=progress, journal_root=tmp_path / "j", stop=stop)
+    assert seen == [1] and r["states"].get("committed") == 1 and r["states"].get("intent", 0) >= 1
+    assert not list(dest.rglob(".*mlt-*"))
+    r2 = runner.resume(con, r["run"])
+    assert set(r2["states"]) == {"committed"}
