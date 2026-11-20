@@ -239,7 +239,8 @@ async function renderUnits(where) {
     onclick: async () => {
       if (!await ask(`Accept the top candidate for ${nReady} Ready and ${nLikely} Likely albums in this folder? ` +
                    "Nothing is copied until you apply a plan; each decision can be undone.")) return;
-      const r = await post2("/api/bulk_accept", { root: S.root.path, path: S.path, confidences: ["ready", "likely"] });
+      const r = await post2("/api/bulk_accept", { root: S.root.path, path: S.path, confidences: ["ready", "likely"],
+                                                   only_ids: S.listQ ? us.map(u => u.id) : null });
       if (r.error) tell(r.error);
       await refreshCenter();
     } }, `Accept all Ready + Likely (${nReady + nLikely})`));
@@ -251,7 +252,8 @@ async function renderUnits(where) {
   const bulkBtn = (label, n, question, body) => n ? h("button", { type: "button", class: "btn",
     style: "min-height:28px;padding:0 10px;margin-left:6px", onclick: async () => {
       if (question && !await ask(question)) return;
-      const r = await post2("/api/bulk", { root: S.root.path, path: S.path, ...body });
+      const r = await post2("/api/bulk", { root: S.root.path, path: S.path, ...body,
+                                           only_ids: S.listQ ? us.map(u => u.id) : null });
       if (r.error) tell(r.error);
       else if (r.n_failed) tell(`${r.done} done; ${r.n_failed} could not be read:\n` + r.failed.join("\n"));
       await refreshCenter();

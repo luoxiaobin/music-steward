@@ -295,3 +295,15 @@ def test_disc_set_of_track_files_gets_one_cue_per_disc(tmp_path, con, monkeypatc
     cues = sorted(i["dest_rel"] for i in p["items"] if i["kind"] == "cue_new")
     assert cues == ["Band/The Set/The Set (CD 1).cue", "Band/The Set/The Set (CD 2).cue"]
     assert all(i["status"] == "ok" for i in p["items"])
+
+
+def test_folder_wide_bulk_respects_a_filtered_list(two_disc_cues, con):
+    """With 'Filter this list' active, the folder-wide buttons act only on the albums shown."""
+    lib, uids = two_disc_cues
+    app = App(con.execute("PRAGMA database_list").fetchone()[2], [str(lib)], None)
+    r = app.bulk(con, {"root": str(lib), "action": "local", "only_ids": [uids[0]]})
+    assert r["done"] == 1
+    assert con.execute("SELECT COUNT(*) FROM candidate WHERE source='Local'").fetchone()[0] == 1
+    assert app.bulk(con, {"root": str(lib), "action": "skip", "confidences": ["no_match", "weak"],
+                          "only_ids": []})["done"] == 0
+    assert con.execute("SELECT COUNT(*) FROM decision").fetchone()[0] == 0

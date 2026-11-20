@@ -396,7 +396,10 @@ class App:
             return {"error": "not a configured root"}
         rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
         n = 0
+        only = {_int(i) for i in body["only_ids"]} if body.get("only_ids") is not None else None
         for u in results.units(con, rid, nfc(body.get("path", ""))):
+            if only is not None and u["id"] not in only:
+                continue    # a filtered list: act only on the albums the user sees
             if u["decision"] is None and u["confidence"] in wanted and u["top"]:
                 cid = u["top"]["id"]
                 con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
@@ -469,9 +472,12 @@ class App:
             return {"error": "bulk skip is only for No match, Weak and Needs review albums"}
         if action not in ("local", "accept_local", "skip"):
             return {"error": "unknown bulk action"}
+        only = {_int(i) for i in body["only_ids"]} if body.get("only_ids") is not None else None
         for u in results.units(con, rid, nfc(body.get("path", ""))):
             if u["decision"] is not None or u["status"] != "done":
                 continue
+            if only is not None and u["id"] not in only:
+                continue    # a filtered list: act only on the albums the user sees
             if action == "local" and u["confidence"] in self.BULK_LOCAL and not u["local"]:
                 try:
                     local.add(con, u["id"])
