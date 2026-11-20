@@ -188,6 +188,22 @@ def cmd_cache(a):
     return 0
 
 
+def cmd_app(a):
+    try:
+        import webview  # noqa: F401
+    except ImportError:
+        sys.exit("the desktop window needs pywebview:  pip install -e '.[desktop]'  (or use: music-steward serve)")
+    from .desktop import run
+    roots = a.root
+    if not roots:   # the collection(s) this database already knows
+        con = db.connect(a.db)
+        roots = [r[0] for r in con.execute("SELECT path FROM root ORDER BY id")]
+        con.close()
+    if not roots:
+        sys.exit("no collection yet: run  music-steward app --root /path/to/music")
+    run(a.db, roots, dest=a.dest, debug=a.debug)
+
+
 def cmd_serve(a):
     from .server import serve
     serve(a.db, a.root, port=a.port, open_browser=not a.no_browser, dest=a.dest)
@@ -261,6 +277,12 @@ def main(argv=None):
     ca = sub.add_parser("cache", help="web lookup cache used while matching: size, or --clear")
     ca.add_argument("--clear", action="store_true", help="delete every cached lookup")
     ca.set_defaults(func=cmd_cache)
+
+    ap_ = sub.add_parser("app", help="open Music Steward in its own desktop window")
+    ap_.add_argument("--root", action="append", default=[], help="collection folder (repeatable)")
+    ap_.add_argument("--dest", help="default destination folder")
+    ap_.add_argument("--debug", action="store_true", help="web inspector")
+    ap_.set_defaults(func=cmd_app)
 
     sv = sub.add_parser("serve", help="local web UI (127.0.0.1 only, token-protected)")
     sv.add_argument("--root", action="append", required=True, help="a folder the UI may browse (repeatable)")

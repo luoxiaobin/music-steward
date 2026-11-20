@@ -37,6 +37,14 @@ We considered Electron.
 * In the window, the session token can be injected directly instead of via the launch URL; the Host-header check, CSP and POST guard stay.
 * Browser constraints remain (APE preview needs transcoding later, whatever the shell).
 
+## Implementation (2026-11-20)
+
+`music-steward app` opens the window (pywebview 6.2.1, optional extra `desktop`): the same server in a
+thread on a random 127.0.0.1 port, signed in automatically; a native "Choose…" folder picker
+(`window.pywebview.api.choose_folder`) for the destination; closing while a job runs asks first, and the
+stopped job can be resumed. Native browser `confirm()`/`alert()` are not used anywhere (some embedded
+web views block them silently); the app has its own in-page dialogs. Browser mode (`serve`) is unchanged.
+
 ## Revisit when
 
 * the app is to be distributed to non-technical users with installers and auto-update, or

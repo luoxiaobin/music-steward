@@ -738,7 +738,8 @@ async function openSettings() {
           d.status.discogs ? "" : "needs DISCOGS_TOKEN in the environment"),
       h("div", { class: "muted xsmall" }, `Fingerprints (AcoustID): ${d.status.acoustid ? "key found" : "no key — matching without fingerprints"}. ` +
         "Keys stay in your environment (~/.zshenv); the app never stores them."), envNote("sources")),
-    h("section", {}, h("h3", {}, h("label", { for: "setDest" }, "Default destination folder")), dest,
+    h("section", {}, h("h3", {}, h("label", { for: "setDest" }, "Default destination folder")),
+      h("div", { style: "display:flex;gap:8px" }, dest, chooseButton(dest)),
       h("div", { class: "muted xsmall" }, "Where plans copy to unless you choose another folder. Never inside your collection.")),
     msg,
     h("div", { class: "btnrow" },
@@ -759,3 +760,16 @@ async function openSettings() {
   dlg.showModal();
 }
 document.getElementById("settingsBtn").addEventListener("click", openSettings);
+
+
+// ---------------------------------------------------------------- desktop window (pywebview)
+// Inside the desktop window, folder fields get a native "Choose…" button.
+const inDesktop = () => !!(window.pywebview && window.pywebview.api && window.pywebview.api.choose_folder);
+function chooseButton(input) {
+  const b = h("button", { type: "button", class: "btn", hidden: inDesktop() ? null : true, onclick: async () => {
+    const p = await window.pywebview.api.choose_folder(input.value || "");
+    if (p) { input.value = p; input.dispatchEvent(new Event("input")); }
+  } }, "Choose…");
+  window.addEventListener("pywebviewready", () => { b.hidden = false; });
+  return b;
+}

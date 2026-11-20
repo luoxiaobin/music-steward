@@ -28,6 +28,7 @@ music-steward scan /Volumes/music          # again: unchanged files (size + mtim
 music-steward scan "/Volumes/music/音乐Ape" # re-scan just one folder (fast; nothing else is touched)
 music-steward hash "/Volumes/music/音乐Ape" # whole-file + audio hashes for one folder (resumable)
 music-steward recognize "/Volumes/music/音乐Ape"   # match its albums (MusicBrainz, Deezer, Discogs)
+music-steward app                          # desktop window (needs: pip install -e '.[desktop]')
 music-steward serve --root /Volumes/music --dest ~/Music/Organized   # web UI: review, plan, apply, undo
                                             #   (albums not found online: "Use own info" = cue sheet / tags / names)
 music-steward cache                        # web lookups + fingerprints cached while matching (--clear)

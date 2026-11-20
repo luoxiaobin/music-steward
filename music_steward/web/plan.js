@@ -33,7 +33,7 @@ async function renderPlanBuilder(msg) {
       h("h2", { class: "h2" }, "Collect accepted albums"),
       h("p", { class: "muted small" }, `Scope: ${scope}. Every album you accepted in this folder becomes part of the plan. ` +
         "Building a plan changes nothing on disk."),
-      h("div", { class: "field" }, h("label", { for: "destInput", class: "strong" }, "Destination"), input,
+      h("div", { class: "field" }, h("label", { for: "destInput", class: "strong" }, "Destination"), input, chooseButton(input),
         h("button", { type: "button", class: "btn btn-primary", onclick: async () => {
           try { localStorage.setItem("mlt.dest", input.value); } catch (e) { /* ignore */ }
           const r = await post("/api/plan", { root: S.root.path, path: S.path, dest: input.value });

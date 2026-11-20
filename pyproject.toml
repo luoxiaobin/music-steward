@@ -20,6 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest"]
+desktop = ["pywebview==6.2.1"]   # native window (ADR 0001); BSD-3-Clause
 
 [project.scripts]
 music-steward = "music_steward.cli:main"
