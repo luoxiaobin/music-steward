@@ -161,7 +161,7 @@ body.resizing{cursor:col-resize;user-select:none}
 .playbtn:hover{background:var(--accent-soft)}
 
 /* search */
-.searchwrap{position:relative;flex:1 1 320px;max-width:560px}
+.searchwrap{position:relative;flex:1 1 200px;max-width:420px;min-width:160px}
 .searchwrap input{width:100%;font:14px var(--font);min-height:34px;padding:0 12px;border:1px solid var(--btn-line);
   border-radius:8px;background:var(--panel)}
 .searchwrap input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
