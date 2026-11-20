@@ -68,6 +68,31 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
     new_stem_of[f["relpath"].rsplit(".", 1)[0]] = f"{adir}/{stem}"
 
 
+def album_cues() -> bool:
+    """Write an album cue sheet for albums of separate track files too (user request after the
+    trial: every album then opens the same way in a player). MLT_ALBUM_CUE=0 turns it off."""
+    return os.environ.get("MLT_ALBUM_CUE", "1") != "0"
+
+
+def _q(s) -> str:
+    return str(s or "").replace('"', "'").replace("\n", " ").strip()
+
+
+def album_cue_text(c: dict, tracks: list[dict], disc: int | None) -> str:
+    """A cue sheet over separate track files: one FILE + TRACK per file, each from 00:00:00."""
+    lines = ["REM COMMENT \"Written by Music Steward\""]
+    if c.get("year"):
+        lines.append(f"REM DATE {c['year']}")
+    if disc and (c.get("mediums") or 1) > 1:
+        lines.append(f"REM DISCNUMBER {disc}")
+        lines.append(f"REM TOTALDISCS {c['mediums']}")
+    lines += [f'PERFORMER "{_q(c.get("artist"))}"', f'TITLE "{_q(c.get("album"))}"']
+    for n, t in enumerate(tracks, 1):
+        lines += [f'FILE "{_q(t["file"])}" WAVE', f"  TRACK {n:02d} AUDIO", f'    TITLE "{_q(t["title"])}"',
+                  f'    PERFORMER "{_q(t["artist"] or c.get("artist"))}"', "    INDEX 01 00:00:00"]
+    return "\r\n".join(lines) + "\r\n"
+
+
 def cue_encoding() -> str | None:
     """Encoding of copied cue sheets: UTF-8 with a BOM by default (readable by foobar2000 on Mac
     and Windows and most players; GB18030 cues showed as mojibake on the Mac).
@@ -212,6 +237,17 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                           "src": os.path.join(root_path, f["fs_relpath"]), "dest_rel": f"{adir}/{name}",
                           "codec": f["codec"], "tags": _tags_for(c, t, u["kind"]),
                           "size": f["size"], "mtime": f["mtime_ns"]})
+        if u["kind"] == "album" and album_cues():
+            mine = [it for it in items if it["unit_id"] == u["id"] and it["kind"] == "audio"]
+            if len(mine) >= 2:
+                mine.sort(key=lambda it: it["dest_rel"])
+                multi = (c["mediums"] or 1) > 1 and c.get("_disc") is not None
+                stem = safe_component(f"{c['album']} (CD {c['_disc']})" if multi else c["album"], "Album")
+                text = album_cue_text(c, [{"file": it["dest_rel"].rsplit("/", 1)[-1], "title": it["tags"].get("title"),
+                                           "artist": it["tags"].get("artist")} for it in mine], c.get("_disc"))
+                items.append({"unit_id": u["id"], "file_id": mine[0]["file_id"], "kind": "cue_new",
+                              "src": mine[0]["src"], "dest_rel": f"{adir}/{stem}.cue", "codec": None,
+                              "tags": {"generated_text": text}, "size": mine[0]["size"], "mtime": mine[0]["mtime"]})
         # side files that live next to the unit's audio
         folders = {f.rsplit("/", 1)[0] if "/" in f else "" for f in new_stem_of}
         for folder in sorted(folders):  # deterministic: CD 1 before CD 2

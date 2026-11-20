@@ -135,8 +135,11 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
     src, final, temp = Path(o["src"]), Path(o["final"]), Path(o["temp"])
     op, state = o["op"], o["history"][-1]
     if state == "intent":
+        generated = (o.get("tags") or {}).get("generated_text")   # a cue sheet written by the plan
         if "final_preexisting_sha" in o or final.exists():
-            same = final.exists() and file_sha256(str(final)) == file_sha256(str(src))
+            want = hashlib.sha256(generated.encode("utf-8-sig")).hexdigest() if generated is not None \
+                else file_sha256(str(src))
+            same = final.exists() and file_sha256(str(final)) == want
             j.write({"op": op, "state": "already_existed" if same else "conflict",
                      "ownership": "already_existed" if same else "not_ours",
                      "reason": "identical file already at destination" if same else "a different file is already there"})
@@ -150,12 +153,17 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
         h = hashlib.sha256()
         fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
         try:
-            with open(src, "rb") as fin:
-                for i, buf in enumerate(iter(lambda: fin.read(CHUNK), b"")):
-                    os.write(fd, buf)
-                    h.update(buf)
-                    if i == 0:
-                        _crash("mid_copy", crash_at)  # copy started, not yet complete or journalled
+            if generated is not None:      # no source to copy: write the plan's text (src = a guard)
+                data = generated.encode("utf-8-sig")
+                os.write(fd, data)
+                h.update(data)
+            else:
+                with open(src, "rb") as fin:
+                    for i, buf in enumerate(iter(lambda: fin.read(CHUNK), b"")):
+                        os.write(fd, buf)
+                        h.update(buf)
+                        if i == 0:
+                            _crash("mid_copy", crash_at)  # copy started, not yet complete or journalled
             os.fsync(fd)
         finally:
             os.close(fd)

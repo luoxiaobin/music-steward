@@ -100,3 +100,10 @@ def con(tmp_path):
 def files(con, live_only=True):
     q = "SELECT * FROM file" + (" WHERE removed_at IS NULL" if live_only else "")
     return {r["relpath"]: r for r in con.execute(q)}
+
+
+@pytest.fixture(autouse=True)
+def _no_album_cues_unless_asked(monkeypatch):
+    """Generated album cue sheets (MLT_ALBUM_CUE, on in the app) would add a file to every
+    multi-file album in older tests; tests that cover them turn them on."""
+    monkeypatch.setenv("MLT_ALBUM_CUE", "0")

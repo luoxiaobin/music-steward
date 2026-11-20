@@ -65,7 +65,7 @@ async function renderPlan(id) {
   const ok = items.filter(i => i.status === "ok"), blocked = items.filter(i => !["ok", "duplicate_source"].includes(i.status));
   const dups = items.filter(i => i.status === "duplicate_source");
   const audio = ok.filter(i => i.kind === "audio"), side = items.filter(i => i.kind !== "audio");
-  const sideLabel = i => i.kind === "lrc" ? "Follows its track" : i.kind === "cue" ? "Rewritten: file name + titles" : "Linked";
+  const sideLabel = i => i.kind === "lrc" ? "Follows its track" : i.kind === "cue" ? "Rewritten: file name + titles" : i.kind === "cue_new" ? "New: album cue sheet" : "Linked";
   const lastRun = p.runs[p.runs.length - 1];
   const applied = lastRun && !lastRun.undone_at;
   const job = st.scan || {};

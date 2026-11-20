@@ -249,3 +249,49 @@ def test_selected_albums_accept_own_info_skip_clear(two_disc_cues, con, monkeypa
     assert app.bulk(con, {"root": root, "action": "clear", "unit_ids": [uids[1]]})["done"] == 1
     assert con.execute("SELECT COUNT(*) FROM decision").fetchone()[0] == 1
     assert "error" in app.bulk(con, {"root": root, "action": "local", "unit_ids": uids})
+
+
+def test_track_file_albums_get_an_album_cue_sheet(untagged, con, tmp_path, monkeypatch):
+    """User request after the trial: albums of separate track files get a cue sheet too."""
+    from music_steward import cue
+    from music_steward.apply import runner
+    monkeypatch.setenv("MLT_ALBUM_CUE", "1")
+    lib, uid = untagged
+    _accept_local(con, uid)
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
+    gen = [i for i in p["items"] if i["kind"] == "cue_new"]
+    assert len(gen) == 1 and gen[0]["dest_rel"] == "林子祥/谁能明白我 (1985)/谁能明白我.cue"
+    r = runner.apply(con, p["id"], journal_root=tmp_path / "j")
+    assert r["states"] == {"committed": 4}
+    adir = tmp_path / "out/林子祥/谁能明白我 (1985)"
+    raw = (adir / "谁能明白我.cue").read_bytes()
+    assert raw.startswith(b"\xef\xbb\xbf")
+    sheet = cue.parse(str(adir / "谁能明白我.cue"))
+    assert sheet.performer == "林子祥" and sheet.title == "谁能明白我"
+    assert [f.name for f in sheet.files] == ["01 - 誰能明白我.mp3", "02 - 莫再悲.mp3", "03 - 敢愛敢做.mp3"]
+    assert all((adir / f.name).exists() for f in sheet.files)
+    assert [t.title for t in sheet.tracks] == ["誰能明白我", "莫再悲", "敢愛敢做"]
+    runner.undo(con, r["run"])
+    assert not any(adir.parent.parent.rglob("*.cue"))
+    monkeypatch.setenv("MLT_ALBUM_CUE", "0")
+    p = plan.load(con, plan.build(con, str(tmp_path / "out2"), 1))
+    assert not [i for i in p["items"] if i["kind"] == "cue_new"]
+
+
+def test_disc_set_of_track_files_gets_one_cue_per_disc(tmp_path, con, monkeypatch):
+    monkeypatch.setenv("MLT_ALBUM_CUE", "1")
+    lib = tmp_path / "lib"
+    for n in (1, 2):
+        for i in range(2):
+            tone(lib / f"Set part {n}" / f"0{i + 1} - Song {n}{i}.mp3", ["-c:a", "libmp3lame"], secs=1, freq=300 + 10 * n + i)
+    scan(con, lib)
+    units.enqueue(con, 1, units.plan_units(con, 1))
+    app = App(con.execute("PRAGMA database_list").fetchone()[2], [str(lib)], None)
+    for n, uid in enumerate([r[0] for r in con.execute("SELECT id FROM unit ORDER BY folder")], 1):
+        con.execute("UPDATE unit SET status='done' WHERE id=?", (uid,))
+        _accept_local(con, uid)
+        app.edit_fields(con, {"unit_id": uid, "overrides": {"album": "The Set", "albumartist": "Band", "disc": str(n)}})
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
+    cues = sorted(i["dest_rel"] for i in p["items"] if i["kind"] == "cue_new")
+    assert cues == ["Band/The Set/The Set (CD 1).cue", "Band/The Set/The Set (CD 2).cue"]
+    assert all(i["status"] == "ok" for i in p["items"])
