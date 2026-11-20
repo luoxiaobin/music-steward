@@ -115,7 +115,14 @@ audio{width:100%}
 .selcol{width:28px;text-align:center}
 
 .appdialog{border:1px solid var(--btn-line);border-radius:10px;padding:18px 20px;max-width:520px;
-  font:14px var(--font);color:inherit;background:var(--card, #fff);box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  font:14px var(--font);color:inherit;background:var(--panel);box-shadow:0 10px 40px rgba(0,0,0,.25)}
 .appdialog::backdrop{background:rgba(0,0,0,.3)}
 .appdialog p{white-space:pre-wrap;margin:0 0 14px;line-height:1.45}
 .appdialog .btnrow{display:flex;gap:8px;justify-content:flex-end}
+
+.detailbar{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;gap:8px;padding:10px 0;margin:-4px 0 6px;
+  background:var(--panel);border-bottom:1px solid var(--line2)}
+.detailbar .btn{min-height:36px}
+.kbd{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid currentColor;border-radius:4px;font:11px var(--mono, monospace);opacity:.6}
+.warnbanner{border-color:var(--warn-line);background:var(--warn-bg);color:var(--review)}
+.linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;padding:4px 0;font:inherit;font-size:13px}

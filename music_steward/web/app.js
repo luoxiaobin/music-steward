@@ -264,6 +264,9 @@ async function renderUnits(where) {
   const f = S.unitFilter || "all";
   const shown = us.filter(u => (f === "all" || (f === "undecided" ? !u.decision : statusOf(u) === f)) &&
                                (!S.titleOnly || (u.evidence && u.evidence.title_agrees)));
+  S.shownIds = shown.map(u => u.id);
+  S.unitsById = Object.fromEntries(us.map(u => [u.id, u]));
+  const titleDiffers = u => !!(u.top && u.evidence && !u.evidence.title_agrees);
   const selBar = h("div", { class: "selbar" });
   const drawBar = () => {
     const n = S.unitSel.size;
@@ -282,7 +285,25 @@ async function renderUnits(where) {
       h("label", { class: "small" }, h("input", { type: "checkbox", checked: S.titleOnly ? true : null,
         onchange: e => { S.titleOnly = e.target.checked; S.unitSel.clear(); refreshCenter(); } }), " only where the album title agrees"),
       h("span", { class: "small strong" }, `${n} selected`),
-      act("Accept top match", "accept_top", "Accept the best online candidate for {n} albums?"),
+      h("button", { type: "button", class: "btn", disabled: !n, onclick: async () => {
+        const ids = [...S.unitSel], bad = ids.filter(id => titleDiffers(S.unitsById[id] || {}));
+        let use = ids;
+        if (bad.length) {
+          const ex = S.unitsById[bad[0]];
+          const pick = await _dialog(`${bad.length} of the ${ids.length} selected albums have a DIFFERENT album title on ` +
+            `their top match — usually a different album by the same artist ` +
+            `(e.g. “${ex.label}” → “${ex.top.album}”).\n\nAccept only the ${ids.length - bad.length} whose title agrees?`,
+            [["Cancel", null], [`Accept all ${ids.length}`, "all"], [`Accept ${ids.length - bad.length} that agree`, "agree", true]]);
+          if (!pick) return;
+          if (pick === "agree") use = ids.filter(id => !bad.includes(id));
+        } else if (!await ask(`Accept the best online candidate for ${ids.length} albums?`)) return;
+        if (!use.length) return;
+        const r = await post2("/api/bulk", { root: S.root.path, path: S.path, action: "accept_top", unit_ids: use });
+        if (r.error) return tell(r.error);
+        if (r.n_failed) tell(`${r.done} done; ${r.n_failed} not done:\n` + r.failed.join("\n"));
+        S.unitSel.clear();
+        await refreshCenter();
+      } }, "Accept top match"),
       act("Use own info", "own_info", "Organize {n} albums from their own info (cue sheet / tags / names)?"),
       act("Skip", "skip", "Skip {n} albums? They are left out of plans."),
       act("Clear decision", "clear", null));
@@ -300,13 +321,14 @@ async function renderUnits(where) {
       onclick: e => e.stopPropagation(),
       onchange: e => { e.target.checked ? S.unitSel.add(u.id) : S.unitSel.delete(u.id); drawBar(); } });
     boxes.push(box);
-    const tr = h("tr", { tabindex: "0", "aria-selected": String(S.selectedUnit === u.id),
+    const tr = h("tr", { tabindex: "0", "data-unit": u.id, "aria-selected": String(S.selectedUnit === u.id),
                          onclick: () => selectUnit(u.id, tr), onkeydown: e => { if (e.key === "Enter") selectUnit(u.id, tr); } },
       h("td", { class: "selcol", onclick: e => e.stopPropagation() }, box),
       h("td", {}, h("div", { class: "strong" }, u.label), h("div", { class: "sub mono" }, (u.folder || ".") + "/")),
       h("td", {}, u.kind === "track" ? "track" : u.kind === "cue" ? `${u.n_tracks || "?"} (cue)` : u.n_files),
       h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${yearText(t)}${t.country ? " · " + t.country : ""}`,
-                         u.evidence && u.evidence.title_agrees ? h("span", { class: "ok small" }, "  title ✓") : null),
+                         u.evidence && u.evidence.title_agrees ? h("span", { class: "ok small" }, "  title ✓")
+                           : titleDiffers(u) ? h("span", { class: "warn small strong" }, "  title differs") : null),
                        h("div", { class: "sub" }, `${t.artist} · distance ${t.distance.toFixed(2)} · fingerprints ${t.fingerprint_agrees}/${u.n_tracks || u.n_files}` +
                          (u.evidence && u.evidence.disc_of_set ? ` · disc ${u.evidence.disc} of ${t.mediums}` : ""))]
                     : h("span", { class: "muted" }, u.status === "error" ? "error" : u.status === "done" ? "no candidates" : "—"),
@@ -316,15 +338,48 @@ async function renderUnits(where) {
     body.append(tr);
   }
   note.after(selBar);
+  selBar.append(h("span", { class: "muted xsmall" }, "Keys: ↓/↑ move · A accept · O own info · S skip · U undo · X tick"));
   document.querySelectorAll(".selbar").forEach(el => { if (el !== selBar) el.remove(); });
   document.getElementById("table").replaceChildren(
     h("thead", {}, h("tr", {}, h("th", { scope: "col", class: "selcol" }, all),
       ...["Album / folder", "Tracks", "Best candidate", "Status"].map(x => h("th", { scope: "col" }, x)))), body);
   return true;
 }
+function nextUnitId(id, step = 1) {
+  const ids = S.shownIds || [];
+  const i = ids.indexOf(id);
+  if (i < 0) return ids[0] ?? null;
+  return ids[Math.min(ids.length - 1, Math.max(0, i + step))] ?? null;
+}
+async function gotoUnit(id) {
+  if (id == null) return;
+  const tr = document.querySelector(`#table tbody tr[data-unit="${id}"]`);
+  if (tr) tr.scrollIntoView({ block: "nearest" });
+  await selectUnit(id, tr);
+}
+document.addEventListener("keydown", e => {
+  if (S.view !== "albums" || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  if (t && (t.closest("input, textarea, select, dialog") || t.isContentEditable)) return;
+  if (document.querySelector("dialog[open]")) return;
+  const k = e.key.toLowerCase(), A = S.detailActions || {};
+  const cur = S.selectedUnit;
+  if (k === "arrowdown" || k === "j") { e.preventDefault(); gotoUnit(cur == null ? (S.shownIds || [])[0] : nextUnitId(cur, 1)); }
+  else if (k === "arrowup" || k === "k") { e.preventDefault(); gotoUnit(nextUnitId(cur, -1)); }
+  else if (cur == null) return;
+  else if (k === "a") A.accept && A.accept();
+  else if (k === "o") A.own && A.own();
+  else if (k === "s") A.skip && A.skip();
+  else if (k === "u") A.undo && A.undo();
+  else if (k === "x") {
+    const box = document.querySelector(`#table tbody tr[data-unit="${cur}"] input[type=checkbox]`);
+    if (box) { box.checked = !box.checked; box.dispatchEvent(new Event("change")); }
+  }
+});
 async function selectUnit(id, tr) {
   if (tr) markSelected(tr);
   S.selectedUnit = id;
+  if (S.allCands !== id) S.allCands = null;
   const d = await api(`/api/unit/${id}`);
   const sel = d.decision && d.decision.candidate_id || (d.candidates[0] && d.candidates[0].id);
   S.unitChoice = sel;
@@ -340,7 +395,10 @@ function renderUnitDetail(d) {
   const list = h("fieldset", { style: "border:0;margin:0;padding:0" }, h("legend", { class: "strong", style: "margin-bottom:8px" },
     cands.length ? `Candidate releases (${cands.length})` : "No candidates"));
   const nT = d.n_tracks || d.n_files;
-  const shown = cands.filter(c => c.source !== "Local").slice(0, 6).concat(cands.filter(c => c.source === "Local"));
+  const onl = cands.filter(c => c.source !== "Local");
+  const nOnl = S.allCands === d.id ? onl.length : Math.min(3, onl.length);
+  const shown = onl.slice(0, nOnl).concat(onl.slice(nOnl).filter(c => c.id === chosen?.id))
+                   .concat(cands.filter(c => c.source === "Local"));
   const ORIGIN = o => Object.entries(o || {}).filter(([, v]) => v).map(([k, v]) => `${k} from ${v}`).join(" · ");
   for (const c of shown) {
     const fpShare = nT ? c.fingerprint_agrees / nT : 0;
@@ -471,18 +529,35 @@ function renderUnitDetail(d) {
         if (!r.error) { const st = await api("/api/state"); renderScan(st.scan); waitThenReload(d.id); }
       } }, "Search"),
       h("span", { id: "searchMsg", class: "muted small" }))));
-  const decide = async (action) => {
-    await api("/api/decision", { method: "POST", headers: { "Content-Type": "application/json", "X-MLT": "1" },
-      body: JSON.stringify({ unit_id: d.id, action, candidate_id: action === "accept" ? chosen.id : null }) });
+  const decide = async (action, advance = action !== "clear") => {
+    if (action === "accept" && !chosen) return;
+    const next = advance ? nextUnitId(d.id) : d.id;
+    if (action === "own_info") {
+      const r = await post2("/api/bulk", { root: S.root.path, path: S.path, action: "own_info", unit_ids: [d.id] });
+      if (r.error || r.n_failed) return tell(r.error || r.failed.join("\n"));
+    } else {
+      await api("/api/decision", { method: "POST", headers: { "Content-Type": "application/json", "X-MLT": "1" },
+        body: JSON.stringify({ unit_id: d.id, action, candidate_id: action === "accept" ? chosen.id : null }) });
+    }
     await refreshCenter();
-    await selectUnit(d.id, document.querySelector(`#table tbody tr[aria-selected="true"]`));
+    await gotoUnit(next ?? d.id);
   };
-  parts.push(h("div", { class: "btnrow" },
-    h("button", { type: "button", class: "btn btn-primary", disabled: !chosen, onclick: () => decide("accept") },
-      d.decision?.action === "accept" && d.decision.candidate_id === chosen?.id ? "Accepted ✓"
-        : chosen?.source === "Local" ? "Accept own info" : "Accept release"),
-    h("button", { type: "button", class: "btn", onclick: () => decide("skip") }, "Skip album"),
-    d.decision ? h("button", { type: "button", class: "btn", onclick: () => decide("clear") }, "Undo decision") : null));
+  S.detailActions = { accept: () => decide("accept"), own: () => decide("own_info"), skip: () => decide("skip"),
+                      undo: () => decide("clear", false) };
+  const acceptedNow = d.decision?.action === "accept" && d.decision.candidate_id === chosen?.id;
+  const bar = h("div", { class: "detailbar" },
+    h("button", { type: "button", class: "btn btn-primary", disabled: !chosen, onclick: S.detailActions.accept },
+      acceptedNow ? "Accepted ✓" : chosen?.source === "Local" ? "Accept own info" : "Accept release", h("span", { class: "kbd" }, "A")),
+    h("button", { type: "button", class: "btn", disabled: d.status !== "done", onclick: S.detailActions.own }, "Own info", h("span", { class: "kbd" }, "O")),
+    h("button", { type: "button", class: "btn", onclick: S.detailActions.skip }, "Skip", h("span", { class: "kbd" }, "S")),
+    d.decision ? h("button", { type: "button", class: "btn", onclick: S.detailActions.undo }, "Undo", h("span", { class: "kbd" }, "U")) : null);
+  const differs = chosen && chosen.source !== "Local" && chosen.evidence && !chosen.evidence.title_agrees;
+  if (differs) parts.splice(1, 0, h("div", { class: "banner warnbanner" }, h("strong", {}, "The album title differs. "),
+    `Your album “${d.label}” vs this release “${chosen.album}”. Often a different album by the same artist — ` +
+    "compare the track mapping below, pick another candidate, or use Own info."));
+  if (onl.length > nOnl) list.append(h("button", { type: "button", class: "linkbtn",
+    onclick: () => { S.allCands = d.id; renderUnitDetail(d); } }, `Show ${onl.length - nOnl} more candidates`));
+  parts.unshift(bar);
   parts.push(h("p", { class: "muted xsmall" }, "Decisions are saved immediately. Nothing is copied or changed until you apply a plan."));
   document.getElementById("details").replaceChildren(...parts.filter(Boolean));
 }
