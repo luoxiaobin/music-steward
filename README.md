@@ -5,64 +5,128 @@
 
 *Formerly MP3LibraryTool.*
 
-A careful steward for a large music collection (MP3, FLAC, APE, …): organize it safely: **scan → recognize → review → plan → apply**.
-Sources are never modified; changes are written only to organized copies, from a saved plan, with a journal for crash recovery and undo.
+**Music Steward organizes a large, messy music collection into a clean copy — without changing your originals.**
+It reads your collection (for example on a NAS), recognizes albums (online catalogues, audio fingerprints, or the
+album's own cue sheet, tags and folder names), lets you review every decision, and then writes an organized copy:
+`Artist / Album (Year) / 01 - Title`, with corrected tags and a cue sheet per album.
 
-Status: **0.3.0 — works end to end on a real collection** (scan, recognize, review, plan, apply, undo; desktop window;
-search with pinyin; English / 中文 / Français / Español). See [`CHANGELOG.md`](CHANGELOG.md),
-[`docs/FEATURE_SHEET.md`](docs/FEATURE_SHEET.md) and [`docs/PLAN.md`](docs/PLAN.md). M0 experiments and their evidence
-report are in [`m0/`](m0/EVIDENCE_REPORT.md). Contributors and coding agents: see [`AGENTS.md`](AGENTS.md).
+It was built for collections where other tools struggle: **Chinese and other East Asian music** with garbled
+GBK/Big5 tags, single-file "image" albums with cue sheets (APE, FLAC, WAV), and albums that no online catalogue knows.
 
-## Install
+**Status: 0.3.0, early release.** It works end to end and was tried on a real 3 TB collection, but it is installed
+from source and needs Python and FFmpeg. See [`CHANGELOG.md`](CHANGELOG.md).
 
-Requires Python 3.12+ and FFmpeg (`ffmpeg`, `ffprobe`) on `PATH`.
+| Platform | Status |
+|---|---|
+| macOS (Apple silicon or Intel) | **Supported** — desktop window or browser; this is where it is used |
+| Linux | Engine and tests run in CI; browser mode should work; the desktop window is untested |
+| Windows | Not yet tested |
+| Collection on a NAS (SMB) | Supported for **reading** (scan, recognize, preview) |
+| Organized copy written to a **local or external disk** | Supported (the safest publish method) |
+| Organized copy written **to the NAS** | Experimental — see [Recovery and safety](docs/RECOVERY.md#writing-the-organized-copy-to-a-nas) |
+
+## Install (macOS)
+
+You need [Homebrew](https://brew.sh). Then, in Terminal:
 
 ```bash
+brew install python@3.12 ffmpeg chromaprint git
+git clone https://github.com/luoxiaobin/music-steward.git
+cd music-steward
 python3.12 -m venv .venv
-.venv/bin/pip install -e '.[dev]'
+source .venv/bin/activate
 ```
 
-## Use
+Then choose **one** of the two ways to run it:
 
-The command is `music-steward` (short alias `steward`; the old `mp3librarytool` still works for now).
-
-All commands only **read** the collection. They write a single app database (default `~/.music-steward/library.sqlite`, override with `--db` or `MLT_DB`).
+**A. Desktop window (recommended)**
 
 ```bash
-music-steward scan /Volumes/music          # inventory: paths, sizes, ffprobe properties, tags
-music-steward scan /Volumes/music          # again: unchanged files (size + mtime) are skipped
-music-steward scan "/Volumes/music/音乐Ape" # re-scan just one folder (fast; nothing else is touched)
-music-steward hash "/Volumes/music/音乐Ape" # whole-file + audio hashes for one folder (resumable)
-music-steward recognize "/Volumes/music/音乐Ape"   # match its albums (MusicBrainz, Deezer, Discogs)
-music-steward app                          # desktop window (needs: pip install -e '.[desktop]')
-music-steward serve --root /Volumes/music --dest ~/Music/Organized   # web UI: review, plan, apply, undo
-                                            #   (albums not found online: "Use own info" = cue sheet / tags / names)
-music-steward cache                        # web lookups + fingerprints cached while matching (--clear)
-music-steward audit                        # summary of all audit filters
-music-steward audit garbled_tags           # one filter: unreadable, missing_metadata, garbled_tags,
-                                            #   estimated_values, exact_duplicates, same_audio, orphan_lrc,
-                                            #   cue_sheets, dirs_named_like_file, unlistable_dirs, removed
-music-steward inspect "song.mp3" --hash    # one file, no database
+pip install -e '.[desktop]'
+music-steward app --root "/path/to/your/music"
 ```
 
-### What the scan guarantees
+**B. Browser tab** (also works from another computer through an SSH tunnel)
 
-* No folder cap; file vs folder is decided by the filesystem, never by extension (`Album.flac/` folders exist).
-* Paths are stored NFC-normalized (macOS may return NFD).
-* Unreadable files are listed, not fatal. Files vanishing mid-scan are handled.
-* If the root disappears mid-scan (unplugged drive, dropped share), the scan **aborts and marks nothing removed**.
-* Audio hash ignores tags: FFmpeg packet hash for MP3/FLAC/M4A/WAV; decoded-PCM hash for APE (its demuxer folds trailing tags into the last packet).
-* Garbled GBK/Big5 tags get a **repair proposal**; nothing is written.
+```bash
+pip install -e .
+music-steward serve --root "/path/to/your/music"
+```
+
+`serve` prints a one-time link (`http://127.0.0.1:…/?token=…`) and opens it in your browser.
+
+Next time: `cd music-steward && source .venv/bin/activate`, then the same `app` or `serve` command (`app` remembers
+your collection, so `--root` can be left out). `music-steward --version` shows the version.
+
+**Recommended before recognizing:** an AcoustID key for audio fingerprints (free for non-commercial use) and optionally a
+Discogs token. Without them recognition still works, by names and durations only. See
+[Configuration — credentials](docs/CONFIGURATION.md#credentials).
+
+## Your first run, in short
+
+1. Point it at a **small folder** first (a few albums), not your whole collection.
+2. **Scan**, then **Recognize folder** (about 10 seconds per album).
+3. In **Albums**, review each album: accept a match, use the album's **own info** when no catalogue knows it, or skip.
+4. **Settings → Default destination folder**: an empty folder **outside** your collection.
+5. **Review plan → Build plan**: check the folder-tree preview, then **Apply**.
+6. Open the copies in your player. Not happy? **Undo run** removes them.
+
+The full walkthrough, including an album no catalogue knows, is in the [User guide](docs/USER_GUIDE.md).
+
+## What it reads and writes
+
+| | Reads | Writes |
+|---|---|---|
+| Your collection (the `--root` folders) | file listings, audio and tags | **nothing, ever** |
+| The destination folder you choose | whether a name is taken | the organized copies (only on **Apply**); **Undo** deletes exactly the copies a run created, if unchanged |
+| App data `~/.music-steward/` | — | the app database, apply journals, web lookup cache, preview cache, window preferences ([details](docs/CONFIGURATION.md#where-the-app-keeps-its-data)) |
+| Internet | — | search terms (artist, album, track names, durations) to MusicBrainz, Deezer, Discogs; audio fingerprints to AcoustID ([what is sent](docs/CONFIGURATION.md#what-is-sent-to-online-services)) |
+
+Scanning, recognizing, reviewing and planning change no music files. Only **Apply** writes, and only to the
+destination. What can still go wrong, and how to recover, is in [Recovery and safety](docs/RECOVERY.md).
+
+## Documentation
+
+| Read this | For |
+|---|---|
+| [User guide](docs/USER_GUIDE.md) | scan, recognize, review, own info, editing, search, plan, apply, undo — step by step |
+| [Recovery and safety](docs/RECOVERY.md) | stopping, resuming, undo, conflicts, a disconnected drive, backups, what is guaranteed and what is not |
+| [Configuration](docs/CONFIGURATION.md) | naming defaults with examples, settings, credentials, data locations, privacy |
+| [Architecture](docs/ARCHITECTURE.md) | components, processes, safety boundaries, tests |
+| [Feature sheet](docs/FEATURE_SHEET.md), [Plan](docs/PLAN.md), [Evidence report](m0/EVIDENCE_REPORT.md) | product overview, roadmap and decisions, measured experiments |
+| [AGENTS.md](AGENTS.md), [SECURITY.md](SECURITY.md) | contributing (people and coding agents), reporting a security problem |
+
+## Command line
+
+Everything the app does is also available as commands (`music-steward <command> --help` for details):
+
+```bash
+music-steward scan "/Volumes/music/音乐Ape"        # inventory a folder (reads only); re-run to pick up changes
+music-steward hash "/Volumes/music/音乐Ape"        # audio hashes for duplicate detection (reads only)
+music-steward audit                                # garbled tags, unreadable files, duplicates, cue sheets …
+music-steward recognize "/Volumes/music/音乐Ape"   # match the albums in a folder (resumable)
+music-steward plan "/Volumes/music/音乐Ape" --dest ~/Music/Organized   # build a plan (writes nothing)
+music-steward apply <plan>                         # copy, tag the copies, verify, publish
+music-steward resume <run>                         # finish an interrupted run
+music-steward undo <run>                           # remove the copies a run created (unchanged ones only)
+music-steward cache                                # web lookup cache size (--clear to empty it)
+music-steward inspect "song.mp3" --hash            # one file, no database
+```
+
+The app database defaults to `~/.music-steward/library.sqlite` (override with `--db` or `MLT_DB`).
 
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest
-MLT_APE_SAMPLE=/path/to/any.ape .venv/bin/python -m pytest   # also run the APE test
+pip install -e '.[dev]'
+python -m pytest
+MLT_APE_SAMPLE=/path/to/any.ape python -m pytest   # also run the optional APE tests
 ```
 
-Fixtures are generated with FFmpeg at test time. **Never commit real music** to this repository.
+Test audio is generated with FFmpeg. **Never commit real music.** CI runs the suite on Linux and macOS for every pull
+request.
 
 ## License
 
-GPL-3.0-or-later (see `LICENSE`). beets/mutagen, used in later milestones, are GPL-compatible.
+GPL-3.0-or-later (see [`LICENSE`](LICENSE)). It uses beets (MIT), mutagen (GPL-2.0-or-later), pywebview (BSD),
+OpenCC (Apache-2.0) and calls FFmpeg and Chromaprint as external programs.

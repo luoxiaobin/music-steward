@@ -16,11 +16,14 @@ Living plan. Sources: the Architecture Assessment and M0 Experiments specs (Nov 
 |---|---|---|
 | **M0** Experiments | beets as a library; safe copy/tag on the NAS | ✅ done — `m0/EVIDENCE_REPORT.md` |
 | **M1** Inventory and audit | `scan` / `hash` / `audit` / `inspect`; incremental, crash-safe, read-only; folder-level scan and hash | ✅ done — full NAS inventory in the app DB |
-| **M2** Recognition and review | background matching queue; review UI; destination preview; conflicts; **desktop window (pywebview)** | 🔄 review, own info, bulk actions, plan screen done; resumability at scale in test; desktop window and singles rules to do |
-| **M3** Apply, verify, recover | saved plans; copy → tag → verify → publish; journal; resume; undo | 🔄 works to a local folder (plan, apply, resume, undo; cue images, disc sets); applying to the NAS to do |
+| **M2** Recognition and review | background matching queue; review UI; destination preview; conflicts; **desktop window (pywebview)** | ✅ done in 0.3.0 (incl. desktop window, search, languages); singles rules still to do |
+| **M3** Apply, verify, recover | saved plans; copy → tag → verify → publish; journal; resume; undo | ✅ to a local or external disk; 🔄 writing the copy to a NAS share is experimental (see docs/RECOVERY.md) |
 | **M4** Apple export | FLAC/APE → ALAC tree for iPhone; MP3 copied | later |
 
-## Next: thin end-to-end slice (decided 2026-11-19)
+Current status and support: [README](../README.md) and [CHANGELOG](../CHANGELOG.md). The numbered log below is the
+dated record of how the slice was built and tested.
+
+## Thin end-to-end slice — dated log (from 2026-11-19)
 
 Get one album all the way through before widening any step:
 
