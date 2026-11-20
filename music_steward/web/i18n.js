@@ -51,8 +51,8 @@ function _core(s) {
 // translate one piece of interface text; returns it unchanged when unknown
 function tr(text) {
   if (I18N.lang === "en" || !text) return text;
-  const lead = text.match(/^\s*/)[0], trail = text.match(/\s*$/)[0];
-  const s = text.trim();
+  const lead = text.match(/^[\s·]*/)[0], trail = text.match(/[\s·]*$/)[0];   // keep " · " separators at the edges
+  const s = text.slice(lead.length, text.length - trail.length);
   if (!s || !/[A-Za-z]/.test(s)) return text;
   let r = _core(s);
   if (r == null && s.includes("\n")) {

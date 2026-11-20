@@ -30,6 +30,8 @@ TABLE: list[tuple[str, str, str, str]] = [
      "Rechercher…  邓丽君 · denglijun · dlj   ( / )", "Buscar…  邓丽君 · denglijun · dlj   ( / )"),
     ("Search the collection", "搜索音乐库", "Rechercher dans la collection", "Buscar en la colección"),
     ("View", "视图", "Affichage", "Vista"),
+    ("Root: {path} · sources read-only", "音乐库：{path} · 源文件只读", "Racine : {path} · sources en lecture seule",
+     "Raíz: {path} · originales de solo lectura"),
     ("Root: {path}", "音乐库：{path}", "Racine : {path}", "Raíz: {path}"),
     ("sources read-only", "源文件只读", "sources en lecture seule", "originales de solo lectura"),
     ("No root configured", "尚未设置音乐库", "Aucune racine configurée", "No hay raíz configurada"),
