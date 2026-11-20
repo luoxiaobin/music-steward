@@ -255,7 +255,8 @@ class App:
 
     def settings_view(self, con) -> dict:
         from . import settings
-        return {"settings": settings.all_values(con),
+        from . import __version__
+        return {"version": __version__, "settings": settings.all_values(con),
                 "status": {"acoustid": bool(os.environ.get("ACOUSTID_API_KEY")),
                            "discogs": bool(os.environ.get("DISCOGS_TOKEN"))}}
 

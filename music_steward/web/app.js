@@ -788,6 +788,7 @@ async function openSettings() {
       h("div", { style: "display:flex;gap:8px" }, dest, chooseButton(dest)),
       h("div", { class: "muted xsmall" }, "Where plans copy to unless you choose another folder. Never inside your collection.")),
     msg,
+    h("div", { class: "muted xsmall", "data-no-translate": "" }, `Music Steward ${d.version}`),
     h("div", { class: "btnrow" },
       h("button", { type: "button", class: "btn", onclick: () => { dlg.close(); dlg.remove(); } }, "Cancel"),
       h("button", { type: "button", class: "btn btn-primary", onclick: async () => {

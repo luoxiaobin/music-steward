@@ -1,0 +1,66 @@
+# Changelog
+
+All notable changes to Music Steward (formerly MP3LibraryTool). The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [Semantic Versioning](https://semver.org/)
+(0.x: the interface and data formats may still change between minor versions).
+
+## [Unreleased]
+
+## [0.3.0] — 2026-11-19
+
+The first version tried end to end on a real collection: 135 albums recognized, reviewed, planned and copied, then
+checked by the owner in foobar2000.
+
+### Added
+- **Search** the whole collection (albums, folders, tracks): any part of a name, Simplified/Traditional-insensitive,
+  repaired tag text, **pinyin** (`denglijun`, `dlj`); `/` or ⌘K; a "Filter this list" box for the current folder.
+- **Interface languages:** English, 简体中文, 繁體中文 (Taiwan phrasing), Français (Canada), Español (EE. UU.).
+- **Settings panel:** names (Simplified / Traditional / as released), year (original / release), cue encoding, album
+  cue sheets, catalogues, default destination, language.
+- **Desktop window** (`music-steward app`, pywebview): signed in automatically, native folder picker, asks before
+  quitting during a job.
+- **Listen while reviewing:** play any track; APE/WavPack/TTA and single cue tracks are converted on demand.
+- **Review speed and safety:** "title differs" warnings, keyboard review (A/O/S/U, arrows), pinned action bar,
+  select-and-act on many albums, bulk accept that offers only the agreeing matches.
+- **Plan screen:** "Done for you" (artist merges, Simplified, original years, duplicates, album cues) and a
+  folder-tree preview; apply progress with ETA and **Stop**.
+- **Layout:** resizable panels with auto-size, a Columns menu, distinct panel tones.
+- **Naming rules from the trial:** names in Simplified (one folder per artist), original release year, the album's
+  own artist name over Latin/junk catalogue names, identical duplicate albums copied once, a cue sheet for every album.
+- Lookup and fingerprint cache; Deezer and Discogs throttled.
+- `music-steward --version`; this changelog; CI on GitHub.
+
+### Changed
+- Copied cue sheets are written as **UTF-8 with a BOM** (GB18030 cues showed as mojibake in foobar2000 for Mac);
+  `MLT_CUE_ENCODING=original` keeps the old behaviour.
+- Apply verifies APE copies by their exact audio bytes instead of decoding twice: about 8× faster.
+
+### Fixed
+- APE files with an ID3 block in front, or APEv2 tags holding GBK bytes or corrupt items, can be read, matched and
+  tagged (the copy's tag is rebuilt; audio verified identical).
+- WAV cue images can be tagged.
+- The embedded browser silently blocked confirmation dialogs: the app now has its own.
+- Concurrent web requests no longer lock the database.
+- Junk catalogue entries (a 274,000-character "track title") no longer stall matching.
+
+## [0.2.0] — 2026-11-19
+
+### Added
+- **Recognition:** albums, discs of a set and cue-sheet image albums as units; MusicBrainz + AcoustID, Deezer,
+  Discogs; garbled GBK/Big5 tags repaired in memory before searching; own confidence rule (Ready, Likely, Needs
+  review, Weak, No match); resumable queue, one process per album.
+- **Review UI:** candidates with evidence, track mapping, Accept / Skip / Undo, Search again, Edit fields.
+- **Own info** for albums no catalogue knows: from the cue sheet, tags, file names or folder name.
+- **Plan, apply, resume, undo** to a local folder: journal-first copy → tag → verify → publish; no overwrite;
+  undo removes only unchanged copies.
+- Renamed to **Music Steward**.
+
+## [0.1.0] — 2026-11-18
+
+### Added
+- M0 experiments: beets as a library, safe copy-and-tag on the NAS (claim-then-rename publish), evidence report.
+- **Inventory and audit** (read-only): incremental scan over SMB, per-folder re-scan, tag-independent audio hashes,
+  audit filters (garbled tags, unreadable, wrong extension, duplicates, cue sheets, orphan lyrics …).
+
+[Unreleased]: https://github.com/OWNER/REPO/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/OWNER/REPO/releases/tag/v0.3.0

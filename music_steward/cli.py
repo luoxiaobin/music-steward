@@ -211,6 +211,8 @@ def cmd_serve(a):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="music-steward")
+    from . import __version__
+    ap.add_argument("--version", action="version", version=f"music-steward {__version__}")
     ap.add_argument("--db", default=str(db.DEFAULT_DB), help="app database (default %(default)s)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
