@@ -573,6 +573,9 @@ def make_handler(app: App, port_ref: dict):
                                        "scan": app.scan_state})
                 if u.path == "/api/settings":
                     return self._json(app.settings_view(con))
+                if u.path == "/api/search":
+                    from . import search as srch_index
+                    return self._json(srch_index.query(con, q.get("q", "")[:100], _int(q.get("root_id"))))
                 if u.path == "/api/folders":
                     return self._json(app.folders(con, _int(q["root_id"]), q.get("path", "")))
                 if u.path == "/api/files":

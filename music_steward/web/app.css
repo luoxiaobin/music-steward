@@ -159,3 +159,17 @@ body.resizing{cursor:col-resize;user-select:none}
 .playbtn{border:1px solid var(--btn-line);background:var(--panel);border-radius:50%;width:26px;height:26px;cursor:pointer;
   font-size:11px;line-height:1;color:var(--accent)}
 .playbtn:hover{background:var(--accent-soft)}
+
+/* search */
+.searchwrap{position:relative;flex:1 1 320px;max-width:560px}
+.searchwrap input{width:100%;font:14px var(--font);min-height:34px;padding:0 12px;border:1px solid var(--btn-line);
+  border-radius:8px;background:var(--panel)}
+.searchwrap input:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.searchpop{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:20;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.16);max-height:70vh;overflow:auto;padding:6px;min-width:420px}
+.sgroup+.sgroup{border-top:1px solid var(--line2);margin-top:4px;padding-top:4px}
+.shead{font:600 12px var(--font);color:var(--muted);padding:6px 8px;text-transform:uppercase;letter-spacing:.03em}
+.sitem{display:flex;gap:8px;width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:6px 8px;cursor:pointer;font:inherit;color:inherit}
+.sitem.on,.sitem:hover{background:var(--accent-soft)}
+.sicon{width:18px;flex:0 0 18px;text-align:center}
+.stext{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

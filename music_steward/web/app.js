@@ -179,7 +179,7 @@ function renderFiles(total, where, fl) {
   const t = document.getElementById("table");
   const body = h("tbody");
   for (const f of S.files) {
-    const tr = h("tr", { tabindex: "0", "aria-selected": String(S.selected && S.selected.id === f.id),
+    const tr = h("tr", { tabindex: "0", "data-file": f.id, "aria-selected": String(S.selected && S.selected.id === f.id),
                          onclick: () => selectFile(f, tr), onkeydown: e => { if (e.key === "Enter") selectFile(f, tr); } },
       h("td", {}, h("div", { class: "strong" }, shown(f, "title") || f.relpath.split("/").pop()),
                   h("div", { class: "sub mono" }, f.relpath)),
@@ -871,3 +871,83 @@ document.addEventListener("click", e => {   // close the Columns menu when click
   const m = document.getElementById("colMenu");
   if (m && m.open && !m.contains(e.target)) m.open = false;
 });
+
+
+// ---------------------------------------------------------------- search (albums, folders, tracks; pinyin)
+const SR = { timer: null, items: [], idx: -1, seq: 0 };
+async function goFolder(path) {
+  const parts = path ? path.split("/") : [];
+  for (let i = 0; i <= parts.length; i++) S.expanded.add(parts.slice(0, i).join("/"));
+  S.path = path; S.filter = null;
+  await refreshCenter(); renderFilters(); await renderTree();
+  document.querySelector('#tree button[aria-current="true"]')?.scrollIntoView({ block: "center" });
+}
+async function setView(v) {
+  if (S.view === v) return;
+  document.querySelector(`[data-view="${v}"]`)?.click();
+  await new Promise(r => setTimeout(r, 50));
+}
+async function openResult(r) {
+  closeSearch();
+  if (r.kind === "folder") { await goFolder(r.folder); return; }
+  if (r.kind === "album") {
+    await setView("albums"); await goFolder(r.folder);
+    await gotoUnit(r.ref); return;
+  }
+  await setView("folders"); await goFolder(r.folder);   // track
+  const tr = document.querySelector(`#table tbody tr[data-file="${r.ref}"]`);
+  if (tr) { tr.scrollIntoView({ block: "center" }); tr.click(); }
+}
+function closeSearch() { document.getElementById("searchPop").hidden = true; SR.idx = -1; }
+function drawSearch(res) {
+  const pop = document.getElementById("searchPop");
+  SR.items = []; SR.idx = -1;
+  const group = (key, title, icon) => {
+    const list = res[key] || [], n = (res.counts || {})[key] || 0;
+    if (!list.length) return null;
+    return h("div", { class: "sgroup" }, h("div", { class: "shead" }, `${title} · ${n.toLocaleString()}` + (n > list.length ? ` (showing ${list.length})` : "")),
+      list.map(r => { const i = SR.items.push(r) - 1;
+        return h("button", { type: "button", class: "sitem", "data-i": i, onclick: () => openResult(r),
+                              onmouseenter: () => { SR.idx = i; markSearch(); } },
+          h("span", { class: "sicon" }, icon),
+          h("span", { class: "stext" }, h("span", { class: "strong" }, r.label),
+            h("span", { class: "muted small" }, r.kind === "folder" ? `  ${r.n} tracks · ${r.folder}` : (r.sub ? `  ${r.sub}` : ""),
+              r.kind !== "folder" ? h("span", { class: "mono xsmall" }, `  ${r.folder}/`) : null))); }));
+  };
+  const parts = [group("albums", "Albums", "💿"), group("folders", "Folders", "📁"), group("tracks", "Tracks", "♪")].filter(Boolean);
+  pop.replaceChildren(...(parts.length ? parts : [h("div", { class: "muted small", style: "padding:10px" }, `Nothing found for “${res.q}”.`)]));
+  pop.hidden = false;
+}
+function markSearch() {
+  document.querySelectorAll("#searchPop .sitem").forEach(b => b.classList.toggle("on", Number(b.dataset.i) === SR.idx));
+  document.querySelector("#searchPop .sitem.on")?.scrollIntoView({ block: "nearest" });
+}
+(function initSearch() {
+  const box = document.getElementById("searchBox");
+  box.addEventListener("input", () => {
+    clearTimeout(SR.timer);
+    const q = box.value.trim();
+    if (!q) return closeSearch();
+    SR.timer = setTimeout(async () => {
+      const seq = ++SR.seq;
+      const pop = document.getElementById("searchPop");
+      if (pop.hidden) { pop.replaceChildren(h("div", { class: "muted small", style: "padding:10px" }, "Searching…")); pop.hidden = false; }
+      const res = await api(`/api/search?q=${encodeURIComponent(q)}&root_id=${S.rootId || ""}`);
+      if (seq === SR.seq) drawSearch(res);
+    }, 220);
+  });
+  box.addEventListener("keydown", e => {
+    if (e.key === "Escape") { box.value = ""; closeSearch(); box.blur(); return; }
+    if (!SR.items.length) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); SR.idx = Math.min(SR.items.length - 1, SR.idx + 1); markSearch(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); SR.idx = Math.max(0, SR.idx - 1); markSearch(); }
+    else if (e.key === "Enter") { e.preventDefault(); openResult(SR.items[Math.max(0, SR.idx)]); }
+  });
+  box.addEventListener("focus", () => { if (box.value.trim() && SR.items.length) document.getElementById("searchPop").hidden = false; });
+  document.addEventListener("click", e => { if (!e.target.closest(".searchwrap")) closeSearch(); });
+  document.addEventListener("keydown", e => {   // "/" or ⌘K / Ctrl+K: jump to search
+    const t = e.target;
+    if (t && t.closest && t.closest("input, textarea, select, dialog")) return;
+    if (e.key === "/" || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) { e.preventDefault(); box.focus(); box.select(); }
+  });
+})();
