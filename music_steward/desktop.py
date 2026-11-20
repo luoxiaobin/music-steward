@@ -57,7 +57,9 @@ def run(db_path: str, roots: list[str], dest: str | None = None, debug: bool = F
 
     window.events.closing += closing
     try:
-        webview.start(debug=debug)
+        # not private: the page remembers per-viewer conveniences (panel sizes, hidden columns)
+        from .db import APP_DIR
+        webview.start(debug=debug, private_mode=False, storage_path=str(APP_DIR / "webview"))
     finally:
         httpd.shutdown()
         httpd.server_close()
