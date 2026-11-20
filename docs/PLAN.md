@@ -131,7 +131,9 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
     with ETA and Stop (resumable); Settings panel (names, year, cue encoding, album cues, catalogues,
     destination); desktop window (`music-steward app`, native folder picker); resizable panels with
     auto-size, Columns menu, panel tones; listening while reviewing (APE / cue-track previews).
-    Still on the list: Chinese UI, apply to the NAS, a double-clickable signed app.
+    Then: search (albums/folders/tracks, script-insensitive, pinyin) and "Filter this list"; interface in
+    English, 简体中文, 繁體中文 (OpenCC Taiwan phrasing), Français (Canada), Español (EE. UU.), chosen in Settings.
+    Still on the list: apply to the NAS, a double-clickable signed app.
 
 ## M2 backlog (original order)
 

@@ -41,7 +41,7 @@ Desktop window and installer · apply to the NAS (protocol proven, UI targets a 
 
 ## Future features (proposed order)
 Guiding constraint: the heavy work (scanning terabytes, decoding APE, fingerprinting) belongs on a computer or on the NAS, not on a phone.
-1. **Chinese UI** (Simplified + Traditional) — string tables for the plain HTML/JS UI; fits the core audience. *Days.*
+1. ✅ **Interface languages** — English, 简体中文, 繁體中文, Français (Canada), Español (EE. UU.), chosen in Settings; plus search with pinyin.
 2. **macOS app** — pywebview window, bundled Python + FFmpeg, signed and notarized download. *~1 week.*
 3. **NAS / Docker mode + phone-friendly review** — run the engine on the NAS (local disk speed instead of SMB: faster scan and hash); every device uses the same web UI over the home network with proper sign-in. A swipe-to-Accept/Skip review with audio preview covers **iPhone and Android** with no store app.
 4. **Windows desktop** — UNC paths, the publish-safety probe on NTFS/SMB, WebView2 window, installer, full test pass. *1–2 weeks.*
