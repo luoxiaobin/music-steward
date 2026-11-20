@@ -125,6 +125,13 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
     (→ own info), and APE verification decoding twice (→ exact audio-byte check, 8× faster).
     Trial 2: 10 min, 331/331 files, 0 blocked, 126 cues UTF-8; albums of separate track files now
     get a generated album cue (user request). User verdict: "it worked".
+21. ✅ End-to-end polish after the trial (2026-11-20), each tried by the user in the app:
+    review safety ("title differs" marker/banner; bulk accept offers only the agreeing ones), keyboard
+    review with a pinned action bar; plan screen "Done for you" + folder-tree preview; apply progress
+    with ETA and Stop (resumable); Settings panel (names, year, cue encoding, album cues, catalogues,
+    destination); desktop window (`music-steward app`, native folder picker); resizable panels with
+    auto-size, Columns menu, panel tones; listening while reviewing (APE / cue-track previews).
+    Still on the list: Chinese UI, apply to the NAS, a double-clickable signed app.
 
 ## M2 backlog (original order)
 
