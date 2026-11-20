@@ -95,7 +95,7 @@ class App:
                 "folders": [{"name": k, "path": prefix + k, "audio": v}
                             for k, v in sorted(counts.items())]}
 
-    def files(self, con, root_id, path, flt, limit=2000):
+    def files(self, con, root_id, path, flt, limit=2000, q: str = ""):
         prefix = f"{path}/" if path else ""
         rows = con.execute(
             "SELECT id, relpath, kind, ext, size, codec, container, duration, bit_rate, "
@@ -106,6 +106,11 @@ class App:
         if flt:
             keep = {r["relpath"] for r in self._filter_rows(con, flt, root_id)}
             rows = [r for r in rows if r["relpath"] in keep]
+        if q:   # "Filter this list": title / artist / album (repaired) and file name
+            from .search import _tags, matcher
+            hit = matcher(q)
+            rows = [r for r in rows if hit(*(lambda t: (t.get("title"), t.get("artist"), t.get("album")))(_tags(r)),
+                                           r["relpath"].rsplit("/", 1)[-1])]
         total = len(rows)
         out = []
         for r in rows[:limit]:
@@ -582,10 +587,17 @@ def make_handler(app: App, port_ref: dict):
                     flt = q.get("filter") or None
                     if flt and flt not in audit.FILTERS:
                         return self._json({"error": "unknown filter"}, 400)
-                    return self._json(app.files(con, _int(q["root_id"]), q.get("path", ""), flt))
+                    return self._json(app.files(con, _int(q["root_id"]), q.get("path", ""), flt, q=q.get("q", "")[:100]))
                 if u.path == "/api/units":
                     from .recognize import results
-                    return self._json(results.units(con, _int(q["root_id"]), q.get("path", "")))
+                    us = results.units(con, _int(q["root_id"]), q.get("path", ""))
+                    if q.get("q"):   # "Filter this list": the album, its folder, matched and own names
+                        from .search import matcher
+                        hit = matcher(q["q"][:100])
+                        us = [x for x in us if hit(x["label"], x["folder"].rsplit("/", 1)[-1],
+                                                   *((x["top"] or {}).get(k) for k in ("album", "artist")),
+                                                   *((x.get("local") or {}).get(k) for k in ("album", "artist")))]
+                    return self._json(us)
                 if u.path == "/api/plans":
                     return self._json([dict(r) for r in con.execute(
                         "SELECT id, created_at, dest_root, scope, summary_json FROM plan ORDER BY id DESC LIMIT 20")])

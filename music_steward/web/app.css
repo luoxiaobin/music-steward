@@ -173,3 +173,6 @@ body.resizing{cursor:col-resize;user-select:none}
 .sitem.on,.sitem:hover{background:var(--accent-soft)}
 .sicon{width:18px;flex:0 0 18px;text-align:center}
 .stext{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.listfilter{font:13px var(--font);min-height:32px;padding:0 10px;border:1px solid var(--btn-line);border-radius:8px;width:180px;background:var(--panel)}
+.listfilter:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}

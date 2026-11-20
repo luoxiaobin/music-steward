@@ -166,3 +166,13 @@ def query(con: sqlite3.Connection, q: str, root_id: int | None = None, limit: in
         best = sorted(pool, key=rank)
         out[key] = best[:limit]
     return out
+
+
+def matcher(q: str):
+    """A predicate for filtering a list in place: matches(*names) is True when any part of the
+    names matches q, the same way the search box does (script-insensitive, pinyin)."""
+    q = (q or "").strip()
+    needles = [n for n in {normalize(q), re.sub(r"\s+", "", q.casefold())} if n]
+    if not needles:
+        return lambda *names: True
+    return lambda *names: any(n in index_text(*names) for n in needles)

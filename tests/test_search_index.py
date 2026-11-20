@@ -50,3 +50,19 @@ def test_index_follows_decisions(tmp_path, con):
     con.commit()
     r = search.query(con, "edited name")              # the user's own edit is searchable at once
     assert r["counts"]["albums"] == 1 and "Accepted" in r["albums"][0]["sub"]
+
+
+def test_filter_this_list(tmp_path, con):
+    from music_steward.server import App
+    lib = tmp_path / "lib"
+    for i, t in enumerate(["我只在乎你", "甜蜜蜜", "Other Song"]):
+        tag_id3(tone(lib / "精選" / f"0{i + 1} - {t}.mp3", ["-c:a", "libmp3lame"], secs=1, freq=300 + i), t,
+                artist="鄧麗君" if i < 2 else "Someone", album="精選")
+    scan(con, lib)
+    app = App(con.execute("PRAGMA database_list").fetchone()[2], [str(lib)], None)
+    titles = lambda q: [f["title"] for f in app.files(con, 1, "精選", None, q=q)["files"]]
+    assert titles("") == ["我只在乎你", "甜蜜蜜", "Other Song"]
+    assert titles("邓丽君") == titles("dlj") == ["我只在乎你", "甜蜜蜜"]
+    assert titles("tmm") == ["甜蜜蜜"] and titles("other") == ["Other Song"] and titles("zzz") == []
+    m = search.matcher("鄧麗君")
+    assert m("邓丽君 - 甜蜜蜜") and not m("林子祥")

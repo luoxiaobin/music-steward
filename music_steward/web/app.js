@@ -141,7 +141,7 @@ async function treeNode(path, name, count) {
   const btn = h("button", { type: "button", "aria-current": String(S.path === path), "aria-expanded": String(open),
                             onclick: async () => { if (S.path === path) { open ? S.expanded.delete(path) : S.expanded.add(path); }
                                                    else { S.expanded.add(path); }
-                                                   S.path = path; S.filter = null; await refreshCenter(); renderFilters(); await renderTree(); } },
+                                                   S.path = path; S.filter = null; clearListFilter(); await refreshCenter(); renderFilters(); await renderTree(); } },
                 h("span", { class: "tw", "aria-hidden": "true" }, open ? "▾" : "▸"), name,
                 count !== null ? h("span", { class: "cnt" }, count) : null);
   const li = h("li", {}, btn);
@@ -161,7 +161,7 @@ async function refreshCenter() {
   if (!S.rootId) return;
   document.querySelectorAll(".selbar").forEach(el => el.remove());   // album selection bar: Albums view only
   const d = await api(`/api/files?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}` +
-                      (S.filter ? `&filter=${S.filter}` : ""));
+                      (S.filter ? `&filter=${S.filter}` : "") + (S.listQ ? `&q=${encodeURIComponent(S.listQ)}` : ""));
   S.files = d.files;
   const fs = await api(`/api/folders?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}`);
   document.getElementById("folderStats").textContent =
@@ -219,11 +219,18 @@ function unitBadge(u) {
   return h("span", { class: `badge ${cls}` }, txt);
 }
 async function renderUnits(where) {
-  const us = await api(`/api/units?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}`);
+  const us = await api(`/api/units?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}` +
+                       (S.listQ ? `&q=${encodeURIComponent(S.listQ)}` : ""));
+  if (!us.length && S.listQ) {
+    document.getElementById("tableTitle").textContent = `Albums · none match “${S.listQ}” in ${where}`;
+    document.getElementById("table").replaceChildren();
+    return true;
+  }
   if (!us.length) return false;
   const counts = {};
   for (const u of us) { const k = u.decision ? u.decision.action : u.confidence; counts[k] = (counts[k] || 0) + 1; }
-  document.getElementById("tableTitle").textContent = `Albums · ${us.length} recognized units in ${where}`;
+  document.getElementById("tableTitle").textContent = S.listQ ? `Albums · ${us.length} matching “${S.listQ}” in ${where}`
+                                                                : `Albums · ${us.length} recognized units in ${where}`;
   const note = document.getElementById("tableNote");
   note.replaceChildren(Object.entries(counts).map(([k, n]) => `${n} ${k.replace("_", " ")}`).join(" · "));
   const nLikely = us.filter(u => !u.decision && u.confidence === "likely").length;
@@ -878,7 +885,7 @@ const SR = { timer: null, items: [], idx: -1, seq: 0 };
 async function goFolder(path) {
   const parts = path ? path.split("/") : [];
   for (let i = 0; i <= parts.length; i++) S.expanded.add(parts.slice(0, i).join("/"));
-  S.path = path; S.filter = null;
+  S.path = path; S.filter = null; clearListFilter();
   await refreshCenter(); renderFilters(); await renderTree();
   document.querySelector('#tree button[aria-current="true"]')?.scrollIntoView({ block: "center" });
 }
@@ -950,4 +957,14 @@ function markSearch() {
     if (t && t.closest && t.closest("input, textarea, select, dialog")) return;
     if (e.key === "/" || ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k")) { e.preventDefault(); box.focus(); box.select(); }
   });
+})();
+
+
+// ---------------------------------------------------------------- "Filter this list" (current folder only)
+function clearListFilter() { S.listQ = ""; const el = document.getElementById("listFilter"); if (el) el.value = ""; }
+(function initListFilter() {
+  const el = document.getElementById("listFilter");
+  let t = null;
+  el.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { S.listQ = el.value.trim(); refreshCenter(); }, 250); });
+  el.addEventListener("keydown", e => { if (e.key === "Escape") { clearListFilter(); refreshCenter(); el.blur(); } });
 })();
