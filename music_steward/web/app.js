@@ -740,7 +740,10 @@ document.getElementById("recognizeBtn").addEventListener("click", async () => {
                "10 seconds each, so a big folder can take hours. You can stop it at any time.")) return;
   startJob("recognize", S.path);
 });
-refreshAll().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });
+(async () => {
+  try { const st = await api("/api/settings"); await setLanguage(st.settings.language.value); } catch (e) { /* English */ }
+  await refreshAll();
+})().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });
 
 
 // ---------------------------------------------------------------- settings
@@ -758,6 +761,12 @@ async function openSettings() {
   const msg = h("p", { class: "err" });
   const dlg = h("dialog", { class: "appdialog settings" },
     h("h2", { class: "h2" }, "Settings"),
+    h("section", {}, h("h3", {}, h("label", { for: "setLang" }, "Language")),
+      h("select", { id: "setLang", "data-no-translate": "", disabled: env("language") ? true : null },
+        [["auto", "Automatic (this computer's language)"], ["en", "English"], ["zh-hans", "简体中文"], ["zh-hant", "繁體中文"],
+         ["fr-ca", "Français (Canada)"], ["es-us", "Español (EE. UU.)"]].map(([val, label]) =>
+          h("option", { value: val, selected: v("language") === val ? true : null }, val === "auto" ? tr(label) : label))),
+      envNote("language")),
     h("section", {}, h("h3", {}, "Names in the organized copies"),
       radios("script", [["simplified", "Simplified Chinese", "one folder per artist (鄧麗君 → 邓丽君)"],
                         ["traditional", "Traditional Chinese"], ["keep", "As each release has it"]]), envNote("script")),
@@ -787,11 +796,12 @@ async function openSettings() {
           album_cue: dlg.querySelector("#setAlbumCue").checked ? "on" : "off",
           sources: ["musicbrainz", dlg.querySelector("#srcDeezer").checked && "deezer",
                     dlg.querySelector("#srcDiscogs").checked && "discogs"].filter(Boolean).join(","),
-          dest: dest.value };
+          dest: dest.value, language: dlg.querySelector("#setLang").value };
         for (const n of Object.keys(body)) if (env(n === "sources" ? "sources" : n)) delete body[n];
         const r = await post2("/api/settings", { settings: body });
         if (r.error) { msg.textContent = r.error; return; }
         dlg.close(); dlg.remove();
+        if (body.language && body.language !== v("language")) location.reload();   // switch the whole interface
       } }, "Save")));
   document.body.append(dlg);
   dlg.showModal();

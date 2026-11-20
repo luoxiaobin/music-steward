@@ -584,6 +584,11 @@ def make_handler(app: App, port_ref: dict):
                                        "scan": app.scan_state})
                 if u.path == "/api/settings":
                     return self._json(app.settings_view(con))
+                m = re.fullmatch(r"/api/i18n/([A-Za-z-]{2,10})", u.path)
+                if m:
+                    from . import i18n
+                    lang = {k.lower(): k for k in i18n.LANGUAGES}.get(m.group(1).lower())
+                    return self._json(i18n.dictionary(lang) if lang else {}) if lang else self._json({}, 404)
                 if u.path == "/api/search":
                     from . import search as srch_index
                     return self._json(srch_index.query(con, q.get("q", "")[:100], _int(q.get("root_id"))))

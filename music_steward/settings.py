@@ -17,6 +17,7 @@ SPEC = {
     "album_cue": ("on", ("on", "off"), "MLT_ALBUM_CUE", "Cue sheet for albums of separate track files"),
     "sources": ("musicbrainz,deezer,discogs", None, "MLT_SOURCES", "Online catalogues to search"),
     "dest": ("", None, None, "Default destination folder"),
+    "language": ("auto", ("auto", "en", "zh-hans", "zh-hant", "fr-ca", "es-us"), "MLT_LANGUAGE", "Interface language"),
 }
 _ENV_TRUE = {"1": "on", "0": "off"}   # MLT_ALBUM_CUE=1/0
 
