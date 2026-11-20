@@ -6,6 +6,9 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 
 ## [Unreleased]
 
+### Changed
+- CI: GitHub Actions updated to actions/checkout v7 and actions/setup-python v7 (Node.js 20 is deprecated on runners).
+
 ## [0.3.0] — 2026-11-19
 
 The first version tried end to end on a real collection: 135 albums recognized, reviewed, planned and copied, then
