@@ -133,3 +133,9 @@ audio{width:100%}
 .tree summary{cursor:pointer;padding:2px 0}
 .tree .tree-album{margin-left:20px}
 .tree ul{margin:2px 0 6px 38px;padding:0;list-style:none}
+
+.appdialog.settings{max-width:620px;width:92vw}
+.settings section{border-top:1px solid var(--line2);padding:10px 0}
+.settings h3{font-size:14px;margin:0 0 6px}
+.settings .radios label,.settings section>label{display:block;margin:4px 0}
+.settings input[type=text]{width:100%;font:14px var(--font);min-height:32px;padding:0 8px;border:1px solid var(--btn-line);border-radius:6px}

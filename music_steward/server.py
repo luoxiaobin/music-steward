@@ -238,6 +238,26 @@ class App:
         threading.Thread(target=work, daemon=True).start()
         return {"started": True}
 
+    def settings_view(self, con) -> dict:
+        from . import settings
+        return {"settings": settings.all_values(con),
+                "status": {"acoustid": bool(os.environ.get("ACOUSTID_API_KEY")),
+                           "discogs": bool(os.environ.get("DISCOGS_TOKEN"))}}
+
+    def save_settings(self, con, body) -> dict:
+        from . import settings
+        try:
+            settings.save(con, body.get("settings") or {})
+        except settings.SettingsError as e:
+            return {"error": str(e)}
+        if (body.get("settings") or {}).get("dest"):
+            from .apply.plan import PlanError, check_destination
+            try:
+                check_destination(con, Path(settings.get(con, "dest")))
+            except PlanError as e:
+                return {"error": str(e)}
+        return self.settings_view(con)
+
     def stop_job(self) -> dict:
         if not self.scan_state.get("running") or self.scan_state.get("kind") not in ("recognize", "apply", "resume"):
             return {"error": "only a running recognition or apply can be stopped"}
@@ -249,7 +269,8 @@ class App:
         root = os.path.abspath(body.get("root", ""))
         if root not in self.roots:
             return {"error": "not a configured root"}
-        dest = (body.get("dest") or self.dest or "").strip()
+        from . import settings
+        dest = (body.get("dest") or settings.get(con, "dest") or self.dest or "").strip()
         if not dest:
             return {"error": "choose a destination folder first"}
         row = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()
@@ -536,9 +557,12 @@ def make_handler(app: App, port_ref: dict):
                 if u.path == "/api/state":
                     roots = app.roots_info(con)
                     rid = _int(q.get("root_id")) or next((r["root_id"] for r in roots if r["root_id"]), None)
-                    return self._json({"roots": roots, "root_id": rid, "dest": app.dest,
+                    from . import settings as _st
+                    return self._json({"roots": roots, "root_id": rid, "dest": _st.get(con, "dest") or app.dest,
                                        "summary": app.summary(con, rid) if rid else None,
                                        "scan": app.scan_state})
+                if u.path == "/api/settings":
+                    return self._json(app.settings_view(con))
                 if u.path == "/api/folders":
                     return self._json(app.folders(con, _int(q["root_id"]), q.get("path", "")))
                 if u.path == "/api/files":
@@ -611,6 +635,12 @@ def make_handler(app: App, port_ref: dict):
                 con = app.con()
                 try:
                     return self._json(app.decide(con, body))
+                finally:
+                    con.close()
+            if u.path == "/api/settings":
+                con = app.con()
+                try:
+                    return self._json(app.save_settings(con, body))
                 finally:
                     con.close()
             if u.path == "/api/stop":

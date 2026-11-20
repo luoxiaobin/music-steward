@@ -61,17 +61,18 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
     items.append({"unit_id": u["id"], "file_id": cf["id"], "kind": "cue",
                   "src": os.path.join(root_path, cf["fs_relpath"]), "dest_rel": f"{adir}/{stem}.cue",
                   "codec": None, "size": cf["size"], "mtime": cf["mtime_ns"],
-                  "tags": {"cue_rewrite": {"encoding": cue_encoding(),
+                  "tags": {"cue_rewrite": {"encoding": cue_encoding(con),
                                            "files": {fl.name: image_name for fl in sheet.files},
                                            "album": {"title": c["album"], "performer": c["artist"]},
                                            "tracks": tracks}}})
     new_stem_of[f["relpath"].rsplit(".", 1)[0]] = f"{adir}/{stem}"
 
 
-def album_cues() -> bool:
+def album_cues(con=None) -> bool:
     """Write an album cue sheet for albums of separate track files too (user request after the
     trial: every album then opens the same way in a player). MLT_ALBUM_CUE=0 turns it off."""
-    return os.environ.get("MLT_ALBUM_CUE", "1") != "0"
+    from .. import settings
+    return settings.get(con, "album_cue") == "on"
 
 
 def _q(s) -> str:
@@ -93,19 +94,20 @@ def album_cue_text(c: dict, tracks: list[dict], disc: int | None) -> str:
     return "\r\n".join(lines) + "\r\n"
 
 
-def cue_encoding() -> str | None:
+def cue_encoding(con=None) -> str | None:
     """Encoding of copied cue sheets: UTF-8 with a BOM by default (readable by foobar2000 on Mac
     and Windows and most players; GB18030 cues showed as mojibake on the Mac).
     MLT_CUE_ENCODING=original keeps each cue's own encoding (old Chinese Windows players)."""
-    v = os.environ.get("MLT_CUE_ENCODING", "utf-8-sig")
-    return None if v.lower() == "original" else v
+    from .. import settings
+    v = settings.get(con, "cue_encoding")
+    return None if v == "original" else v
 
 
-def script_rule() -> str:
+def script_rule(con=None) -> str:
     """How names are written in the copies (user decision 2026-11-19: Simplified, so one artist
     never ends up in two folders, 鄧麗君 / 邓丽君). MLT_SCRIPT=traditional|keep to change it."""
-    v = os.environ.get("MLT_SCRIPT", "simplified").lower()
-    return v if v in ("simplified", "traditional", "keep") else "simplified"
+    from .. import settings
+    return settings.get(con, "script")
 
 
 def _script(s, rule):
@@ -183,14 +185,16 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
         ov = json.loads(u["overrides_json"] or "{}")
         before = {"album": c["album"], "artist": c["artist"], "year": c["year"]}
         # the album's first release year, not a reissue's (user decision 2026-11-19)
-        if c.get("original_year") and (not c["year"] or c["original_year"] < c["year"]):
+        from .. import settings as _settings
+        if _settings.get(con, "year") == "original" and c.get("original_year") and \
+                (not c["year"] or c["original_year"] < c["year"]):
             c["year"] = c["original_year"]
         if (c.get("source") or "") != "Local":
             _prefer_own_artist(con, u, c, tracks)
         if c.get("_artist_from"):
             notes.append({"unit_id": u["id"], "label": u["label"], "type": "artist_merged",
                           "from": c["_artist_from"], "to": c["artist"]})
-        rule = script_rule()   # catalogue/own-info names only; the user's own edits stay as typed
+        rule = script_rule(con)   # catalogue/own-info names only; the user's own edits stay as typed
         pre = (c["album"], c["artist"])
         c["album"], c["artist"] = _script(c["album"], rule), _script(c["artist"], rule)
         if (c["album"], c["artist"]) != pre:
@@ -248,7 +252,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                           "src": os.path.join(root_path, f["fs_relpath"]), "dest_rel": f"{adir}/{name}",
                           "codec": f["codec"], "tags": _tags_for(c, t, u["kind"]),
                           "size": f["size"], "mtime": f["mtime_ns"]})
-        if u["kind"] == "album" and album_cues():
+        if u["kind"] == "album" and album_cues(con):
             mine = [it for it in items if it["unit_id"] == u["id"] and it["kind"] == "audio"]
             if len(mine) >= 2:
                 mine.sort(key=lambda it: it["dest_rel"])
@@ -301,7 +305,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                "blocked": sum(i["status"] not in ("ok", "duplicate_source") for i in items),
                "duplicate_albums_skipped": len(dup_units),
                "bytes": sum(i["size"] for i in items if i["status"] == "ok"),
-               "albums": len({i["unit_id"] for i in items}), "script": script_rule(),
+               "albums": len({i["unit_id"] for i in items}), "script": script_rule(con),
                "album_cues": sum(i["kind"] == "cue_new" and i["status"] == "ok" for i in items),
                "changes": {t: sum(n["type"] == t for n in notes) for t in ("artist_merged", "script", "original_year")},
                "notes": notes[:1000]}

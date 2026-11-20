@@ -704,3 +704,58 @@ document.getElementById("recognizeBtn").addEventListener("click", async () => {
   startJob("recognize", S.path);
 });
 refreshAll().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });
+
+
+// ---------------------------------------------------------------- settings
+async function openSettings() {
+  const d = await api("/api/settings");
+  const v = n => d.settings[n].value, env = n => d.settings[n].overridden_by;
+  const radios = (name, opts) => h("div", { class: "radios" }, opts.map(([val, label, hint]) =>
+    h("label", {}, h("input", { type: "radio", name, value: val, checked: v(name) === val ? true : null, disabled: env(name) ? true : null }),
+      " ", label, hint ? h("span", { class: "muted xsmall" }, "  " + hint) : null)));
+  const envNote = n => env(n) ? h("div", { class: "muted xsmall" }, `Set by ${env(n)} in the environment; change it there.`) : null;
+  const srcs = v("sources").split(",");
+  const chk = (id, label, on, disabled, hint) => h("label", {}, h("input", { type: "checkbox", id, checked: on ? true : null,
+    disabled: disabled ? true : null }), " ", label, hint ? h("span", { class: "muted xsmall" }, "  " + hint) : null);
+  const dest = h("input", { type: "text", id: "setDest", value: v("dest") || "", placeholder: "/Users/you/Music/Organized  (outside your collection)" });
+  const msg = h("p", { class: "err" });
+  const dlg = h("dialog", { class: "appdialog settings" },
+    h("h2", { class: "h2" }, "Settings"),
+    h("section", {}, h("h3", {}, "Names in the organized copies"),
+      radios("script", [["simplified", "Simplified Chinese", "one folder per artist (鄧麗君 → 邓丽君)"],
+                        ["traditional", "Traditional Chinese"], ["keep", "As each release has it"]]), envNote("script")),
+    h("section", {}, h("h3", {}, "Year in folder names and tags"),
+      radios("year", [["original", "Original release year", "a 2018 reissue of a 1986 album shows 1986"],
+                      ["release", "Year of the matched release"]]), envNote("year")),
+    h("section", {}, h("h3", {}, "Cue sheets"),
+      radios("cue_encoding", [["utf-8-sig", "UTF-8", "readable by foobar2000 on Mac and Windows and most players"],
+                              ["original", "Keep each cue's original encoding", "for old Chinese Windows players"]]), envNote("cue_encoding"),
+      chk("setAlbumCue", "Write a cue sheet for albums of separate track files", v("album_cue") === "on", env("album_cue")), envNote("album_cue")),
+    h("section", {}, h("h3", {}, "Online catalogues"),
+      chk("srcMb", "MusicBrainz", true, true, "always"),
+      chk("srcDeezer", "Deezer", srcs.includes("deezer"), env("sources")),
+      chk("srcDiscogs", "Discogs", srcs.includes("discogs") && d.status.discogs, env("sources") || !d.status.discogs,
+          d.status.discogs ? "" : "needs DISCOGS_TOKEN in the environment"),
+      h("div", { class: "muted xsmall" }, `Fingerprints (AcoustID): ${d.status.acoustid ? "key found" : "no key — matching without fingerprints"}. ` +
+        "Keys stay in your environment (~/.zshenv); the app never stores them."), envNote("sources")),
+    h("section", {}, h("h3", {}, h("label", { for: "setDest" }, "Default destination folder")), dest,
+      h("div", { class: "muted xsmall" }, "Where plans copy to unless you choose another folder. Never inside your collection.")),
+    msg,
+    h("div", { class: "btnrow" },
+      h("button", { type: "button", class: "btn", onclick: () => { dlg.close(); dlg.remove(); } }, "Cancel"),
+      h("button", { type: "button", class: "btn btn-primary", onclick: async () => {
+        const pick = n => dlg.querySelector(`input[name=${n}]:checked`)?.value;
+        const body = { script: pick("script"), year: pick("year"), cue_encoding: pick("cue_encoding"),
+          album_cue: dlg.querySelector("#setAlbumCue").checked ? "on" : "off",
+          sources: ["musicbrainz", dlg.querySelector("#srcDeezer").checked && "deezer",
+                    dlg.querySelector("#srcDiscogs").checked && "discogs"].filter(Boolean).join(","),
+          dest: dest.value };
+        for (const n of Object.keys(body)) if (env(n === "sources" ? "sources" : n)) delete body[n];
+        const r = await post2("/api/settings", { settings: body });
+        if (r.error) { msg.textContent = r.error; return; }
+        dlg.close(); dlg.remove();
+      } }, "Save")));
+  document.body.append(dlg);
+  dlg.showModal();
+}
+document.getElementById("settingsBtn").addEventListener("click", openSettings);

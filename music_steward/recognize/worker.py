@@ -49,6 +49,9 @@ def run_unit(db_path: str, unit_id: int) -> int:
     con.execute("UPDATE unit SET status='running', started_at=?, error=NULL WHERE id=?", (time.time(), unit_id))
     con.commit()
     try:
+        from .. import settings
+        if "MLT_SOURCES" not in os.environ:          # the user's choice in Settings
+            os.environ["MLT_SOURCES"] = settings.get(con, "sources")
         from . import beets_adapter as A
         key = os.environ.get("ACOUSTID_API_KEY")
         paths = [path_of[i] for i in sorted(path_of)]
