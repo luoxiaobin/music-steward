@@ -115,6 +115,16 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
     lenient tag reading (repair proposals for GBK/Big5), beets falls back to it, and a copy's
     unreadable APE tag is rebuilt from its salvageable items (audio verified identical).
     Follow-up: when an album tag is a placeholder (未知标题), search with the folder name instead.
+20. ✅ Subset trial, end to end (2026-11-19): 357 音乐Ape albums recognized → user review in the app
+    (bulk + selection) → 135 albums accepted → plan → apply to a local folder → checked by the user
+    in foobar2000 (Mac). Trial 1: 85 min, 326/327 files. Found and fixed: GB18030 cues unreadable
+    on the Mac (→ UTF-8 + BOM), one artist in two folders (George Lam / 林子祥 → the album's own
+    Chinese name wins), byte-identical duplicate albums (→ copied once), genre prefixes, mid-title
+    "(CD5)", own-info track performers, WAV tagging, the browser pane silently blocking confirm()
+    (→ in-page dialogs), DB setup locking concurrent requests, 37 wrong "title differs" accepts
+    (→ own info), and APE verification decoding twice (→ exact audio-byte check, 8× faster).
+    Trial 2: 10 min, 331/331 files, 0 blocked, 126 cues UTF-8; albums of separate track files now
+    get a generated album cue (user request). User verdict: "it worked".
 
 ## M2 backlog (original order)
 
