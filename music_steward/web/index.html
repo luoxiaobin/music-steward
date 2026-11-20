@@ -38,6 +38,8 @@
     </section>
   </nav>
 
+  <div class="resizer" data-side="left" role="separator" aria-orientation="vertical"
+       title="Drag to resize · double-click to auto-size"></div>
   <main class="panel center">
     <div class="center-head">
       <div style="min-width:0">
@@ -46,6 +48,7 @@
       </div>
       <div class="actions">
         <span class="muted small" id="folderStats"></span>
+        <details class="colmenu" id="colMenu"><summary class="btn">Columns</summary><div class="colmenu-pop" id="colMenuPop"></div></details>
         <button type="button" class="btn" id="rescanFolderBtn" title="Re-read only this folder (fast)">Re-scan folder</button>
         <button type="button" class="btn" id="hashFolderBtn" title="Hash this folder's audio for duplicate detection">Hash folder</button>
       </div>
@@ -53,6 +56,8 @@
     <div class="table-wrap"><table id="table"></table></div>
   </main>
 
+  <div class="resizer" data-side="right" role="separator" aria-orientation="vertical"
+       title="Drag to resize · double-click to auto-size"></div>
   <aside class="panel right" aria-label="Details" id="details">
     <p class="muted">Select a file or album to see its details.</p>
   </aside>

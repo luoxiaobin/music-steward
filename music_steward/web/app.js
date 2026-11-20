@@ -193,6 +193,7 @@ function renderFiles(total, where, fl) {
   }
   t.replaceChildren(h("thead", {}, h("tr", {}, ["Title / file", "Artist", "Album", "Track", "Audio", "Status"]
                                       .map(x => h("th", { scope: "col" }, x)))), body);
+  applyColumns("files");
 }
 function albumGroups() {
   const g = new Map();
@@ -343,6 +344,7 @@ async function renderUnits(where) {
   document.getElementById("table").replaceChildren(
     h("thead", {}, h("tr", {}, h("th", { scope: "col", class: "selcol" }, all),
       ...["Album / folder", "Tracks", "Best candidate", "Status"].map(x => h("th", { scope: "col" }, x)))), body);
+  applyColumns("albums");
   return true;
 }
 function nextUnitId(id, step = 1) {
@@ -593,6 +595,7 @@ function renderAlbums(where, fl) {
   }
   document.getElementById("table").replaceChildren(
     h("thead", {}, h("tr", {}, ["Album / folder", "Artist", "Tracks", "Audio", "Status"].map(x => h("th", { scope: "col" }, x)))), body);
+  applyColumns("albumgroups");
 }
 function markSelected(tr) {
   for (const r of document.querySelectorAll("#table tbody tr")) r.setAttribute("aria-selected", "false");
@@ -773,3 +776,73 @@ function chooseButton(input) {
   window.addEventListener("pywebviewready", () => { b.hidden = false; });
   return b;
 }
+
+
+// ---------------------------------------------------------------- panel sizes (remembered per viewer)
+const LAYOUT_KEY = "mlt.layout";
+function layoutEl() { return document.getElementById("reviewPage"); }
+function setWidths(w) {
+  const el = layoutEl(), max = Math.max(320, window.innerWidth * 0.45);
+  if (w.left) el.style.setProperty("--w-left", Math.round(Math.min(max, Math.max(170, w.left))) + "px");
+  if (w.right) el.style.setProperty("--w-right", Math.round(Math.min(max, Math.max(300, w.right))) + "px");
+}
+function saveWidths() {
+  const cs = getComputedStyle(layoutEl());
+  try { localStorage.setItem(LAYOUT_KEY, JSON.stringify({ left: parseInt(cs.getPropertyValue("--w-left")),
+                                                          right: parseInt(cs.getPropertyValue("--w-right")) })); } catch (e) { /* storage off */ }
+}
+function autoSize(side) {
+  // left: fit the longest folder name (within limits); right: about 30% of the window
+  if (side !== "right") {
+    const tree = document.getElementById("tree");
+    setWidths({ left: Math.min(380, (tree ? tree.scrollWidth : 220) + 40) });
+  }
+  if (side !== "left") setWidths({ right: Math.min(600, Math.max(380, window.innerWidth * 0.3)) });
+  saveWidths();
+}
+(function initResizers() {
+  try { const w = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null"); if (w) setWidths(w); } catch (e) { /* none */ }
+  for (const r of document.querySelectorAll(".resizer")) {
+    const side = r.dataset.side;
+    r.addEventListener("dblclick", () => autoSize(side));
+    r.addEventListener("pointerdown", e => {
+      e.preventDefault();
+      const cs = getComputedStyle(layoutEl()), x0 = e.clientX;
+      const w0 = parseInt(cs.getPropertyValue(side === "left" ? "--w-left" : "--w-right"));
+      r.setPointerCapture(e.pointerId); r.classList.add("dragging"); document.body.classList.add("resizing");
+      const move = ev => setWidths(side === "left" ? { left: w0 + (ev.clientX - x0) } : { right: w0 - (ev.clientX - x0) });
+      const up = () => { r.removeEventListener("pointermove", move); r.classList.remove("dragging");
+                         document.body.classList.remove("resizing"); saveWidths(); };
+      r.addEventListener("pointermove", move);
+      r.addEventListener("pointerup", up, { once: true });
+    });
+  }
+})();
+
+// ---------------------------------------------------------------- show / hide table columns (remembered)
+const PINNED = new Set(["", "Title / file", "Album / folder"]);   // the name column always shows
+function applyColumns(kind) {
+  const t = document.getElementById("table");
+  t.dataset.kind = kind;
+  const heads = [...t.querySelectorAll("thead th")].map(th => th.textContent.trim());
+  let hidden = [];
+  try { hidden = JSON.parse(localStorage.getItem("mlt.cols." + kind) || "[]"); } catch (e) { /* none */ }
+  let css = "";
+  heads.forEach((name, i) => { if (hidden.includes(name) && !PINNED.has(name)) css += `#table[data-kind="${kind}"] tr > :nth-child(${i + 1}){display:none}`; });
+  let st = document.getElementById("colStyle");
+  if (!st) { st = document.createElement("style"); st.id = "colStyle"; document.head.append(st); }
+  st.textContent = css;
+  const pop = document.getElementById("colMenuPop");
+  if (!pop) return;
+  pop.replaceChildren(h("div", { class: "muted xsmall", style: "margin-bottom:4px" }, "Show columns"),
+    ...heads.filter(n => n && !PINNED.has(n) && !/^\d+$/.test(n)).map(name => h("label", { class: "small" },
+      h("input", { type: "checkbox", checked: hidden.includes(name) ? null : true, onchange: e => {
+        hidden = e.target.checked ? hidden.filter(x => x !== name) : [...new Set([...hidden, name])];
+        try { localStorage.setItem("mlt.cols." + kind, JSON.stringify(hidden)); } catch (err) { /* storage off */ }
+        applyColumns(kind);
+      } }), " ", name)));
+}
+document.addEventListener("click", e => {   // close the Columns menu when clicking elsewhere
+  const m = document.getElementById("colMenu");
+  if (m && m.open && !m.contains(e.target)) m.open = false;
+});
