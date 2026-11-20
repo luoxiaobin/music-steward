@@ -1,6 +1,6 @@
 # Music Steward — feature sheet
 
-*A careful steward for a large, messy music collection.* Status: working end to end on real data (macOS, local web UI); not yet packaged. GPL-3.0-or-later.
+*A careful steward for a large, messy music collection.* Status: working end to end on real data (macOS desktop window or local web UI; 135-album trial checked by the owner in foobar2000); not yet packaged as a signed app. GPL-3.0-or-later.
 
 ## The problem
 Collections built over 20+ years (CD rips, downloads, image + cue albums) sit on a NAS with broken text, missing tags and folder names as the only metadata. On the reference collection (~3 TB, 142k audio files): **43k files with garbled GBK/Big5 tags**, 35k missing title/artist/album, 1,700 single-file "image" albums with cue sheets, 89 files with the wrong extension. Existing taggers (MusicBrainz Picard, beets, Mp3tag) rewrite files **in place**, assume Western catalogues, and are hard to trust on a collection that cannot be replaced.
@@ -16,33 +16,35 @@ Collections built over 20+ years (CD rips, downloads, image + cue albums) sit on
 | **Scan / audit** | Read-only inventory over SMB; incremental (size + mtime); per-folder re-scan in seconds; finds unreadable files, wrong extensions, duplicates (tag-independent audio hash), garbled tags, orphan lyrics, cue sheets. |
 | **Recognize** | Albums, discs of a set and cue image albums as units; MusicBrainz + AcoustID fingerprints, plus Deezer and Discogs; garbled tags repaired *in memory* before searching; Simplified/Traditional-insensitive title checks. |
 | **Confidence** | Own rule, tuned on real data: **Ready** (fingerprints confirm) · **Likely** · **Needs review** · **Weak** · **No match**. |
-| **Review** | Candidates with evidence (distance, fingerprints agreeing, missing tracks, track mapping), audio preview, Accept / Skip / Undo, **Search again** (terms or a MusicBrainz link), **Edit fields** (album, artist, year, disc, every track title). |
+| **Review** | Candidates with evidence (distance, fingerprints agreeing, missing tracks, track mapping), a "title differs" warning, **listen to any track** (APE and single cue tracks converted on demand), Accept / Own info / Skip / Undo with keyboard shortcuts, **Search again** (terms or a MusicBrainz link), **Edit fields** (album, artist, year, disc, every track title). |
+| **Find** | **Search** the whole collection (albums, folders, tracks) by any part of a name, Simplified/Traditional-insensitive, by **pinyin** (`denglijun`, `dlj`) and by repaired tag text; **Filter this list** narrows the current folder. |
 | **Own info** | For albums no catalogue knows (~40% of the Chinese APE sample): build the release from the cue sheet, repaired tags, file names or folder name, with download-site noise cleaned. |
-| **Bulk** | Accept all Ready + Likely; add / accept own info for No match + Weak; skip the rest — undecided albums only. |
-| **Plan** | Frozen, previewable plan: destination paths from naming rules (Windows-safe, NFC), tag changes, side files (covers, lyrics, rewritten cue in its original encoding), conflicts flagged, never resolved by overwriting. |
-| **Apply / undo** | Copy → tag the copy → verify → publish, with a journal; crash-safe resume; undo removes only copies that are unchanged since. |
+| **Bulk** | Accept all Ready + Likely; add / accept own info for No match + Weak; skip the rest — undecided albums only; or tick albums (filter by status, "title agrees") and accept / own info / skip / clear exactly those. |
+| **Plan** | Frozen, previewable plan with a **folder-tree preview** and a "Done for you" list: names in Simplified (one folder per artist), original release year, the album's own artist name over Latin/junk catalogue names, identical duplicate albums copied once, a cue sheet for every album (UTF-8), side files (covers, lyrics); paths Windows-safe and NFC; conflicts flagged, never resolved by overwriting. |
+| **Apply / undo** | Copy → tag the copy → verify (exact audio bytes) → publish, with a journal; progress with ETA and **Stop**; crash-safe resume; undo removes only copies that are unchanged since. ~70 MB/s from the NAS. |
+| **Settings & languages** | Naming rules, year, cue encoding, album cues, catalogues, default destination; interface in English, 简体中文, 繁體中文, Français (Canada), Español (EE. UU.). |
 
 ## Key design highlights
 1. **Sources are never modified.** All changes go to organized copies; the destination may never overlap a source; verified byte-identical sources after every test run.
 2. **Crash-safe by construction.** Journal-first apply; no-overwrite publish probed per destination (SMB has no atomic exclusive rename → claim-then-rename); scans abort, not "mark removed", when a share drops; matching resumable unit by unit (each in its own process).
-3. **Built for non-Western collections.** Legacy-encoding repair with CJK heuristics, cue sheets in GB18030/Big5 kept in their encoding, Simplified/Traditional keys, extra catalogues, own-info fallback.
+3. **Built for non-Western collections.** Legacy-encoding repair with CJK heuristics (tags, cue sheets, unreadable APE tags), GB18030/Big5 cue sheets read correctly and written as UTF-8 for any player, Simplified/Traditional keys, pinyin search, extra catalogues, own-info fallback.
 4. **Evidence over automation.** Nothing is accepted silently; bulk actions are limited to measured-safe classes; every decision is reversible until apply, and apply is reversible after.
 5. **Fast on a NAS.** Per-folder scan and hash; lookup + fingerprint cache (re-match ~1.5 s/album vs 10–15 s); rate limits respected (MusicBrainz 1/s, Deezer, Discogs).
 6. **Private and local.** One Python process; UI on 127.0.0.1 with a one-time token, CSP, Host check; keys only from the environment, never stored in the clear.
 
 ## Architecture in one line
-Python 3.12 engine (beets 2.14 in-process for matching, mutagen for tags, FFmpeg for probing/hashing/decoding) + SQLite app database + plain HTML/JS UI served locally; desktop window via pywebview planned ([ADR 0001](adr/0001-desktop-shell-pywebview.md)).
+Python 3.12 engine (beets 2.14 in-process for matching, mutagen for tags, FFmpeg for probing/hashing/decoding/previews) + SQLite app database + plain HTML/JS UI, in a pywebview desktop window (`music-steward app`, [ADR 0001](adr/0001-desktop-shell-pywebview.md)) or a local browser tab.
 
 ## Measured (reference collection)
-Full scan 75 min once, folder re-scan ~75 s for 6.9k files; recognition ~10–13 s/album cold, ~1.5 s warm; 142 automated tests.
+Full scan 75 min once, folder re-scan ~75 s for 6.9k files; recognition ~10–13 s/album cold, ~1.5 s warm; resumable at scale (329 albums, Ctrl-C and hard kill: 0 redone, 0 stuck); apply ~70 MB/s (135 albums, 43 GB in 10 min); search ~100–150 ms over 142k tracks; 170 automated tests.
 
 ## Not done yet
-Desktop window and installer · apply to the NAS (protocol proven, UI targets a local folder) · singles rules · APE playback in the browser · Apple (ALAC) export · Windows testing.
+Signed, double-clickable macOS app · apply to the NAS (protocol proven, UI targets a local folder) · singles rules (loose tracks, live/cover versions) · own-info rule for credit lines used as artist (`【指挥】…【朗诵】…`) · native-speaker review of the French and Spanish (and Chinese) wording · Apple (ALAC) export · Windows testing.
 
 ## Future features (proposed order)
 Guiding constraint: the heavy work (scanning terabytes, decoding APE, fingerprinting) belongs on a computer or on the NAS, not on a phone.
 1. ✅ **Interface languages** — English, 简体中文, 繁體中文, Français (Canada), Español (EE. UU.), chosen in Settings; plus search with pinyin.
-2. **macOS app** — pywebview window, bundled Python + FFmpeg, signed and notarized download. *~1 week.*
+2. **macOS app** — ✅ desktop window (pywebview); still to do: bundled Python + FFmpeg, signed and notarized "Music Steward.app". *~1 week.*
 3. **NAS / Docker mode + phone-friendly review** — run the engine on the NAS (local disk speed instead of SMB: faster scan and hash); every device uses the same web UI over the home network with proper sign-in. A swipe-to-Accept/Skip review with audio preview covers **iPhone and Android** with no store app.
 4. **Windows desktop** — UNC paths, the publish-safety probe on NTFS/SMB, WebView2 window, installer, full test pass. *1–2 weeks.*
 5. **More collection languages** — tag repair for Japanese (Shift-JIS), Korean (EUC-KR/CP949), Cyrillic (CP1251), each with its own heuristics and test files; added one script at a time, on demand.
