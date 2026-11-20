@@ -62,5 +62,5 @@ checked by the owner in foobar2000.
 - **Inventory and audit** (read-only): incremental scan over SMB, per-folder re-scan, tag-independent audio hashes,
   audit filters (garbled tags, unreadable, wrong extension, duplicates, cue sheets, orphan lyrics …).
 
-[Unreleased]: https://github.com/OWNER/REPO/compare/v0.3.0...HEAD
-[0.3.0]: https://github.com/OWNER/REPO/releases/tag/v0.3.0
+[Unreleased]: https://github.com/luoxiaobin/music-steward/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/luoxiaobin/music-steward/releases/tag/v0.3.0

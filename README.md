@@ -1,11 +1,17 @@
 # Music Steward
 
+[![CI](https://github.com/luoxiaobin/music-steward/actions/workflows/ci.yml/badge.svg)](https://github.com/luoxiaobin/music-steward/actions/workflows/ci.yml)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
+
 *Formerly MP3LibraryTool.*
 
 A careful steward for a large music collection (MP3, FLAC, APE, …): organize it safely: **scan → recognize → review → plan → apply**.
 Sources are never modified; changes are written only to organized copies, from a saved plan, with a journal for crash recovery and undo.
 
-Status: **inventory, recognition, review, plan and apply work end to end** (see `docs/PLAN.md`). M0 experiments and their evidence report are in [`m0/`](m0/EVIDENCE_REPORT.md).
+Status: **0.3.0 — works end to end on a real collection** (scan, recognize, review, plan, apply, undo; desktop window;
+search with pinyin; English / 中文 / Français / Español). See [`CHANGELOG.md`](CHANGELOG.md),
+[`docs/FEATURE_SHEET.md`](docs/FEATURE_SHEET.md) and [`docs/PLAN.md`](docs/PLAN.md). M0 experiments and their evidence
+report are in [`m0/`](m0/EVIDENCE_REPORT.md). Contributors and coding agents: see [`AGENTS.md`](AGENTS.md).
 
 ## Install
 
