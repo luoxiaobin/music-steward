@@ -172,8 +172,8 @@ listing every file with its original path and its organized copy, so you can res
 | | |
 |---|---|
 | **Restore** | On the plan screen, under **Originals set aside**, press **Restore originals**: every file goes back to where it was. Anything that has appeared at an original place since is left alone and reported; nothing is overwritten. |
-| **Archive** | Copy the `_ORIGINALS/run…` folder to a backup drive (Finder), and keep it there. *(An Archive button that makes a verified copy is planned.)* |
-| **Delete** | To free the space, delete the `_ORIGINALS/run…` folder yourself in Finder — **only after you have played the organized copies and have a backup of them. Deleting cannot be undone.** *(A guarded Delete button in the app is planned.)* |
+| **Archive** | Press **Archive…** and choose a folder on a backup drive or share (never inside your collection). Every parked file is copied with its README and manifest, checked by SHA-256 and never overwritten. You can stop and continue. The card then says *verified* and keeps checking that the archive is still all there. The parked originals stay. |
+| **Delete** | Press **Delete…** to free the space. **It cannot be undone.** The app repeats every check first (the organized copy's audio is intact; each parked file is exactly the one set aside), shows what the organized copy does *not* carry (original tag values, lyrics), and asks you to type **DELETE**. If there is no verified archive you must also tick that you have no backup; and if the originals were set aside less than the cooling-off period ago (7 days by default, Settings), you must tick that you have played the copies. Albums that fail a check are kept. |
 
 Interrupted (the app quit, the drive dropped)? **Finish setting aside** on the same card settles what was
 half-done: every file is either at its old place or in `_ORIGINALS`, never lost.

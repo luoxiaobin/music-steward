@@ -31,7 +31,8 @@ def test_the_retire_screens_mark_album_names_and_paths_as_data():
     web = Path(__file__).resolve().parents[1] / "music_steward/web"
     js = (web / "plan.js").read_text(encoding="utf-8")
     assert 'data-no-translate' in re.search(r"const reasonLi = .*?\n\n", js, re.S).group(0)
-    for needle in ("b.folder)", "r.folder)", "r.blocked.slice", "x.label)", "(x.folder"):
+    for needle in ("b.folder)", "r.folder)", "r.blocked.slice", "x.label)", "(x.folder",
+                   "d.dest)", "b.archive.dest)", "d.archive.dest)", "r.dest)", "x.path.split"):
         lines = [ln for ln in js.splitlines() if needle in ln]
         assert lines and all("data-no-translate" in ln for ln in lines), needle
     assert "data-no-translate" in next(ln for ln in (web / "app.js").read_text(encoding="utf-8").splitlines()
