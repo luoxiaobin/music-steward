@@ -150,7 +150,8 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
    checked on real NAS APE images). Tried 2026-11-21: 4 real albums (3 APE, 1 FLAC; 51 tracks) split and served by
    Navidrome 0.64.2 — all tracks imported, Chinese titles, order, durations, year and covers right; played by the
    owner on a phone over the home network: works.
-4. **Retire the originals**: ADR first (it changes the read-only principle), then a guided, verified, per-album step.
+4. **Retire the originals**: ✅ design accepted ([ADR 0003](adr/0003-retire-originals.md)); build order: retire + restore +
+   labelling, then Archive, then Delete.
 5. Read-only **collection health report**; a signed, notarized `.app`; ✅ icon for the chosen concept (vector
    master, every size generated from one geometry, checked at 16–1024 px; Dock, favicon, iPhone home screen, macOS
    `.icns`, iOS app icon). A subtle variant for a future player app, if one is made.
@@ -178,6 +179,7 @@ Cyrillic) on demand → Apple export (M4) → native phone apps only if a store 
 
 | Date | Decision | Record |
 |---|---|---|
+| 2026-11-21 | **Retire the originals: design accepted** — a move (never a delete) of verified albums' files into `<root>/_ORIGINALS/<run>/…` on the same volume, clearly labelled (README + manifest), per-root opt-in, dry run first, journalled, restorable; the app offers **Restore, Archive (verified copy) and Delete** (typed word, warnings, repeated checks) as separate confirmed actions. All nine decisions accepted by the owner | [ADR 0003](adr/0003-retire-originals.md) (accepted; revised: labelled `_ORIGINALS`, Archive and Delete offered in the app with warnings) |
 | 2026-11-21 | **Required feature: the organized copy works in Subsonic-standard music servers** (Navidrome is the reference): every album once, all tracks in order, titles/artists/years/durations as planned. Checked by `tests/test_subsonic.py` on every PR (macOS CI installs Navidrome). Covers albums of track files and cue-sheet albums split into tracks; albums kept as one file + cue sheet need a cue-aware player. Format is not the issue: Navidrome lists APE and converts it while streaming (checked with a real NAS APE) | this file, AGENTS.md |
 | 2026-11-20 | **Ongoing upkeep is a goal: album identity must not depend on file paths.** Identity follows the audio; renames and moves keep decisions; changed audio goes back to review | [ADR 0002](adr/0002-album-identity-independent-of-paths.md) (proposed) |
 | 2026-11-20 | **Cue-sheet albums: a setting** — keep the image + cue sheet (default, today's behaviour) or split into one file per track for servers and phone players. Splitting is lossless (FLAC/WAV image → FLAC tracks; APE → FLAC is a lossless re-encode, stated as such); the source stays untouched | this file |
