@@ -50,6 +50,20 @@ def all_values(con: sqlite3.Connection) -> dict:
                 "overridden_by": SPEC[n][2] if _env(n) is not None else None} for n in SPEC}
 
 
+def retire_allowed(con: sqlite3.Connection | None, root_id: int) -> bool:
+    """Retiring originals (ADR 0003) is off unless the user allowed it for this collection folder."""
+    if con is None:
+        return False
+    row = con.execute("SELECT value FROM meta WHERE key=?", (f"setting:retire_root:{int(root_id)}",)).fetchone()
+    return bool(row and row[0] == "on")
+
+
+def set_retire_allowed(con: sqlite3.Connection, root_id: int, allowed: bool) -> None:
+    con.execute("INSERT OR REPLACE INTO meta VALUES(?, ?)",
+                (f"setting:retire_root:{int(root_id)}", "on" if allowed else "off"))
+    con.commit()
+
+
 class SettingsError(ValueError):
     pass
 

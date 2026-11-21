@@ -784,6 +784,11 @@ async function openSettings() {
       radios("cue_albums", [["image", "Keep one file + cue sheet", "as they are; needs a cue-aware player (foobar2000, VOX…)"],
                             ["tracks", "One file per track", "lossless FLAC, for music servers and phone players; MP3 images stay one file"]]),
       envNote("cue_albums")),
+    h("section", {}, h("h3", {}, "Retiring originals"),
+      h("div", { class: "muted xsmall" }, "After an organized copy has been verified, Music Steward can set the original files aside " +
+        "(moved into a folder called _ORIGINALS in the same collection folder, never deleted) so you can restore them, archive them or delete them yourself. " +
+        "Off unless you allow it for a collection folder."),
+      ...(d.retire_roots || []).map(r => chk("setRetire" + r.id, ["Allow for ", h("span", { class: "mono" }, r.path)], r.allowed, false))),
     h("section", {}, h("h3", {}, "Online catalogues"),
       chk("srcMb", "MusicBrainz", true, true, "always"),
       chk("srcDeezer", "Deezer", srcs.includes("deezer"), env("sources")),
@@ -805,8 +810,9 @@ async function openSettings() {
           sources: ["musicbrainz", dlg.querySelector("#srcDeezer").checked && "deezer",
                     dlg.querySelector("#srcDiscogs").checked && "discogs"].filter(Boolean).join(","),
           dest: dest.value, language: dlg.querySelector("#setLang").value };
+        const retire_roots = Object.fromEntries((d.retire_roots || []).map(r => [r.id, dlg.querySelector("#setRetire" + r.id).checked]));
         for (const n of Object.keys(body)) if (env(n === "sources" ? "sources" : n)) delete body[n];
-        const r = await post2("/api/settings", { settings: body });
+        const r = await post2("/api/settings", { settings: body, retire_roots });
         if (r.error) { msg.textContent = r.error; return; }
         dlg.close(); dlg.remove();
         if (body.language && body.language !== v("language")) location.reload();   // switch the whole interface

@@ -4,10 +4,10 @@ What Music Steward guarantees, what it does not, and what to do when something i
 
 ## The short version
 
-* **Your collection is only read.** No command writes, renames or deletes anything under a collection folder. A
-  destination inside (or containing) a collection folder is refused when the plan is built, again when it is applied,
+* **Your collection is only read** — unless you switch on *Retire originals* (below, off by default). No command
+  deletes anything under a collection folder. A destination inside (or containing) a collection folder is refused when the plan is built, again when it is applied,
   and every file's real path (links followed) is checked just before it is written.
-* **Only Apply writes**, and only into the destination folder. A file is copied under a temporary name, tagged,
+* **Only Apply writes copies**, and only into the destination folder. A file is copied under a temporary name, tagged,
   verified, and only then given its final name.
 * **Nothing at the destination is overwritten** — with one documented exception on NAS shares, below.
 * **Interrupted? Resume, don't apply again.** **Undo** removes exactly what a run created, if you haven't changed it.
@@ -68,7 +68,7 @@ reported. Files the run did not create are never touched. Empty folders may rema
 
 | Guarantee | How | Evidence |
 |---|---|---|
-| Sources are never written | All writes go through the apply protocol into the destination; the destination may not overlap a collection root | tests; every trial checked all source sizes and modification times afterwards |
+| Sources are only written by the optional, confirmed *Retire originals* (a move into `_ORIGINALS`, never a deletion) | Apply writes only to the destination (which may not overlap a collection root); retiring needs the per-folder opt-in, a confirmation, and re-checks each album's copy and original just before moving it | tests; every trial checked all source sizes and modification times afterwards |
 | No partial file under a final name | Copy to a temporary name → tag → verify → publish; journal on the local disk first | crash tests at every step (`m0/EVIDENCE_REPORT.md` §6) |
 | Audio unchanged in the copies | After tagging, the copy's audio bytes (APE/WavPack/TTA) or audio packets (other formats) must equal the original's | tests; 1,800+ files in trials |
 | Tracks split from a cue-sheet image are lossless | Each track's decoded samples must equal the same samples of the image (before tagging), then the tagging check above | tests (the tracks joined again equal the image); real APE images from the NAS |
@@ -92,6 +92,22 @@ Residual limitations ([evidence report §6.7](../m0/EVIDENCE_REPORT.md)):
   during an apply.
 * A crash between creating the placeholder and recording it leaves a 0-byte file whose ownership is decided by its
   time stamp rather than its file identity; Resume removes it.
+
+## Retiring originals: interruptions and undo
+
+Retiring **moves** the files of verified albums into `<collection folder>/_ORIGINALS/run…/` (same drive, same relative
+paths), after re-checking each album; nothing is deleted. Every step is journalled first.
+
+| What happened | What is left | What to do |
+|---|---|---|
+| You pressed **Stop**, or the app quit or crashed, while retiring | Every file is either at its old place or in `_ORIGINALS`; the album in flight is listed with its files | **Finish setting aside** on the Originals card: it completes that album (each file re-checked) and continues |
+| The drive disconnected | The files not yet moved stay where they are | Reconnect, **Finish setting aside** |
+| You want them back | — | **Restore originals**: files go back to their old paths; a file that has appeared there since is left alone and reported; nothing is overwritten |
+| Something at an original path blocks a restore | That file stays in `_ORIGINALS` | Move or rename the other file, press Restore again, or move it by hand using `MANIFEST.csv` |
+
+An album is **not** set aside — and nothing of it moves — if any of its files was not copied or blocked, the organized
+copy is missing or its audio differs from the journal, the original changed since it was copied, or a path on the way
+is a link. The reason is shown in the dialog. See [User guide, step 11](USER_GUIDE.md#11-your-originals-optional).
 
 ## Backing up the app's own data
 

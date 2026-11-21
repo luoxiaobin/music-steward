@@ -15,6 +15,7 @@ These shape every organized copy. **Check them before your first plan.**
 | **Cue sheets** | **UTF-8** (with a byte-order mark) | a GB18030 cue that showed as `ÏéÇé…` in foobar2000 for Mac → readable Chinese | keep each cue's original encoding (for old Chinese Windows players) | `MLT_CUE_ENCODING=utf-8-sig\|original` |
 | **Cue sheet for albums of separate track files** | **On** | `孟庭苇/真的还是假的 (1995)/` gets `真的还是假的.cue` listing its 10 files | off | `MLT_ALBUM_CUE=1\|0` |
 | **Albums of one file with a cue sheet** | **Keep one file + cue sheet** | `蔡琴/老歌 (1990)/老歌.ape` + `老歌.cue` | **one file per track**: `01 - 恰似你的温柔.flac` … for music servers (Navidrome, Plex) and phone players that don't read cue sheets. Lossless: FLAC, cut at the cue sheet's exact positions, each track checked sample for sample against the image; the image in your collection is untouched. MP3 images stay one file (cutting would mean re-encoding) | `MLT_CUE_ALBUMS=image\|tracks` |
+| **Retiring originals** | **Off**, per collection folder | with it on, after you confirm, the originals of albums whose copy was verified are moved (never deleted) into `_ORIGINALS` in that folder, with a README ([what it does](USER_GUIDE.md#11-your-originals-optional)) | — | — (a Settings choice only, never an environment variable) |
 | **Default destination folder** | none | where plans copy to, unless you choose another folder | — | — |
 | **Language** | **Automatic** (this computer's language) | — | English, 简体中文, 繁體中文, Français (Canada), Español (EE. UU.) | `MLT_LANGUAGE` |
 

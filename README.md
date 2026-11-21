@@ -77,13 +77,15 @@ The full walkthrough, including an album no catalogue knows, is in the [User gui
 
 | | Reads | Writes |
 |---|---|---|
-| Your collection (the `--root` folders) | file listings, audio and tags | **nothing, ever** |
+| Your collection (the `--root` folders) | file listings, audio and tags | **nothing** — unless you switch on *Retire originals* for a folder (off by default): then, after you confirm, the files of albums whose copy was verified are **moved** (never deleted) into a folder called `_ORIGINALS` in the same collection folder, with a README, and can be restored |
 | The destination folder you choose | whether a name is taken | the organized copies (only on **Apply**); **Undo** deletes exactly the copies a run created, if unchanged |
 | App data `~/.music-steward/` | — | the app database, apply journals, web lookup cache, preview cache, window preferences ([details](docs/CONFIGURATION.md#where-the-app-keeps-its-data)) |
 | Internet | — | search terms (artist, album, track names, durations) to MusicBrainz, Deezer, Discogs; audio fingerprints to AcoustID ([what is sent](docs/CONFIGURATION.md#what-is-sent-to-online-services)) |
 
-Scanning, recognizing, reviewing and planning change no music files. Only **Apply** writes, and only to the
-destination. What can still go wrong, and how to recover, is in [Recovery and safety](docs/RECOVERY.md).
+Scanning, recognizing, reviewing and planning change no music files. **Apply** writes only to the destination.
+The one thing that ever touches your collection is the optional, confirmed *Retire originals* step (a move, restorable;
+see the [User guide](docs/USER_GUIDE.md#11-your-originals-optional)). What can still go wrong, and how to recover, is in
+[Recovery and safety](docs/RECOVERY.md).
 
 ## Documentation
 

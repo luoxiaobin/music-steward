@@ -369,11 +369,14 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
                 # simply sees it as changed again next time
                 held.append((f, vals, k))
             elif k:
-                c["n_changed"] += 1
+                # a row marked removed whose file is back with the very same size and time (files set
+                # aside by retire.py and restored): the bytes are the same, so its saved hashes stay valid
+                back = k["removed_at"] is not None and (k["size"], k["mtime_ns"]) == (f.size, f.mtime_ns)
+                c["n_unchanged" if back else "n_changed"] += 1
                 if k["content_id"] != cid or not cid:
                     from .recognize.units import flag_changed
                     flag_changed(con, [k["id"]])     # same transaction as the new content_id below
-                _write(con, k["id"], f, vals, scan_id, clear_hashes=True)
+                _write(con, k["id"], f, vals, scan_id, clear_hashes=not back)
             else:
                 c["n_new"] += 1
                 _insert(con, root_id, f, vals, scan_id)

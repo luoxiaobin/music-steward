@@ -1,8 +1,9 @@
 # User guide
 
 This guide takes you from a small folder of albums to a verified organized copy. It assumes Music Steward is
-installed ([README — Install](../README.md#install-macos)). Nothing in steps 1–6 changes any music file; only
-**Apply** (step 8) writes, and only to the destination you choose.
+installed ([README — Install](../README.md#install-macos)). Nothing in steps 1–6 changes any music file; **Apply**
+(step 8) writes only to the destination you choose. Only the optional step 11 (off unless you switch it on) ever moves
+files in your collection, and it never deletes.
 
 **Start small.** Copy three or four albums into a test folder — ideally one well-known album, one disc of a set, and
 one album no online catalogue will know (a cue-sheet image with Chinese text is a good test). Point the app at that
@@ -144,3 +145,32 @@ Not what you wanted? On the plan screen, **Undo run** removes exactly the copies
 changed since are kept). Adjust your decisions or settings, build a new plan, apply again.
 
 When the test folder looks right, repeat with a bigger folder. On a big collection, work folder by folder.
+
+## 11. Your originals (optional)
+
+A copy of a big collection means two collections. Once you have played the organized copies and are happy, Music
+Steward can **set the originals aside** so you end up with one organized library. It is off until you allow it:
+**Settings → Retiring originals → Allow for <your collection folder>**.
+
+**Retire originals.** On the plan screen, next to the run, press **Retire originals…**. The app re-checks every album
+first and lists what can be set aside and what stays (with the reason): an album is set aside only if all its files
+were copied, the organized copy is still there with *identical audio* (retagging it is fine), and the original has
+not changed since. You tick a box that says the organized copy becomes your only finished copy — *keep your own
+backup* — and confirm. The originals are then **moved, never deleted**, into `_ORIGINALS/run…/` inside the same
+collection folder, on the same drive: it takes seconds, whatever the size. Anything not part of a verified album
+stays exactly where it is.
+
+**What the `_ORIGINALS` folder is.** Nothing else in a collection looks like it. Each batch has a
+`README - ORIGINALS.txt` (in your interface language) saying what it is and what you can do, and a `MANIFEST.csv`
+listing every file with its original path and its organized copy, so you can restore by hand without the app.
+
+**What you can do with them:**
+
+| | |
+|---|---|
+| **Restore** | On the plan screen, under **Originals set aside**, press **Restore originals**: every file goes back to where it was. Anything that has appeared at an original place since is left alone and reported; nothing is overwritten. |
+| **Archive** | Copy the `_ORIGINALS/run…` folder to a backup drive (Finder), and keep it there. *(An Archive button that makes a verified copy is planned.)* |
+| **Delete** | To free the space, delete the `_ORIGINALS/run…` folder yourself in Finder — **only after you have played the organized copies and have a backup of them. Deleting cannot be undone.** *(A guarded Delete button in the app is planned.)* |
+
+Interrupted (the app quit, the drive dropped)? **Finish setting aside** on the same card settles what was
+half-done: every file is either at its old place or in `_ORIGINALS`, never lost.
