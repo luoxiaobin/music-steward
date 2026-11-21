@@ -130,8 +130,25 @@ def _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, 
                                          "size": cf["size"], "mtime_ns": cf["mtime_ns"]}}}}
         items.append(it)
         mine.append(it)
-    new_stem_of[f["relpath"].rsplit(".", 1)[0]] = f"{adir}/{mine[0]['dest_rel'].rsplit('/', 1)[-1].rsplit('.', 1)[0]}" \
-        if mine else f"{adir}/x"
+    # the image's own lyrics belong to the whole album, not to track 1: split them along the tracks
+    # below (None: the side-file loop must not copy the album's .lrc under one track's name)
+    image_stem = f["relpath"].rsplit(".", 1)[0]
+    new_stem_of[image_stem] = None
+    lrc = [x for x in con.execute("SELECT * FROM file WHERE root_id=? AND removed_at IS NULL AND kind='lrc' "
+                                  "AND relpath >= ? AND relpath < ?",
+                                  (f["root_id"], image_stem + ".", image_stem + ".\uffff")).fetchall()
+           if x["relpath"].rsplit(".", 1)[0] == image_stem]
+    if lrc and mine:
+        from ..lrc import decode, split as split_lrc
+        src_lrc = os.path.join(root_path, lrc[0]["fs_relpath"])
+        with open(src_lrc, "rb") as fh:
+            parts = split_lrc(decode(fh.read()), [(it["tags"]["split"]["start"], it["tags"]["split"]["end"]) for it in mine],
+                              [it["tags"]["title"] for it in mine])
+        for it, text in zip(mine, parts):
+            if text is not None:
+                items.append({"unit_id": u["id"], "file_id": lrc[0]["id"], "kind": "lrc",
+                              "src": src_lrc, "dest_rel": it["dest_rel"].rsplit(".", 1)[0] + ".lrc", "codec": None,
+                              "tags": {"generated_text": text}, "size": lrc[0]["size"], "mtime": lrc[0]["mtime_ns"]})
     if album_cues(con) and len(mine) >= 2:
         stem = safe_component(f"{c['album']} (CD {c['_disc']})" if multi else c["album"], "Album")
         text = album_cue_text(c, [{"file": it["dest_rel"].rsplit("/", 1)[-1], "title": it["tags"]["title"],
@@ -349,6 +366,8 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                     continue
                 stem = s["relpath"].rsplit(".", 1)[0]
                 if s["kind"] == "lrc" and stem in new_stem_of:
+                    if new_stem_of[stem] is None:      # an image's lyrics, already split along its tracks
+                        continue
                     dest_rel = new_stem_of[stem] + ".lrc"
                 elif s["kind"] == "image" and u["kind"] in ("album", "cue") and COVER.match(s["relpath"].rsplit("/", 1)[-1]):
                     dest_rel = f"{adir}/{safe_component(s['relpath'].rsplit('/', 1)[-1])}"

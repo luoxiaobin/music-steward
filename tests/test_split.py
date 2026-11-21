@@ -246,3 +246,24 @@ def test_finished_files_are_flushed_to_disk_before_they_are_published(split_albu
     if not published:
         pytest.skip("this destination does not publish with rename_excl")
     assert len(published) == 3 and all(temp in seen for temp, seen in published)
+
+
+def test_the_images_lyrics_are_split_along_its_tracks(split_album, con, tmp_path):
+    """Codex review on #7: the album's .lrc went next to track 1 only, with album times."""
+    lib, _ = split_album
+    (lib / "HIFI/image.lrc").write_bytes(
+        "[ar:柏菲]\n[ti:整张专辑]\n[00:00.50]第一首\n[00:02.50]第二首 一\n[00:03.20][00:05.10]副歌\n".encode("gbk"))
+    scan(con, lib)
+    dest = tmp_path / "out"
+    p = plan.load(con, plan.build(con, str(dest), 1))
+    lrcs = sorted(i["dest_rel"] for i in p["items"] if i["kind"] == "lrc")
+    assert lrcs == ["柏菲/HIFI年代 - 怀念战友/01 - 红星照我去战斗.lrc", "柏菲/HIFI年代 - 怀念战友/02 - 怀念战友.lrc",
+                    "柏菲/HIFI年代 - 怀念战友/03 - 大海啊故乡.lrc"]
+    res = runner.apply(con, p["id"], journal_root=tmp_path / "j")
+    assert set(res["states"]) == {"committed"}, res
+    adir = dest / "柏菲/HIFI年代 - 怀念战友"
+    read = lambda n: (adir / n).read_text(encoding="utf-8-sig").splitlines()   # noqa: E731
+    assert read("01 - 红星照我去战斗.lrc") == ["[ar:柏菲]", "[ti:红星照我去战斗]", "[00:00.50]第一首"]
+    assert read("02 - 怀念战友.lrc") == ["[ar:柏菲]", "[ti:怀念战友]", "[00:00.50]第二首 一", "[00:01.20]副歌"]
+    assert read("03 - 大海啊故乡.lrc") == ["[ar:柏菲]", "[ti:大海啊故乡]", "[00:01.10]副歌"]
+    assert (lib / "HIFI/image.lrc").read_bytes().startswith("[ar:柏菲]".encode("gbk"))   # source untouched
