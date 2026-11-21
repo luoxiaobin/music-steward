@@ -7,6 +7,10 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 ## [Unreleased]
 
 ### Added
+- **App icon**: the chosen concept, an ivory folder with a music note in negative space on teal, redrawn as a
+  vector master (`assets/icon/*.svg`) by `tools/make_icons.py`, which also makes every size from the same shapes.
+  Shown in the Dock for the desktop window, as the page's favicon and as the iPhone home-screen icon; a macOS
+  `.icns` and an iOS 1024 px app icon are ready in `assets/icon/` for a packaged app later.
 - **Albums keep their decisions when folders are renamed or moved** (ADR 0002). Every file gets an identity from its
   audio (the audio's length and its first and last 64 KiB, tags excluded; small files such as cue sheets: the whole
   file). A file found at a new path whose content is a known file no longer at its old path is that file, moved:

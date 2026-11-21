@@ -149,8 +149,9 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
 3. **Cue-sheet albums setting**: keep image + cue, or split into tracks; check the result in Navidrome and a phone
    player.
 4. **Retire the originals**: ADR first (it changes the read-only principle), then a guided, verified, per-album step.
-5. Read-only **collection health report**; a signed, notarized `.app`; icon (vector master, small-size tests,
-   macOS/iOS assets) for the existing concept.
+5. Read-only **collection health report**; a signed, notarized `.app`; ✅ icon for the chosen concept (vector
+   master, every size generated from one geometry, checked at 16–1024 px; Dock, favicon, iPhone home screen, macOS
+   `.icns`, iOS app icon). A subtle variant for a future player app, if one is made.
 6. Outside trial users when the above is solid.
 
 ## M2 backlog (original order)
