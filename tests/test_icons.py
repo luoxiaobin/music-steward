@@ -34,3 +34,68 @@ def test_icon_sizes_and_masters():
 
 def test_icons_are_packaged():
     assert '"web/icons/*"' in (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+
+# ---- the Dock icon of the desktop window (Codex review on #8) ---------------------------------------
+import sys
+import types
+
+import pytest
+
+
+def _fake_appkit(monkeypatch, image_ok=True, boom=False):
+    """A stand-in for AppKit: records what the helper does, works on any platform."""
+    calls = {"set": [], "loaded": []}
+
+    class Image:
+        @classmethod
+        def alloc(cls):
+            return cls()
+
+        def initWithContentsOfFile_(self, path):
+            calls["loaded"].append(path)
+            return self if image_ok else None
+
+    class App:
+        def setApplicationIconImage_(self, image):
+            if boom:
+                raise RuntimeError("AppKit exploded")
+            calls["set"].append(image)
+
+    app = App()
+    mod = types.ModuleType("AppKit")
+    mod.NSImage = Image
+    mod.NSApplication = types.SimpleNamespace(sharedApplication=lambda: app)
+    monkeypatch.setitem(sys.modules, "AppKit", mod)
+    return calls
+
+
+def test_dock_icon_is_installed_on_macos(monkeypatch):
+    from music_steward import desktop
+    monkeypatch.setattr(sys, "platform", "darwin")
+    calls = _fake_appkit(monkeypatch)
+    desktop._dock_icon()
+    assert calls["loaded"] == [str(desktop.ICON)] and len(calls["set"]) == 1
+    assert desktop.ICON.is_file()                       # the icon the helper loads is the shipped one
+
+
+def test_dock_icon_is_skipped_off_macos_and_without_the_file(monkeypatch, tmp_path):
+    from music_steward import desktop
+    calls = _fake_appkit(monkeypatch)
+    monkeypatch.setattr(sys, "platform", "linux")
+    desktop._dock_icon()
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(desktop, "ICON", tmp_path / "missing.png")
+    desktop._dock_icon()
+    assert calls == {"set": [], "loaded": []}
+
+
+@pytest.mark.parametrize("kind", ["unreadable image", "AppKit error", "AppKit missing"])
+def test_dock_icon_failures_never_stop_the_window(monkeypatch, kind):
+    from music_steward import desktop
+    monkeypatch.setattr(sys, "platform", "darwin")
+    if kind == "AppKit missing":
+        monkeypatch.setitem(sys.modules, "AppKit", None)           # import raises ImportError
+    else:
+        _fake_appkit(monkeypatch, image_ok=kind != "unreadable image", boom=kind == "AppKit error")
+    desktop._dock_icon()                                           # must not raise
