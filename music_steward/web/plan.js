@@ -24,6 +24,7 @@ async function renderPlanBuilder(msg) {
                              placeholder: "/Users/you/Music/Organized  (outside your collection)" });
   const plans = await api("/api/plans");
   const scope = S.path || "(whole root)";
+  const dchk = folderCheck(input, "destination", s => { const b = document.getElementById("buildPlanBtn"); if (b) b.disabled = s.level === "error"; });
   const page = document.getElementById("planPage");
   page.replaceChildren(...[
     h("div", { class: "plan-head" },
@@ -34,12 +35,13 @@ async function renderPlanBuilder(msg) {
       h("p", { class: "muted small" }, `Scope: ${scope}. Every album you accepted in this folder becomes part of the plan. ` +
         "Building a plan changes nothing on disk."),
       h("div", { class: "field" }, h("label", { for: "destInput", class: "strong" }, "Destination"), input, chooseButton(input),
-        h("button", { type: "button", class: "btn btn-primary", onclick: async () => {
+        h("button", { type: "button", class: "btn btn-primary", id: "buildPlanBtn", onclick: async () => {
           try { localStorage.setItem("mlt.dest", input.value); } catch (e) { /* ignore */ }
           const r = await post("/api/plan", { root: S.root.path, path: S.path, dest: input.value });
           if (r.error) return renderPlanBuilder(r.error);
           P.planId = r.plan_id; renderPlan(r.plan_id);
         } }, "Build plan")),
+      dchk.el,
       msg ? h("p", { class: "err" }, msg) : null),
     plans.length ? h("div", { class: "card" }, h("h2", { class: "h2" }, "Recent plans"),
       h("table", {}, h("tbody", {}, plans.map(p => {

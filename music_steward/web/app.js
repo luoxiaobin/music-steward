@@ -762,6 +762,7 @@ async function openSettings() {
     disabled: disabled ? true : null }), " ", label, hint ? h("span", { class: "muted xsmall" }, "  " + hint) : null);
   const dest = h("input", { type: "text", id: "setDest", value: v("dest") || "", placeholder: "/Users/you/Music/Organized  (outside your collection)" });
   const msg = h("p", { class: "err" });
+  const destCheck = folderCheck(dest, "destination", s => { const b = document.getElementById("settingsSave"); if (b) b.disabled = s.level === "error"; });
   const dlg = h("dialog", { class: "appdialog settings" },
     h("h2", { class: "h2" }, "Settings"),
     h("section", {}, h("h3", {}, h("label", { for: "setLang" }, "Language")),
@@ -801,12 +802,16 @@ async function openSettings() {
         "Keys stay in your environment (~/.zshenv); the app never stores them."), envNote("sources")),
     h("section", {}, h("h3", {}, h("label", { for: "setDest" }, "Default destination folder")),
       h("div", { style: "display:flex;gap:8px" }, dest, chooseButton(dest)),
-      h("div", { class: "muted xsmall" }, "Where plans copy to unless you choose another folder. Never inside your collection.")),
+      h("div", { class: "muted xsmall" }, "Where plans copy to unless you choose another folder. Never inside your collection."),
+      destCheck.el,
+      h("div", { class: "muted xsmall", style: "margin-top:6px" }, "This is where the organized copies are written, not the folder to scan. The folders Music Steward scans are your collection folders: ",
+        ...(d.retire_roots || []).map(r => h("span", { class: "mono", "data-no-translate": "" }, r.path + "  ")),
+        "To add another, start the app with --root and the folder's path.")),
     msg,
     h("div", { class: "muted xsmall", "data-no-translate": "" }, `Music Steward ${d.version}`),
     h("div", { class: "btnrow" },
       h("button", { type: "button", class: "btn", onclick: () => { dlg.close(); dlg.remove(); } }, "Cancel"),
-      h("button", { type: "button", class: "btn btn-primary", onclick: async () => {
+      h("button", { type: "button", class: "btn btn-primary", id: "settingsSave", onclick: async () => {
         const pick = n => dlg.querySelector(`input[name=${n}]:checked`)?.value;
         const body = { script: pick("script"), year: pick("year"), cue_encoding: pick("cue_encoding"), cue_albums: pick("cue_albums"),
           album_cue: dlg.querySelector("#setAlbumCue").checked ? "on" : "off",
@@ -830,6 +835,37 @@ document.getElementById("settingsBtn").addEventListener("click", openSettings);
 // ---------------------------------------------------------------- desktop window (pywebview)
 // Inside the desktop window, folder fields get a native "Choose…" button.
 const inDesktop = () => !!(window.pywebview && window.pywebview.api && window.pywebview.api.choose_folder);
+// A live check under a folder field (music_steward/folders.py): is it written correctly, does it exist,
+// can it be used? Shows the answer in words, offers the real path when a network address is typed, and
+// tells `onChange` the result ({level: "empty" | "ok" | "warn" | "error"}) so a button can wait for it.
+function folderCheck(input, purpose, onChange) {
+  const el = h("div", { class: "small foldercheck", style: "margin-top:4px;min-height:18px" });
+  let timer = null, seq = 0, state = { level: "empty", ok: true };
+  const run = async () => {
+    const mine = ++seq, text = input.value;
+    if (!text.trim()) { state = { level: "empty", ok: true }; el.replaceChildren(); if (onChange) onChange(state); return; }
+    el.replaceChildren(h("span", { class: "muted" }, "Checking the folder…"));
+    let r;
+    try { r = await api(`/api/check_folder?purpose=${purpose}&path=${encodeURIComponent(text)}`); }
+    catch (e) { r = { level: "error", ok: false, message: String(e) }; }
+    if (mine !== seq) return;                                           // the field changed meanwhile
+    state = r;
+    const cls = r.level === "error" ? "err" : r.level === "warn" ? "warn" : "ok", mark = r.level === "error" ? "✗ " : r.level === "warn" ? "! " : "✓ ";
+    el.replaceChildren(...[
+      h("span", { class: cls, style: "font-weight:600" }, mark), h("span", { class: cls === "err" ? "err" : "" }, r.message),
+      r.detail ? h("span", { class: "mono", "data-no-translate": "" }, " " + r.detail) : null,
+      r.suggestion ? h("div", {}, h("span", { class: "mono", "data-no-translate": "" }, r.suggestion), " ",
+        h("button", { type: "button", class: "btn", style: "min-height:26px;padding:0 8px",
+          onclick: () => { input.value = r.suggestion; input.dispatchEvent(new Event("input")); } }, "Use this path")) : null,
+      r.free != null && r.ok ? h("div", { class: "muted xsmall" }, `${fmtSize(r.free)} free`) : null].filter(Boolean));
+    if (onChange) onChange(state);
+  };
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 400); });
+  input.addEventListener("change", run);
+  setTimeout(run, 0);
+  return { el, state: () => state, recheck: run };
+}
+
 function chooseButton(input) {
   const b = h("button", { type: "button", class: "btn", hidden: inDesktop() ? null : true, onclick: async () => {
     const p = await window.pywebview.api.choose_folder(input.value || "");

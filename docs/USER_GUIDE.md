@@ -110,7 +110,10 @@ repaired tag text. Click a result (or ↑/↓ and Enter) to jump there.
 
 ## 7. Plan
 
-Open **Settings** once: set the **Default destination folder** (use **Choose…**). If you play your music through a
+Open **Settings** once: set the **Default destination folder** (use **Choose…**, or type the path — a line under the
+field tells you at once if it is written correctly, whether the folder exists and whether it can be used; if you
+paste a network address such as `//nas/music/…`, it offers the path as your Mac shows the connected share, under
+`/Volumes`). This is where the organized copies go; it is not the folder to scan. If you play your music through a
 music server or a phone app that doesn't read cue sheets, set **Albums of one file with a cue sheet** to **One file
 per track**. It must be an empty folder outside
 your collection — on a local or external disk for now. Check the naming defaults there too
