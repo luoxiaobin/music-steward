@@ -156,7 +156,9 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
 5. Read-only **collection health report**; a signed, notarized `.app`; ✅ icon for the chosen concept (vector
    master, every size generated from one geometry, checked at 16–1024 px; Dock, favicon, iPhone home screen, macOS
    `.icns`, iOS app icon). A subtle variant for a future player app, if one is made.
-6. Outside trial users when the above is solid.
+6. **Collection folders** ([ADR 0004](adr/0004-collection-folders.md), proposed): after Folder check, Archive and Delete
+   — the not-connected message and *Change path*; later *Add* and *Hide*.
+7. Outside trial users when the above is solid.
 
 ## M2 backlog (original order)
 
@@ -180,6 +182,7 @@ Cyrillic) on demand → Apple export (M4) → native phone apps only if a store 
 
 | Date | Decision | Record |
 |---|---|---|
+| 2026-11-21 | **Collection folders (proposed, awaiting approval)**: first build *change path* (same collection at a new path, 90% of a 200-file sample must match; blocked while a job runs, a copy is unfinished or originals are parked; decisions kept; Retire reset to off; history kept) with the *not connected* message; then *add* and *hide*. No overlapping folders; `--root` adds; albums not found are never dropped; share identity kept locally to suggest the new mount point; no "forget everything" | [ADR 0004](adr/0004-collection-folders.md) (proposed) |
 | 2026-11-21 | **Retire the originals: design accepted** — a move (never a delete) of verified albums' files into `<root>/_ORIGINALS/<run>/…` on the same volume, clearly labelled (README + manifest), per-root opt-in, dry run first, journalled, restorable; the app offers **Restore, Archive (verified copy) and Delete** (typed word, warnings, repeated checks) as separate confirmed actions. All nine decisions accepted by the owner | [ADR 0003](adr/0003-retire-originals.md) (accepted; revised: labelled `_ORIGINALS`, Archive and Delete offered in the app with warnings) |
 | 2026-11-21 | **Required feature: the organized copy works in Subsonic-standard music servers** (Navidrome is the reference): every album once, all tracks in order, titles/artists/years/durations as planned. Checked by `tests/test_subsonic.py` on every PR (macOS CI installs Navidrome). Covers albums of track files and cue-sheet albums split into tracks; albums kept as one file + cue sheet need a cue-aware player. Format is not the issue: Navidrome lists APE and converts it while streaming (checked with a real NAS APE) | this file, AGENTS.md |
 | 2026-11-20 | **Ongoing upkeep is a goal: album identity must not depend on file paths.** Identity follows the audio; renames and moves keep decisions; changed audio goes back to review | [ADR 0002](adr/0002-album-identity-independent-of-paths.md) (proposed) |

@@ -48,5 +48,8 @@ copies that a Subsonic-standard server would no longer serve correctly** (requir
 tracks in order, titles/artists/years/durations from the plan — `tests/test_subsonic.py` checks it against Navidrome;
 it covers albums of separate track files and cue-sheet albums split into tracks).
 
+Words: the product, its screens and its documents use the terms in [`GLOSSARY.md`](GLOSSARY.md) (say *collection folder*,
+not *root*); a new term goes there when it is settled.
+
 Style: small focused modules, comments explain *why* (often a measured finding on the real collection), tests
 generate their own audio with FFmpeg.
