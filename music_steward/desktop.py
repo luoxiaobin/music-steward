@@ -9,8 +9,26 @@ job is safe and can be resumed.
 from __future__ import annotations
 
 import os
+import sys
 import threading
 from http.server import ThreadingHTTPServer
+from pathlib import Path
+
+ICON = Path(__file__).parent / "web/icons/icon-512.png"     # made by tools/make_icons.py
+
+
+def _dock_icon() -> None:
+    """macOS: show the app's icon in the Dock and the app switcher (a plain Python process would
+    show the Python rocket). Best effort -- the window works without it."""
+    if sys.platform != "darwin" or not ICON.exists():
+        return
+    try:
+        from AppKit import NSApplication, NSImage     # pyobjc, installed with pywebview on macOS
+        image = NSImage.alloc().initWithContentsOfFile_(str(ICON))
+        if image is not None:
+            NSApplication.sharedApplication().setApplicationIconImage_(image)
+    except Exception:       # noqa: BLE001 -- an icon is never worth failing the window for
+        pass
 
 
 class Api:
@@ -59,6 +77,7 @@ def run(db_path: str, roots: list[str], dest: str | None = None, debug: bool = F
     try:
         # not private: the page remembers per-viewer conveniences (panel sizes, hidden columns)
         from .db import APP_DIR
+        _dock_icon()
         webview.start(debug=debug, private_mode=False, storage_path=str(APP_DIR / "webview"))
     finally:
         httpd.shutdown()

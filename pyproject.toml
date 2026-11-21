@@ -20,6 +20,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest"]
+icons = ["pillow"]                # only to regenerate the app icon (tools/make_icons.py)
 desktop = ["pywebview==6.2.1"]   # native window (ADR 0001); BSD-3-Clause
 
 [project.scripts]
@@ -31,7 +32,7 @@ mp3librarytool = "music_steward.cli:main"   # old name, kept as an alias for now
 packages = ["music_steward", "music_steward.recognize", "music_steward.apply"]
 
 [tool.setuptools.package-data]
-music_steward = ["web/*"]
+music_steward = ["web/*", "web/icons/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
