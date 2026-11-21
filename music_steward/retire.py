@@ -136,9 +136,16 @@ def _verify_copy(run: "Run", op: dict, item: dict, src: str | None = None) -> st
             if _fp(str(final), op.get("codec")) != op["src_audio"]:
                 raise _Skip("the audio of the organized copy changed")
         elif src == _DELETED:
-            pass        # the original has been deleted; the copy was proved identical before that began
+            # the original is gone, so the copy cannot be compared with it any more: it must still be the very
+            # audio that was proved identical, whose fingerprint was recorded before the first deletion
+            known = run.known_fp.get(op["op"])
+            if known is None:
+                raise _Skip("the organized copy was not recorded before its original was deleted; left alone")
+            if _fp(str(final), op.get("codec")) != known:
+                raise _Skip("the audio of the organized copy changed since its original was deleted")
         else:       # already there when the run started: prove it equals the original now
             src = src or op["src"]
+            fpf = None
             if sp is not None:
                 from .apply.split import SplitError, verify
                 try:
@@ -146,9 +153,11 @@ def _verify_copy(run: "Run", op: dict, item: dict, src: str | None = None) -> st
                 except SplitError as e:
                     raise _Skip(f"cannot compare the track with its image ({e})") from e
             else:
-                ok = _fp(src, op.get("codec")) == _fp(str(final), op.get("codec"))
+                fpf = _fp(str(final), op.get("codec"))
+                ok = _fp(src, op.get("codec")) == fpf
             if not ok:
                 raise _Skip("the organized copy is not the same audio as the original")
+            run.fresh_fp[op["op"]] = fpf or _fp(str(final), op.get("codec"))     # what Delete records before it starts
         return None
     # side files: cue (rewritten), lyrics (copied or split), cover images
     if state == "committed":
@@ -192,6 +201,8 @@ class Run:
         self.root_id = self.plan["root_id"]
         self.root = con.execute("SELECT path FROM root WHERE id=?", (self.root_id,)).fetchone()["path"]
         self.ops = protocol.Journal(Path(r["journal"])).ops()
+        self.known_fp: dict[str, str] = {}     # op -> audio fingerprint recorded before its original was deleted
+        self.fresh_fp: dict[str, str] = {}     # op -> fingerprint of a copy proved equal to its original just now
         items = [dict(x) for x in con.execute("SELECT * FROM plan_item WHERE plan_id=? ORDER BY seq", (r["plan_id"],))]
         self.units: dict[int, list[dict]] = {}
         for it in items:
@@ -1158,6 +1169,7 @@ def delete(con: sqlite3.Connection, batch_id: int, typed: str, acks: dict | None
     _reconcile(con, batch, j)
     folder, root = batch["folder"], run.root
     _keep_manifest_record(con, batch)
+    run.known_fp = {k[1:]: o["fp"] for k, o in j.ops().items() if k.startswith("v") and "fp" in o}
     albums = _delete_checks(con, batch, run, j, unit_ids)
     todo = sum(len(a["files"]) for a in albums if a["eligible"])
     kept = [{"unit_id": a["unit_id"], "label": a["label"], "reason": a["reason"]} for a in albums if not a["eligible"]]
@@ -1165,6 +1177,18 @@ def delete(con: sqlite3.Connection, batch_id: int, typed: str, acks: dict | None
     for a in albums:
         if not a["eligible"]:
             continue
+        # the first pass may be hours old on a big batch: look at this album again, right before its files go
+        run.fresh_fp.clear()
+        again = _delete_checks(con, batch, run, j, {a["unit_id"]})
+        if not again or not again[0]["eligible"]:
+            kept.append({"unit_id": a["unit_id"], "label": a["label"],
+                         "reason": (again[0]["reason"] if again else None) or "no longer verifies; left alone"})
+            continue
+        a = again[0]
+        for k, v in run.fresh_fp.items():      # durable before the first original of this album is deleted
+            if k not in run.known_fp:
+                j.write({"op": "v" + k, "state": "copy_fp", "fp": v})
+                run.known_fp[k] = v
         for f in a["files"]:
             if stop is not None and stop.is_set():
                 stopped = True

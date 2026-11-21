@@ -365,6 +365,63 @@ def test_stopping_a_delete_between_files_then_running_it_again(parked, con):
     assert retire.batches(con, [run])[0]["delete"]["deleted"] == 4
 
 
+def test_each_album_is_checked_again_right_before_its_files_go(parked, con, monkeypatch):
+    """P0 (Codex): on a big batch the first pass is hours old when an album's turn comes; its organized copy may
+    have changed since."""
+    lib, dest, run, batch, folder = parked
+    real, calls = retire._delete_checks, []
+
+    def spoil_after_the_first_pass(*a, **kw):
+        out = real(*a, **kw)
+        calls.append(1)
+        if len(calls) == 1:
+            tone(next(dest.rglob("01 - *.mp3")), ["-c:a", "libmp3lame"], secs=2, freq=1500)
+        return out
+    monkeypatch.setattr(retire, "_delete_checks", spoil_after_the_first_pass)
+    out = retire.delete(con, batch["id"], "DELETE", {"no_backup": True})
+    assert out["deleted"] == 0 and "changed" in out["kept"][0]["reason"]
+    assert len(files_under(folder)) == 6                                  # nothing was removed
+
+
+def test_resuming_a_delete_still_vouches_for_a_copy_that_pre_existed(applied, con):
+    """P0 (Codex): an organized file that was 'already there' at Apply has no recorded audio fingerprint; once its
+    original is deleted it could not be compared with anything, so a later change went unnoticed."""
+    import json
+    lib, dest, run = applied
+    jp = Path(con.execute("SELECT journal FROM run WHERE id=?", (run,)).fetchone()[0])
+    recs = [json.loads(ln) for ln in jp.read_text(encoding="utf-8").splitlines()]
+    audio = {r["op"] for r in recs if "src_audio" in r}
+    for r in recs:
+        if r["op"] in audio:
+            r.pop("src_audio", None)
+            if r.get("state") == "committed":
+                r["state"] = "already_existed"
+    lines = [json.dumps(r) for r in recs]
+    jp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    settings.save(con, {"retire_cooloff_days": "0"})
+    assert retire.retire(con, run)["files"] == 4
+    batch = con.execute("SELECT * FROM retire_batch").fetchone()
+    folder = Path(batch["folder"])
+    stop = threading.Event()
+
+    def progress(done, total):
+        if done == 1:
+            stop.set()
+    out = retire.delete(con, batch["id"], "DELETE", {"no_backup": True}, progress=progress, stop=stop)
+    assert out["status"] == "stopped" and out["deleted"] == 1
+    gone = [o for o in protocol_ops(jp).values() if o.get("src", "").startswith(str(lib))
+            and not (folder / Path(o["src"]).relative_to(lib)).exists() and o["final"].endswith(".mp3")]
+    assert gone                                                           # the copy whose original is already deleted
+    tone(Path(gone[0]["final"]), ["-c:a", "libmp3lame"], secs=2, freq=1500)
+    out2 = retire.delete(con, batch["id"], "DELETE", {"no_backup": True})
+    assert out2["deleted"] == 0 and "changed" in out2["kept"][0]["reason"]
+    assert len(files_under(folder)) == 6 - 1                              # the other originals were not deleted
+
+
+def protocol_ops(path):
+    return retire.protocol.Journal(path).ops()
+
+
 # ---- delete: what the dialog tells the user ------------------------------------------------------------------------
 def test_the_preview_repeats_the_checks_and_says_what_is_lost(parked, con, tmp_path):
     lib, dest, run, batch, folder = parked
