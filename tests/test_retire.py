@@ -757,3 +757,49 @@ def test_recovery_never_unlinks_through_a_replaced_album_folder(applied, con, mo
     except retire.RetireError:
         pass
     assert {p.name: sha(p) for p in outside.iterdir()} == kept
+
+
+def test_recovery_refuses_when_the_collection_folder_itself_was_replaced_by_a_link(applied, con, monkeypatch, tmp_path):
+    """P0 (Codex, round 5): the collection was moved away and a link left at its old path. Every path below
+    the root passed the checks, so recovery unlinked a file in the moved collection."""
+    lib, dest, run = applied
+    _crash_midway(monkeypatch, "after_link")
+    with pytest.raises(Crash):
+        retire.retire(con, run)
+    monkeypatch.setattr(retire, "_rename_noreplace", retire._rename_noreplace)
+    batch = con.execute("SELECT * FROM retire_batch").fetchone()
+    moved_lib = tmp_path / "moved_lib"
+    shutil.move(str(lib), str(moved_lib))
+    os.symlink(moved_lib, lib)
+    kept = {str(p.relative_to(moved_lib)): sha(p) for p in moved_lib.rglob("*") if p.is_file()}
+    with pytest.raises(retire.RetireError, match="collection folder"):
+        retire.resume(con, batch["id"])
+    with pytest.raises(retire.RetireError, match="collection folder"):
+        retire.restore(con, batch["id"])
+    assert {str(p.relative_to(moved_lib)): sha(p) for p in moved_lib.rglob("*") if p.is_file()} == kept
+
+
+def test_restore_refuses_after_a_normal_retire_when_the_collection_became_a_link(applied, con, tmp_path):
+    lib, dest, run = applied
+    res = retire.retire(con, run)
+    moved_lib = tmp_path / "moved_lib2"
+    shutil.move(str(lib), str(moved_lib))
+    os.symlink(moved_lib, lib)
+    with pytest.raises(retire.RetireError, match="collection folder"):
+        retire.restore(con, res["batch"])
+    assert len([p for p in (moved_lib / retire.ORIGINALS).rglob("*") if p.is_file()]) == 6
+
+
+def test_a_collection_reached_through_a_stable_link_still_works(tmp_path):
+    """Not every setup is a plain path (a share mounted behind a link): what is checked is that the real
+    location did not CHANGE since the batch was made, not that the path has no link in it."""
+    real = tmp_path / "real_lib"
+    real.mkdir()
+    alias = tmp_path / "alias_lib"
+    os.symlink(real, alias)
+    assert os.path.realpath(alias) == str(real.resolve())
+    folder = alias / retire.ORIGINALS / "run1-x"
+    folder.mkdir(parents=True)
+    retire._check_batch_paths(str(alias), str(folder), os.path.realpath(alias))        # accepted
+    with pytest.raises(retire.RetireError, match="collection folder"):
+        retire._check_batch_paths(str(alias), str(folder), str(tmp_path / "somewhere_else"))

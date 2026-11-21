@@ -174,7 +174,9 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
                  ("candidate", "origin_json", "TEXT"), ("candidate", "original_year", "INTEGER"),
                  # ADR 0002: identity follows the content; a decision made on different audio is flagged
                  ("file", "content_id", "TEXT"), ("decision", "stale_reason", "TEXT"),
-                 ("scan", "n_moved", "INTEGER")]
+                 ("scan", "n_moved", "INTEGER"),
+                 # where the collection folder really was when originals were set aside (retire.py)
+                 ("retire_batch", "root_real", "TEXT")]
 
 
 _READY: set[str] = set()   # databases already set up by this process

@@ -495,9 +495,9 @@ def _new_batch(con: sqlite3.Connection, run: Run) -> sqlite3.Row:
         fh.flush()
         os.fsync(fh.fileno())
     jpath = _journal_dir(con) / f"retire-{key}.jsonl"
-    bid = con.execute("INSERT INTO retire_batch(root_id, run_id, key, folder, journal, created_at, status) "
-                      "VALUES(?,?,?,?,?,?, 'running')",
-                      (run.root_id, run.id, key, folder, str(jpath), time.time())).lastrowid
+    bid = con.execute("INSERT INTO retire_batch(root_id, run_id, key, folder, journal, created_at, status, root_real) "
+                      "VALUES(?,?,?,?,?,?, 'running', ?)",
+                      (run.root_id, run.id, key, folder, str(jpath), time.time(), os.path.realpath(run.root))).lastrowid
     con.commit()
     return con.execute("SELECT * FROM retire_batch WHERE id=?", (bid,)).fetchone()
 
@@ -546,9 +546,16 @@ def _has_link(root: str, path: str) -> bool:
     return False
 
 
-def _check_batch_paths(root: str, folder: str) -> None:
+def _check_batch_paths(root: str, folder: str, root_real: str | None) -> None:
     """The batch folder is <root>/_ORIGINALS/<batch>, with no link on the way and inside the collection
-    folder: a folder that was moved away and replaced by a link must never be followed."""
+    folder: a folder that was moved away and replaced by a link must never be followed. That includes the
+    collection folder itself: its real location was recorded when the batch was made, and if the path now
+    resolves elsewhere (the collection moved and a link left in its place) nothing below it is trusted."""
+    if root_real is None or os.path.realpath(root) != root_real:
+        raise RetireError("the collection folder is not where it was when these originals were set aside "
+                          "(moved, or replaced by a link now); refusing to move files through it")
+    if os.path.realpath(folder) != os.path.join(root_real, ORIGINALS, os.path.basename(os.path.normpath(folder))):
+        raise RetireError(f"the originals folder is a link now, or not where it was; refusing to move files through it")
     if os.path.dirname(os.path.normpath(folder)) != os.path.normpath(os.path.join(root, ORIGINALS)):
         raise RetireError("the originals folder of this batch is not where it should be")
     if _has_link(root, folder) or not _inside(folder, root):
@@ -639,7 +646,7 @@ def _finish_album(con, batch: sqlite3.Row, j: protocol.Journal, root: str, uid: 
                   files: list[dict]) -> int:
     """Move every file of the album that has not been moved yet, settling what a crash left."""
     folder, n = batch["folder"], 0
-    _check_batch_paths(root, folder)
+    _check_batch_paths(root, folder, batch["root_real"])
     ops = j.ops()
     for f in files:
         op = f"f{f['file_id']}"
@@ -713,7 +720,7 @@ _HANDLED = ("album_done", "album_skipped", "album_halted")
 def _run_batch(con, run: Run, batch: sqlite3.Row | None, progress, stop, carried: list[dict] | None = None) -> dict:
     j = protocol.Journal(Path(batch["journal"])) if batch is not None else None
     if batch is not None:
-        _check_batch_paths(run.root, batch["folder"])
+        _check_batch_paths(run.root, batch["folder"], batch["root_real"])
     done_units = {int(k[1:]) for k, o in (j.ops().items() if j else []) if k.startswith("a") and
                   o["history"][-1] in _HANDLED}
     todo = [u for u in sorted(k for k in run.units if k is not None) if u not in done_units]
@@ -760,7 +767,7 @@ def resume(con: sqlite3.Connection, batch_id: int, progress=None, stop=None) -> 
         raise RetireError("no such batch")
     run = Run(con, batch["run_id"])
     require_allowed(con, run.root_id)
-    _check_batch_paths(run.root, batch["folder"])
+    _check_batch_paths(run.root, batch["folder"], batch["root_real"])
     j = protocol.Journal(Path(batch["journal"]))
     _settle_inflight(con, batch, j, run.root)
     _reconcile(con, batch, j)
@@ -793,7 +800,7 @@ def restore(con: sqlite3.Connection, batch_id: int, unit_ids: set[int] | None = 
     if batch is None:
         raise RetireError("no such batch")
     root = con.execute("SELECT path FROM root WHERE id=?", (batch["root_id"],)).fetchone()["path"]
-    _check_batch_paths(root, batch["folder"])
+    _check_batch_paths(root, batch["folder"], batch["root_real"])
     j = protocol.Journal(Path(batch["journal"]))
     _settle_inflight(con, batch, j, root)
     _reconcile(con, batch, j)
