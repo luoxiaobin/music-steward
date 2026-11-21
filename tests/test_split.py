@@ -299,3 +299,50 @@ def test_the_lyrics_offset_is_applied_before_lines_are_placed_into_tracks():
     assert parts[0] == "[ar:A]\n[ti:One]\n[00:00.50]first\n[00:01.80]boundary line\n"   # 2.30 - 0.50 = 1.80
     assert parts[1] is None
     assert "[offset" not in parts[0]
+
+
+JPEG = b"\xff\xd8\xff\xe0" + b"\x00\x10JFIF\x00" + b"cover-bytes" * 40 + b"\xff\xd9"
+
+
+def test_the_images_embedded_cover_goes_into_every_track(tmp_path, con, monkeypatch):
+    """Codex review on #7: only the audio stream was mapped, so a cover embedded in the image was lost."""
+    from mutagen.flac import FLAC, Picture
+    monkeypatch.setenv("MLT_CUE_ALBUMS", "tracks")
+    lib = tmp_path / "lib"
+    img = noise(lib / "HIFI/image.flac", 6)
+    pic = Picture()
+    pic.type, pic.mime, pic.data = 3, "image/jpeg", JPEG
+    f = FLAC(img)
+    f.add_picture(pic)
+    f.save()
+    (lib / "HIFI/image.cue").write_bytes(CUE.replace("old image name.wav", "image.flac").encode("gbk"))
+    scan(con, lib)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["kind"] == "cue"])
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    con.execute("UPDATE unit SET status='done', n_tracks=3")
+    cid = local.add(con, uid)
+    con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                "VALUES(?, 'accept', ?, 0, 'local')", (uid, cid))
+    con.commit()
+    dest = tmp_path / "out"
+    res = runner.apply(con, plan.build(con, str(dest), 1), journal_root=tmp_path / "j")
+    assert set(res["states"]) == {"committed"}, res
+    tracks = sorted(dest.rglob("*.flac"))
+    assert len(tracks) == 3
+    for t in tracks:
+        got = FLAC(t).pictures
+        assert len(got) == 1 and got[0].data == JPEG and got[0].type == 3
+    assert b"".join(samples(t) for t in tracks) == samples(img)          # the audio is still exact
+
+
+def test_an_ape_tags_cover_art_item_is_found(tmp_path):
+    from mutagen.apev2 import APEv2, APEValue, BINARY
+    p = tmp_path / "x.ape"
+    p.write_bytes(b"MAC " + b"\x00" * 200)
+    t = APEv2()
+    t["Cover Art (Front)"] = APEValue(b"front.jpg\x00" + JPEG, BINARY)
+    t["Title"] = "x"
+    t.save(str(p))
+    assert split.embedded_picture(str(p), "ape") == ("image/jpeg", JPEG)
+    assert split.embedded_picture(str(p), "flac") is None            # wrong codec: not looked for
+    assert split.embedded_picture(str(tmp_path / "missing.ape"), "ape") is None

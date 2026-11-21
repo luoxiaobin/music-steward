@@ -101,8 +101,9 @@ def apev2_span(path: str) -> tuple[int, int] | None:
     return (start, footer_at + 32) if 0 <= start < footer_at else None
 
 
-def _raw_apev2(path: str) -> list[tuple[str, bytes]] | None:
-    """Minimal APEv2 reader: footer 'APETAGEX' at the end (or before a 128-byte ID3v1 tag)."""
+def _raw_apev2(path: str, binary: bool = False) -> list[tuple[str, bytes]] | None:
+    """Minimal APEv2 reader: footer 'APETAGEX' at the end (or before a 128-byte ID3v1 tag).
+    binary=True also returns binary items (cover art) with their whole value."""
     import struct
     with open(path, "rb") as fh:
         fh.seek(0, 2)
@@ -134,6 +135,8 @@ def _raw_apev2(path: str) -> list[tuple[str, bytes]] | None:
         pos = k_end + 1 + vlen
         if (iflags >> 1) & 3 == 0:          # text item (not binary / external)
             out.append((key, value.split(b"\x00")[0]))
+        elif binary and (iflags >> 1) & 3 == 1:
+            out.append((key, value))
     return out
 
 

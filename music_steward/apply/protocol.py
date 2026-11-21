@@ -283,6 +283,11 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None, guard=None):
             write_tags(str(temp), o["tags"], o["codec"])
         if o["kind"] == "split":
             write_tags(str(temp), {k: v for k, v in o["tags"].items() if k != "split"}, "flac")
+            from .split import add_picture, embedded_picture
+            sp_ = o["tags"]["split"]
+            pic = embedded_picture(str(src), sp_.get("src_codec"))     # the image's own cover, if it has one
+            if pic is not None:
+                add_picture(str(temp), pic)
         if o["kind"] == "cue" and (o.get("tags") or {}).get("cue_rewrite"):
             from ..cue import rewrite_bytes
             rw = o["tags"]["cue_rewrite"]

@@ -21,6 +21,41 @@ class SplitError(Exception):
     pass
 
 
+def embedded_picture(src: str, codec: str | None) -> tuple[str, bytes] | None:
+    """The cover embedded in the image file, (mime type, bytes), or None. FLAC: the front-cover
+    picture block (else the first); APE / WavPack / TTA: the 'Cover Art (Front)' item of the APEv2
+    tag (a file name, a zero byte, then the image). FFmpeg is told to map only the audio stream, so
+    without this the tracks would lose it (Codex review on #7)."""
+    try:
+        if codec == "flac":
+            from mutagen.flac import FLAC
+            pics = FLAC(src).pictures
+            pic = next((p for p in pics if p.type == 3), pics[0] if pics else None)
+            return (pic.mime, pic.data) if pic else None
+        if codec in ("ape", "wavpack", "tta"):
+            from ..tags import _raw_apev2
+            for key, value in _raw_apev2(src, binary=True) or []:
+                if key.lower().startswith("cover art"):
+                    data = value.split(b"\x00", 1)[1] if b"\x00" in value[:256] else value
+                    mime = ("image/png" if data[:8] == b"\x89PNG\r\n\x1a\n"
+                            else "image/jpeg" if data[:2] == b"\xff\xd8" else None)
+                    return (mime, data) if mime else None
+    except Exception:      # noqa: BLE001 -- a damaged tag must not stop the split; the cover is then left out
+        return None
+    return None
+
+
+def add_picture(track: str, pic: tuple[str, bytes]) -> None:
+    """Embed `pic` as the front cover of the FLAC file `track`."""
+    from mutagen.flac import FLAC, Picture
+    p = Picture()
+    p.type, p.mime, p.data = 3, pic[0], pic[1]
+    f = FLAC(track)
+    f.clear_pictures()
+    f.add_picture(p)
+    f.save()
+
+
 def _input(src: str, src_ext: str, seek: float) -> list[str]:
     args = ["-ss", f"{seek:.6f}", "-copyts"]
     off = audio_offset(src, src_ext)                 # APE with an ID3 tag in front (seen on the NAS)
