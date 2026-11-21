@@ -24,8 +24,10 @@ originals.* Treat these as **P0** (block the PR):
   let a destination overlap a root (`apply/plan.py: check_destination`) — **except `retire.py`** (ADR 0003, fenced):
   it may only *rename* files into `<root>/_ORIGINALS/<batch>/` (and write that batch's README and manifest), only for
   files of albums whose organized copy was verified *just before* the move (`retire.check_album`), only for a
-  collection folder the user switched it on for, never replacing a file, never across a symlink or a device, always
-  journal-first (Resume settles a crash, Restore moves back). Nothing may be **deleted** under a root until the
+  collection folder the user switched it on for, never replacing a file (the same no-replace ladder as apply:
+  exclusive rename / link / claim-then-rename; it may remove only its own empty placeholder, identified by inode),
+  never across a symlink or a device, always journal-first (Resume re-checks the album in flight and settles a
+  crash; Restore moves back and refuses to work through a link). Nothing may be **deleted** under a root until the
   confirmed *Delete* of ADR 0003 exists (then only inside `_ORIGINALS/<run>/`, after its checks and typed
   confirmation); removing empty folders inside `_ORIGINALS` is fine. Every other write, rename or deletion under a
   root is still P0, and so is weakening any check or the opt-in.

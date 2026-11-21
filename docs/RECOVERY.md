@@ -104,6 +104,14 @@ paths), after re-checking each album; nothing is deleted. Every step is journall
 | The drive disconnected | The files not yet moved stay where they are | Reconnect, **Finish setting aside** |
 | You want them back | — | **Restore originals**: files go back to their old paths; a file that has appeared there since is left alone and reported; nothing is overwritten |
 | Something at an original path blocks a restore | That file stays in `_ORIGINALS` | Move or rename the other file, press Restore again, or move it by hand using `MANIFEST.csv` |
+| A folder in the way (the batch folder or `_ORIGINALS`, or a folder of the original place) was replaced by a link | Nothing is moved through a link; Restore and Finish refuse (or list the file as blocked) | Remove the link, or put the folder back, then try again |
+| The app crashed in the middle of an album | **Finish setting aside** checks that album **again** (the copies, the originals still in place, links) before moving what is left; if something no longer verifies, the files not yet moved stay where they are and the album is listed | Look at the reason; fix it or leave the album as it is |
+
+Files are moved **without ever replacing** anything: an atomic exclusive rename where the drive has one (APFS), else a
+hard link, else — on NAS shares — claim-then-rename (the same method as copying to a NAS; its residual window is
+described [above](#writing-the-organized-copy-to-a-nas): another program writing the very same file name in the
+microseconds between the check and the rename). The app's database can be rebuilt from the journal, so a crash never
+costs you the Restore button.
 
 An album is **not** set aside — and nothing of it moves — if any of its files was not copied or blocked, the organized
 copy is missing or its audio differs from the journal, the original changed since it was copied, or a path on the way

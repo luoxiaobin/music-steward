@@ -1,6 +1,7 @@
 """ADR 0003: retire the originals -- a verified, reversible, labelled move into <root>/_ORIGINALS/.
 
 The one place a collection folder is written to, so every refusal and every crash point is tested."""
+import errno
 import hashlib
 import os
 import shutil
@@ -248,13 +249,13 @@ def test_a_crash_while_moving_is_settled_by_resume(applied, con, monkeypatch, wh
     before = {p.name: sha(p) for p in (lib / ALBUM).iterdir()}
     real, calls = retire._rename_noreplace, []
 
-    def flaky(src, dst):
+    def flaky(src, dst, claimed=None):
         calls.append(src)
         if len(calls) == 2:
             if when == "after_rename":
-                real(src, dst)
+                real(src, dst, claimed)
             raise Crash()
-        return real(src, dst)
+        return real(src, dst, claimed)
     monkeypatch.setattr(retire, "_rename_noreplace", flaky)
     with pytest.raises(Crash):
         retire.retire(con, run)
@@ -410,3 +411,212 @@ def test_the_manifest_names_each_originals_own_copy(applied, con):
     for r in rows:                                                    # every listed copy exists in the destination
         for c in r["organized_copy"].split(" | "):
             assert (dest / c).is_file(), c
+
+
+# ---- Codex review on #11: four P0 findings, each reproduced --------------------------------------------
+def _unsupported(*_a, **_k):
+    raise OSError(errno.ENOTSUP, "not supported here")
+
+
+def _make_pair(tmp_path, name="a"):
+    src, dst = tmp_path / f"{name}-src.bin", tmp_path / f"{name}-dst.bin"
+    src.write_bytes(b"the original")
+    return src, dst
+
+
+@pytest.mark.parametrize("method", ["natural", "link", "claim"])
+def test_the_move_never_replaces_whatever_the_volume_supports(tmp_path, monkeypatch, method):
+    """P0: a check-then-rename fallback could replace a file created in between. Every rung of the ladder
+    (exclusive rename / link / claim-then-rename) must refuse instead."""
+    if method in ("link", "claim"):
+        monkeypatch.setattr(retire.protocol, "rename_excl", _unsupported)
+        monkeypatch.setattr(retire, "_renameat2_excl", _unsupported)
+    if method == "claim":
+        monkeypatch.setattr(os, "link", _unsupported)
+    src, dst = _make_pair(tmp_path)
+    used = retire._rename_noreplace(str(src), str(dst))
+    assert not src.exists() and dst.read_bytes() == b"the original"
+    if method != "natural":
+        assert used == method
+    src2, dst2 = _make_pair(tmp_path, "b")
+    dst2.write_bytes(b"someone else's file")
+    with pytest.raises(FileExistsError):
+        retire._rename_noreplace(str(src2), str(dst2))
+    assert dst2.read_bytes() == b"someone else's file" and src2.read_bytes() == b"the original"
+
+
+def test_a_file_that_replaces_the_claimed_name_is_not_overwritten(tmp_path, monkeypatch):
+    """P0: another client creates the target between our claim and our rename."""
+    for name in ("rename_excl",):
+        monkeypatch.setattr(retire.protocol, name, _unsupported)
+    monkeypatch.setattr(retire, "_renameat2_excl", _unsupported)
+    monkeypatch.setattr(os, "link", _unsupported)
+    src, dst = _make_pair(tmp_path)
+
+    def intruder():
+        os.unlink(dst)
+        dst.write_bytes(b"created by another program")
+    monkeypatch.setattr(retire, "_after_claim", intruder)
+    with pytest.raises(FileExistsError):
+        retire._rename_noreplace(str(src), str(dst))
+    assert dst.read_bytes() == b"created by another program" and src.read_bytes() == b"the original"
+
+
+def _crash_midway(monkeypatch, how):
+    """Make the 2nd move 'die' in a given way, leaving what a real crash would leave."""
+    real, calls = retire._rename_noreplace, []
+
+    def die(src, dst, claimed=None):
+        calls.append(src)
+        if len(calls) != 2:
+            return real(src, dst, claimed)
+        if how == "after_claim":                      # a placeholder claimed and journalled, then power loss
+            fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+            ino = os.fstat(fd).st_ino
+            os.close(fd)
+            claimed(ino)
+        elif how == "after_link":                     # two names for one inode, then power loss
+            os.link(src, dst)
+        raise Crash()
+    monkeypatch.setattr(retire, "_rename_noreplace", die)
+    return real
+
+
+@pytest.mark.parametrize("how", ["after_claim", "after_link"])
+def test_resume_settles_a_placeholder_or_a_second_name_left_by_a_crash(applied, con, monkeypatch, how):
+    lib, dest, run = applied
+    before = {p.name: sha(p) for p in (lib / ALBUM).iterdir()}
+    real = _crash_midway(monkeypatch, how)
+    with pytest.raises(Crash):
+        retire.retire(con, run)
+    monkeypatch.setattr(retire, "_rename_noreplace", real)
+    batch = con.execute("SELECT * FROM retire_batch").fetchone()
+    res = retire.resume(con, batch["id"])
+    assert res["status"] == "complete" and res["files"] == 4 and res["skipped"] == []
+    assert not list((lib / ALBUM).glob("*"))
+    assert {p.name: sha(p) for p in (Path(batch["folder"]) / ALBUM).iterdir()} == before   # no empty placeholder left
+    assert retire.restore(con, batch["id"])["restored"] == 4
+
+
+def _interrupted(con, run, monkeypatch):
+    """A batch interrupted before its 2nd file moved. Returns (batch row, names still at the original place)."""
+    real = retire._rename_noreplace
+    calls = []
+
+    def die(src, dst, claimed=None):
+        calls.append(src)
+        if len(calls) == 2:
+            raise Crash()
+        return real(src, dst, claimed)
+    monkeypatch.setattr(retire, "_rename_noreplace", die)
+    with pytest.raises(Crash):
+        retire.retire(con, run)
+    monkeypatch.setattr(retire, "_rename_noreplace", real)
+    return con.execute("SELECT * FROM retire_batch").fetchone()
+
+
+def test_resume_checks_the_organized_copies_again_before_going_on(applied, con, monkeypatch):
+    """P0: Resume went straight to moving the saved file list, whatever had happened to the copies."""
+    lib, dest, run = applied
+    batch = _interrupted(con, run, monkeypatch)
+    left = sorted(p.name for p in (lib / ALBUM).iterdir())
+    assert left and len(left) < 4
+    next(dest.rglob("*.mp3")).unlink()                      # an organized copy is lost while the batch is interrupted
+    res = retire.resume(con, batch["id"])
+    assert [x["label"] for x in res["skipped"]] and "stopped half-way" in res["skipped"][0]["reason"]
+    assert sorted(p.name for p in (lib / ALBUM).iterdir()) == left        # nothing more moved
+    assert retire.restore(con, batch["id"])["restored"] == 4 - len(left)  # what had moved can still come back
+
+
+def test_resume_checks_the_originals_again_too(applied, con, monkeypatch):
+    lib, dest, run = applied
+    batch = _interrupted(con, run, monkeypatch)
+    victim = next(p for p in (lib / ALBUM).iterdir() if p.suffix == ".mp3")
+    st = victim.stat()
+    data = bytearray(victim.read_bytes())
+    data[-3000:] = bytes(b ^ 0xFF for b in data[-3000:])
+    victim.write_bytes(bytes(data))
+    os.utime(victim, ns=(st.st_atime_ns, st.st_mtime_ns))                # same size and time, other content
+    res = retire.resume(con, batch["id"])
+    assert "stopped half-way" in res["skipped"][0]["reason"] and victim.exists()
+
+
+def test_database_rows_lost_in_a_crash_are_rebuilt_from_the_journal(applied, con):
+    """P0: the journal is fsynced per move, SQLite commits later; a rollback left moved files with no row,
+    so the Restore button never appeared and a resumed batch reported zero files."""
+    lib, dest, run = applied
+    res = retire.retire(con, run)
+    con.execute("DELETE FROM retired_file")
+    con.execute("UPDATE retire_batch SET summary_json='{}', status='running'")
+    con.commit()
+    again = retire.resume(con, res["batch"])
+    assert again["files"] == 4 and retire.batches(con, [run])[0]["moved"] == 4
+    con.execute("DELETE FROM retired_file")
+    con.commit()
+    out = retire.restore(con, res["batch"])                            # restore does not depend on the rows either
+    assert out["restored"] == 4 and len(list((lib / ALBUM).iterdir())) == 4
+
+
+def test_restore_refuses_to_work_through_a_link(applied, con, tmp_path):
+    """P0: a batch folder moved away and replaced by a link was followed: files were pulled out of an
+    outside folder into the collection and empty folders removed there."""
+    lib, dest, run = applied
+    res = retire.retire(con, run)
+    batch = Path(res["folder"])
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    shutil.move(str(batch), str(outside / batch.name))
+    os.symlink(outside / batch.name, batch)
+    kept = {str(p.relative_to(outside)): sha(p) for p in outside.rglob("*") if p.is_file()}
+    with pytest.raises(retire.RetireError, match="link"):
+        retire.restore(con, res["batch"])
+    assert {str(p.relative_to(outside)): sha(p) for p in outside.rglob("*") if p.is_file()} == kept
+    assert not list((lib / ALBUM).glob("*.mp3"))
+    with pytest.raises(retire.RetireError, match="link"):
+        retire.resume(con, res["batch"])
+
+
+def test_restore_refuses_when_the_whole_originals_folder_became_a_link(applied, con, tmp_path):
+    lib, dest, run = applied
+    res = retire.retire(con, run)
+    outside = tmp_path / "outside2"
+    shutil.move(str(lib / retire.ORIGINALS), str(outside))
+    os.symlink(outside, lib / retire.ORIGINALS)
+    with pytest.raises(retire.RetireError, match="link"):
+        retire.restore(con, res["batch"])
+    assert len([p for p in outside.rglob("*") if p.is_file()]) == 6      # 4 files + README + manifest
+
+
+def test_restore_does_not_write_through_a_link_at_the_original_place(applied, con, tmp_path):
+    lib, dest, run = applied
+    res = retire.retire(con, run)
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    shutil.rmtree(lib / ALBUM)
+    os.symlink(outside, lib / ALBUM)
+    out = retire.restore(con, res["batch"])
+    assert out["restored"] == 0 and len(out["blocked"]) == 4 and "link" in out["blocked"][0]["reason"]
+    assert not list(outside.iterdir()) and len([p for p in Path(res["folder"]).rglob("*") if p.is_file()]) == 6
+
+
+def test_restore_recovers_from_a_crash_after_claiming_the_original_place(applied, con, monkeypatch):
+    lib, dest, run = applied
+    res = retire.retire(con, run)
+    real, calls = retire._rename_noreplace, []
+
+    def die(src, dst, claimed=None):
+        calls.append(src)
+        if len(calls) == 2:
+            fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+            ino = os.fstat(fd).st_ino
+            os.close(fd)
+            claimed(ino)
+            raise Crash()
+        return real(src, dst, claimed)
+    monkeypatch.setattr(retire, "_rename_noreplace", die)
+    with pytest.raises(Crash):
+        retire.restore(con, res["batch"])
+    monkeypatch.setattr(retire, "_rename_noreplace", real)
+    out = retire.restore(con, res["batch"])
+    assert out["blocked"] == [] and len(list((lib / ALBUM).iterdir())) == 4
+    assert all((lib / ALBUM / n).stat().st_size > 0 for n in os.listdir(lib / ALBUM))          # no empty placeholder
