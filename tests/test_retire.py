@@ -620,3 +620,44 @@ def test_restore_recovers_from_a_crash_after_claiming_the_original_place(applied
     out = retire.restore(con, res["batch"])
     assert out["blocked"] == [] and len(list((lib / ALBUM).iterdir())) == 4
     assert all((lib / ALBUM / n).stat().st_size > 0 for n in os.listdir(lib / ALBUM))          # no empty placeholder
+
+
+def _crash_after_rename_before_record(con, run, monkeypatch):
+    """The 2nd file is renamed into _ORIGINALS, then the process dies before 'moved' is journalled."""
+    real, calls = retire._rename_noreplace, []
+
+    def die(src, dst, claimed=None):
+        calls.append(src)
+        if len(calls) == 2:
+            real(src, dst, claimed)
+            raise Crash()
+        return real(src, dst, claimed)
+    monkeypatch.setattr(retire, "_rename_noreplace", die)
+    with pytest.raises(Crash):
+        retire.retire(con, run)
+    monkeypatch.setattr(retire, "_rename_noreplace", real)
+    return con.execute("SELECT * FROM retire_batch").fetchone()
+
+
+def test_restore_finds_a_file_parked_before_its_record_was_written(applied, con, monkeypatch):
+    """P0 (Codex, round 2): the journal said 'intent', so Restore skipped the file and the batch could be
+    marked restored while an original was still parked."""
+    lib, dest, run = applied
+    batch = _crash_after_rename_before_record(con, run, monkeypatch)
+    parked = [p for p in (Path(batch["folder"]) / ALBUM).iterdir()]
+    assert len(parked) == 2                                  # one recorded, one renamed but not recorded
+    out = retire.restore(con, batch["id"])
+    assert out["restored"] == 2 and out["blocked"] == []
+    assert not [p for p in (Path(batch["folder"]) / ALBUM).glob("*")]
+    assert len(list((lib / ALBUM).iterdir())) == 4
+
+
+def test_resume_records_such_a_file_even_when_the_album_then_halts(applied, con, monkeypatch):
+    lib, dest, run = applied
+    batch = _crash_after_rename_before_record(con, run, monkeypatch)
+    next(dest.rglob("*.mp3")).unlink()                      # a copy is lost: the album will halt
+    res = retire.resume(con, batch["id"])
+    assert "stopped half-way" in res["skipped"][0]["reason"]
+    assert retire.batches(con, [run])[0]["moved"] == 2      # both parked files are known, Restore will offer them
+    assert retire.restore(con, batch["id"])["restored"] == 2
+    assert len(list((lib / ALBUM).iterdir())) == 4

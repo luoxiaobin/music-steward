@@ -555,6 +555,28 @@ def _is_parked(orig: str, parked: str, last_state: str | None) -> bool:
     return bool(o_there and p_there and os.path.samefile(orig, parked))
 
 
+def _row_of(o: dict) -> dict:
+    return dict(file_id=o.get("file_id"), unit=o.get("unit"), album=o.get("album"), relpath=o["relpath"],
+                size=o.get("size"), mtime_ns=o.get("mtime_ns"), content_id=o.get("content_id"), kind=o.get("kind"))
+
+
+def _settle_inflight(con: sqlite3.Connection, batch: sqlite3.Row, j: protocol.Journal) -> None:
+    """A crash between the rename and its journal record leaves a file parked while the journal still says
+    'intent' (or 'claimed'). The disk is the truth: record those moves, so that Restore sees them and no
+    check that later halts an album can strand them. Also finishes a link-method move (one inode, two
+    names). Must run before anything filters operations by their journal state."""
+    for op, o in j.ops().items():
+        if not op.startswith("f") or "src" not in o or o["history"][-1] not in ("intent", "claimed"):
+            continue
+        orig, parked = o["src"], o["dst"]
+        o_there, p_there = os.path.lexists(orig), os.path.lexists(parked)
+        if o_there and p_there and os.path.samefile(orig, parked):
+            os.unlink(orig)
+            o_there = False
+        if p_there and not o_there:
+            _record(con, batch, j, op, _row_of(o), "moved", ino=os.stat(parked).st_ino)
+
+
 def _move_album(con, run: Run, batch: sqlite3.Row, j: protocol.Journal, album: dict) -> int:
     """Move the files of one album that was just checked. The journal gets the album's whole file list
     first, so a crash half-way through is finished by Resume with exactly these files."""
@@ -700,6 +722,7 @@ def resume(con: sqlite3.Connection, batch_id: int, progress=None, stop=None) -> 
     require_allowed(con, run.root_id)
     _check_batch_paths(run.root, batch["folder"])
     j = protocol.Journal(Path(batch["journal"]))
+    _settle_inflight(con, batch, j)
     _reconcile(con, batch, j)
     ops, halted = j.ops(), []
     for op, o in ops.items():
@@ -732,6 +755,7 @@ def restore(con: sqlite3.Connection, batch_id: int, unit_ids: set[int] | None = 
     root = con.execute("SELECT path FROM root WHERE id=?", (batch["root_id"],)).fetchone()["path"]
     _check_batch_paths(root, batch["folder"])
     j = protocol.Journal(Path(batch["journal"]))
+    _settle_inflight(con, batch, j)
     _reconcile(con, batch, j)
     restored, blocked, missing = 0, [], []
     for op, o in j.ops().items():
@@ -741,8 +765,7 @@ def restore(con: sqlite3.Connection, batch_id: int, unit_ids: set[int] | None = 
         if unit_ids is not None and o.get("unit") not in unit_ids:
             continue
         orig, parked = o["src"], o["dst"]
-        row = dict(file_id=o.get("file_id"), unit=o.get("unit"), album=o.get("album"), relpath=o["relpath"],
-                   size=o.get("size"), mtime_ns=o.get("mtime_ns"), content_id=o.get("content_id"), kind=o.get("kind"))
+        row = _row_of(o)
         if _has_link(root, parked) or not _inside(parked, batch["folder"]):
             raise RetireError("a path in the journal leads outside the originals folder (or through a link)")
         if _has_link(root, os.path.dirname(orig)):
