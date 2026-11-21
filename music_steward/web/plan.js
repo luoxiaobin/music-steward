@@ -64,7 +64,8 @@ async function renderPlan(id) {
   const s = p.summary, items = p.items;
   const ok = items.filter(i => i.status === "ok"), blocked = items.filter(i => !["ok", "duplicate_source"].includes(i.status));
   const dups = items.filter(i => i.status === "duplicate_source");
-  const audio = ok.filter(i => i.kind === "audio"), side = items.filter(i => i.kind !== "audio");
+  const audio = ok.filter(i => i.kind === "audio" || i.kind === "split"),
+        side = items.filter(i => i.kind !== "audio" && i.kind !== "split");
   const sideLabel = i => i.kind === "lrc" ? "Follows its track" : i.kind === "cue" ? "Rewritten: file name + titles" : i.kind === "cue_new" ? "New: album cue sheet" : "Linked";
   const lastRun = p.runs[p.runs.length - 1];
   const applied = lastRun && !lastRun.undone_at;
@@ -188,7 +189,8 @@ function doneForYou(s, dups) {
   const groups = [
     ["artist_merged", "Artist names unified", n => `${n.label}: “${n.from}” → “${n.to}” (the album's own name)`],
     ["script", "Written in Simplified Chinese", n => `${n.from} → ${n.to}`],
-    ["original_year", "Original release year used", n => `${n.label}: ${n.from} → ${n.to}`]];
+    ["original_year", "Original release year used", n => `${n.label}: ${n.from} → ${n.to}`],
+    ["kept_image", "Kept as one file (lossy audio is not cut)", n => `${n.label} (${n.from})`]];
   const dupUnits = [...new Map(dups.map(i => [i.unit_id, i])).values()];
   const rowsOf = (list, fmt) => h("ul", { class: "small" }, list.slice(0, 100).map(x => h("li", {}, fmt(x))),
     list.length > 100 ? h("li", { class: "muted" }, `+ ${list.length - 100} more`) : null);
@@ -199,6 +201,8 @@ function doneForYou(s, dups) {
   }).filter(Boolean);
   if (dupUnits.length) parts.push(h("details", {}, h("summary", {}, h("strong", {}, "Duplicate albums copied once "),
     h("span", { class: "badge b-unid" }, dupUnits.length)), rowsOf(dupUnits, i => `${i.src_rel.split("/").slice(-2, -1)[0]} — ${i.note}`)));
+  if (s.split_tracks) parts.push(h("div", { class: "small" }, h("strong", {}, "Cue-sheet albums split into tracks "),
+    h("span", { class: "badge b-unid" }, s.split_tracks), h("span", { class: "muted" }, "  lossless FLAC files, the images unchanged")));
   if (s.album_cues) parts.push(h("div", { class: "small" }, h("strong", {}, "Album cue sheets written "),
     h("span", { class: "badge b-unid" }, s.album_cues), h("span", { class: "muted" }, "  for albums of separate track files")));
   return parts.length ? h("div", { class: "card" }, h("h2", { class: "h2" }, "Done for you ",

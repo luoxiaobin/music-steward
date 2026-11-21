@@ -21,6 +21,7 @@
 | `recognize/httpcache.py` | Cache of web answers and fingerprints; per-service throttling. |
 | `apply/plan.py`, `naming.py` | Frozen plan: destination paths, naming rules, tag values, conflicts, duplicate albums, generated cue sheets. |
 | `apply/protocol.py`, `tagwrite.py`, `runner.py` | Journal-first apply: copy → tag the copy → verify → publish (no overwrite); resume; undo. |
+| `apply/split.py` | "One file per track": cuts a track out of a lossless cue-sheet image into FLAC at exact sample positions and checks its samples against the image. Read-only on the image. |
 | `identity.py` | File identities from the audio (length + first/last 64 KiB, tags excluded), so renamed or moved files keep their records and decisions ([ADR 0002](adr/0002-album-identity-independent-of-paths.md)). Read-only. |
 | `cue.py`, `chinese.py`, `search.py`, `preview.py`, `settings.py`, `i18n.py` | Cue sheets (encodings, rewrite), Simplified/Traditional, search index with pinyin, audio previews, settings, interface languages. |
 | `server.py`, `web/` | HTTP API and the plain HTML/CSS/JS interface (no framework, no external requests). |

@@ -7,6 +7,12 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 ## [Unreleased]
 
 ### Added
+- **Setting: albums of one file with a cue sheet → one file per track.** For music servers and phone players that
+  don't read cue sheets. Lossless: each track is cut from the image into FLAC at the cue sheet's exact positions
+  (sample-exact, the source's bit depth kept), and checked: its decoded samples must equal the same samples of the
+  image. The image is never changed. MP3 images stay one file (cutting would mean re-encoding); the plan says so.
+  Measured on a real 43-minute APE from the NAS: 12 tracks cut and verified in 22 s, joined again identical to the
+  image. Default: keep one file + cue sheet, as before.
 - **Albums keep their decisions when folders are renamed or moved** (ADR 0002). Every file gets an identity from its
   audio (the audio's length and its first and last 64 KiB, tags excluded; small files such as cue sheets: the whole
   file). A file found at a new path whose content is a known file no longer at its old path is that file, moved:
