@@ -140,11 +140,12 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
 
 ## Next (strategy review, 2026-11-20)
 
-1. **Correctness fixes**, each with a failure-injection test: write the whole journal before a run counts as
+1. ✅ **Correctness fixes** (PR #4), each with a failure-injection test: write the whole journal before a run counts as
    started (no silent omissions); re-check the destination at apply time, including symlinks; map each audio file of
    a multi-FILE cue to its own tracks (matcher, track mapping, own info, plan); **Retry failed** for a run.
-2. **Album identity independent of paths** ([ADR 0002](adr/0002-album-identity-independent-of-paths.md)): measure
-   the hashing cost on the NAS, settle the design, migrate. Also fixes "changed source keeps its accepted match".
+2. ✅ **Album identity independent of paths** ([ADR 0002](adr/0002-album-identity-independent-of-paths.md)): cost
+   measured on the NAS, design accepted, implemented and checked on a copy of the real database; also fixes
+   "changed source keeps its accepted match".
 3. **Cue-sheet albums setting**: keep image + cue, or split into tracks; check the result in Navidrome and a phone
    player.
 4. **Retire the originals**: ADR first (it changes the read-only principle), then a guided, verified, per-album step.

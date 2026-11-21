@@ -119,14 +119,66 @@ def plan_units(con: sqlite3.Connection, root_id: int, subpath: str = "") -> list
     return units
 
 
+CHANGED = "its audio or cue sheet changed since you decided; review this album again"
+CUE_REPLACED = "its cue sheet was replaced since you decided; review this album again"
+
+
+def flag_changed(con: sqlite3.Connection, file_ids: list[int]) -> int:
+    """Files whose content changed (the scan saw a different content_id): their albums go back to
+    the queue, and a decision made on the old audio is flagged -- kept, so it can be confirmed, but
+    left out of plans until the album is decided again. Returns the number of albums flagged."""
+    if not file_ids:
+        return 0
+    marks = ",".join("?" * len(file_ids))
+    hit = [r[0] for r in con.execute(
+        f"SELECT DISTINCT u.id FROM unit u, json_each(u.file_ids) j WHERE j.value IN ({marks}) "
+        f"UNION SELECT id FROM unit WHERE cue_file_id IN ({marks})", (*file_ids, *file_ids))]
+    for uid in hit:
+        _flag(con, uid, CHANGED)
+    return len(hit)
+
+
+def _flag(con: sqlite3.Connection, uid: int, reason: str):
+    con.execute("UPDATE unit SET status='queued', queued_at=? WHERE id=? AND status<>'running'", (time.time(), uid))
+    con.execute("UPDATE decision SET stale_reason=? WHERE unit_id=?", (reason, uid))
+
+
 def enqueue(con: sqlite3.Connection, root_id: int, units: list[dict], requeue: bool = False,
             scope: str | None = None) -> dict:
     """Insert units; existing ones (same key) keep their results unless requeue.
     With scope (the folder that was planned, "" = whole root), units in that folder that the
     new plan no longer contains are removed -- e.g. a folder now recognised as a cue album --
     so a file can never sit in two units (and be copied twice)."""
-    c = {"queued": 0, "already_done": 0, "requeued": 0, "removed_stale": 0}
+    c = {"queued": 0, "already_done": 0, "requeued": 0, "removed_stale": 0, "moved": 0}
     now = time.time()
+    # An album whose folder was renamed or moved has a new key but the same files (file rows follow
+    # their content, ADR 0002): it is the same album -- move the unit, keeping its matches and decision.
+    # Albums are matched by their FILES first and keys sorted out after, so a new album placed in the
+    # old folder (or two folders swapped) cannot take over a moved album's unit and decision (Codex
+    # review on #6). All of this happens before stale units are removed below.
+    moves = []
+    for u in units:
+        ids = json.dumps(sorted(u["file_ids"]))
+        rows = con.execute("SELECT id, key, cue_file_id FROM unit WHERE root_id=? AND file_ids=? AND kind=?",
+                           (root_id, ids, u["kind"])).fetchall()
+        if rows and not any(r["key"] == u["key"] for r in rows):
+            moves.append((rows[0], u))
+    moving = {m["id"] for m, _ in moves}
+    for m, _ in moves:                       # free the old keys first (a swap of two folders included)
+        con.execute("UPDATE unit SET key=? WHERE id=?", (f"moving:{m['id']}", m["id"]))
+    for m, u in moves:
+        holder = con.execute("SELECT id FROM unit WHERE root_id=? AND key=?", (root_id, u["key"])).fetchone()
+        if holder and holder["id"] not in moving:
+            # the unit that held this key has other files: it is not this album (removed below as stale
+            # if its files are gone, like any album whose folder no longer holds it)
+            con.execute("UPDATE unit SET key=? WHERE id=?", (f"replaced:{holder['id']}", holder["id"]))
+        con.execute("UPDATE unit SET key=?, folder=?, label=?, cue_file_id=? WHERE id=?",
+                    (u["key"], u["folder"], u["label"], u.get("cue_file_id"), m["id"]))
+        if m["cue_file_id"] != u.get("cue_file_id"):
+            # same image, another cue sheet (a moved sheet keeps its file row): its track layout
+            # may differ from the one the decision was made on -- keep the decision, but review
+            _flag(con, m["id"], CUE_REPLACED)
+        c["moved"] += 1
     if scope is not None:
         keep = {u["key"] for u in units}
         for row in con.execute("SELECT id, key, folder FROM unit WHERE root_id=?", (root_id,)).fetchall():

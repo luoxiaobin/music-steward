@@ -7,6 +7,14 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 ## [Unreleased]
 
 ### Added
+- **Albums keep their decisions when folders are renamed or moved** (ADR 0002). Every file gets an identity from its
+  audio (the audio's length and its first and last 64 KiB, tags excluded; small files such as cue sheets: the whole
+  file). A file found at a new path whose content is a known file no longer at its old path is that file, moved:
+  it keeps its record, and its album keeps its matches and your decision. Measured on the NAS: about 50 ms per
+  file, read only when a file is new or changed; existing files get their identity once, on their next scan.
+- **Changed audio goes back to review.** When a file's audio (or an album's cue sheet) changes after you decided,
+  the album is queued again, marked "Audio changed · decide again", and left out of plans (listed under "Left out")
+  until you decide again. Retagging a file does not count as a change.
 - User documentation: a complete install and first-run path in the README, a [User guide](docs/USER_GUIDE.md),
   [Recovery and safety](docs/RECOVERY.md), [Configuration](docs/CONFIGURATION.md) (naming defaults with examples,
   credentials, data locations, what is sent online) and [Architecture](docs/ARCHITECTURE.md). (Codex review)

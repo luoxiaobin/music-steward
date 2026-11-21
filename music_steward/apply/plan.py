@@ -177,15 +177,18 @@ def check_destination(con: sqlite3.Connection, dest: Path):
 def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = "") -> int:
     dest = Path(dest_root).expanduser().resolve()
     check_destination(con, dest)
-    q = ("SELECT u.*, d.candidate_id, d.overrides_json FROM unit u JOIN decision d ON d.unit_id=u.id "
+    q = ("SELECT u.*, d.candidate_id, d.overrides_json, d.stale_reason FROM unit u JOIN decision d ON d.unit_id=u.id "
          "WHERE d.action='accept' AND u.root_id=?")
     args: tuple = (root_id,)
     if scope:
         q += " AND (u.folder=? OR (u.folder >= ? AND u.folder < ?))"
         args += (scope, scope + "/", scope + "/￿")
     root_path = con.execute("SELECT path FROM root WHERE id=?", (root_id,)).fetchone()["path"]
-    items, prepared, notes = [], [], []
+    items, prepared, notes, left_out = [], [], [], []
     for u in con.execute(q, args).fetchall():
+        if u["stale_reason"]:            # decided on audio that has changed since (ADR 0002)
+            left_out.append({"unit_id": u["id"], "label": u["label"], "folder": u["folder"], "reason": u["stale_reason"]})
+            continue
         c = dict(con.execute("SELECT * FROM candidate WHERE id=?", (u["candidate_id"],)).fetchone())
         tracks = {t["file_id"]: dict(t) for t in con.execute("SELECT * FROM cand_track WHERE candidate_id=?", (c["id"],))}
         ov = json.loads(u["overrides_json"] or "{}")
@@ -314,7 +317,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                "albums": len({i["unit_id"] for i in items}), "script": script_rule(con),
                "album_cues": sum(i["kind"] == "cue_new" and i["status"] == "ok" for i in items),
                "changes": {t: sum(n["type"] == t for n in notes) for t in ("artist_merged", "script", "original_year")},
-               "notes": notes[:1000]}
+               "notes": notes[:1000], "left_out": left_out[:1000]}
     pid = con.execute("INSERT INTO plan(created_at, dest_root, root_id, scope, summary_json) VALUES(?,?,?,?,?)",
                       (time.time(), str(dest), root_id, scope, json.dumps(summary))).lastrowid
     con.executemany("INSERT INTO plan_item VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -340,11 +343,14 @@ def _identical_albums(items: list[dict]) -> dict[int, str]:
         for it in its:
             by_dest[collision_key(it["dest_rel"])].append(it)
     skipped: dict[int, str] = {}
-    for uid in sorted(audio):
+    # the copy kept is the one whose folder sorts first -- the same on every plan, not whichever
+    # album happened to get the lower id (ids follow the order in which a scan finished reading)
+    order = sorted(audio, key=lambda u: (min(it["src"] for it in audio[u]), u))
+    for i, uid in enumerate(order):
         if uid in skipped:
             continue
-        for other in sorted(audio):
-            if other <= uid or other in skipped or len(audio[other]) != len(audio[uid]):
+        for other in order[i + 1:]:
+            if other in skipped or len(audio[other]) != len(audio[uid]):
                 continue
             pairs = []
             for it in audio[other]:
