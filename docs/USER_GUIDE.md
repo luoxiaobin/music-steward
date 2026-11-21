@@ -109,7 +109,9 @@ repaired tag text. Click a result (or ↑/↓ and Enter) to jump there.
 
 ## 7. Plan
 
-Open **Settings** once: set the **Default destination folder** (use **Choose…**). It must be an empty folder outside
+Open **Settings** once: set the **Default destination folder** (use **Choose…**). If you play your music through a
+music server or a phone app that doesn't read cue sheets, set **Albums of one file with a cue sheet** to **One file
+per track**. It must be an empty folder outside
 your collection — on a local or external disk for now. Check the naming defaults there too
 ([what they do](CONFIGURATION.md#naming-defaults)): names in Simplified Chinese, the original release year, a cue sheet
 for every album.
@@ -133,8 +135,8 @@ disconnected) are listed under **Not copied**: fix the cause and press **Retry f
 
 ## 9. Check the result
 
-Open the destination in Finder and play some albums in your player. Cue-sheet albums need a cue-aware player
-(foobar2000, VOX, Swinsian…): open the `.cue` file. Every album has a cue sheet, also albums of separate track files.
+Open the destination in Finder and play some albums in your player. Cue-sheet albums kept as one file need a
+cue-aware player (foobar2000, VOX, Swinsian…): open the `.cue` file; albums split into tracks play anywhere. Every album has a cue sheet, also albums of separate track files.
 
 ## 10. Undo, or keep going
 

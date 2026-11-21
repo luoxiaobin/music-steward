@@ -146,8 +146,8 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
 2. ✅ **Album identity independent of paths** ([ADR 0002](adr/0002-album-identity-independent-of-paths.md)): cost
    measured on the NAS, design accepted, implemented and checked on a copy of the real database; also fixes
    "changed source keeps its accepted match".
-3. **Cue-sheet albums setting**: keep image + cue, or split into tracks; check the result in Navidrome and a phone
-   player.
+3. ✅ **Cue-sheet albums setting**: keep image + cue, or split into lossless FLAC tracks (sample-exact, verified;
+   checked on real NAS APE images). Still to do: try the split output in Navidrome and a phone player.
 4. **Retire the originals**: ADR first (it changes the read-only principle), then a guided, verified, per-album step.
 5. Read-only **collection health report**; a signed, notarized `.app`; icon (vector master, small-size tests,
    macOS/iOS assets) for the existing concept.
