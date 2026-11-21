@@ -993,6 +993,11 @@ def archive(con: sqlite3.Connection, batch_id: int, target: str | None = None, p
     redo = bool(cur) and cur.get("status") in ("running", "stopped")
     if redo:
         dest, jpath = Path(cur["dest_root"]), Path(cur["journal"])
+        from .apply.plan import PlanError, check_destination
+        try:                               # the saved place may have been swapped (a link) since: look again, first
+            check_destination(con, dest)
+        except PlanError as e:
+            raise RetireError(str(e))
     else:
         target = target or cur.get("target") or ""
         pre = archive_preview(con, batch_id, target)
@@ -1045,6 +1050,16 @@ def archive_state(con: sqlite3.Connection, batch: sqlite3.Row) -> dict:
         out["why"] = "no complete archive" if not cur else "the archive is not finished or not verified"
         return out
     ops = protocol.Journal(Path(cur["journal"])).ops()
+    if not ops or len(ops) != cur.get("planned"):
+        out["why"] = "the archive's record is missing or incomplete"
+        return out
+    try:                                   # parked after the archive was made (a stopped retire, finished later)?
+        current = {src for src, _ in _archive_files(batch, protocol.Journal(Path(batch["journal"])))}
+    except OSError:
+        current = set()
+    if not current <= {o["src"] for o in ops.values()}:
+        out["why"] = "originals were set aside after this archive was made; archive again"
+        return out
     for o in ops.values():
         try:
             ok = o["history"][-1] in OK_STATES and os.path.getsize(o["final"]) == o["src_size"]

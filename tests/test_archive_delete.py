@@ -115,6 +115,55 @@ def test_the_archive_state_notices_a_file_that_went_missing_later(parked, con, t
     assert st["verified"] is False and "missing" in st["why"]
 
 
+def test_continuing_an_archive_looks_at_its_saved_place_again(parked, con, tmp_path):
+    """P0 (Codex): a stopped archive's saved place was swapped for a link into the collection; continuing must refuse
+    before it probes or recovers anything there."""
+    lib, dest, run, batch, folder = parked
+    stop = threading.Event()
+    stop.set()
+    res = retire.archive(con, batch["id"], str(tmp_path / "backup"), stop=stop)
+    saved = Path(res["dest"])
+    shutil.rmtree(tmp_path / "backup")
+    saved.parent.mkdir(parents=True)
+    os.symlink(lib, saved)
+    before = sorted(str(p) for p in lib.rglob("*"))
+    with pytest.raises(retire.RetireError, match="overlaps"):
+        retire.archive(con, batch["id"])
+    assert sorted(str(p) for p in lib.rglob("*")) == before                # not a probe file, not a copy
+
+
+def test_an_archive_whose_record_is_gone_is_not_verified(parked, con, tmp_path):
+    """P0 (Codex): a missing journal made the loop check nothing and report 'verified'."""
+    lib, dest, run, batch, folder = parked
+    res = retire.archive(con, batch["id"], str(tmp_path / "backup"))
+    assert retire.archive_state(con, con.execute("SELECT * FROM retire_batch").fetchone())["verified"]
+    shutil.rmtree(res["dest"])
+    Path(json_journal(con, batch)).unlink()
+    st = retire.archive_state(con, con.execute("SELECT * FROM retire_batch").fetchone())
+    assert st["verified"] is False and "record" in st["why"]
+
+
+def json_journal(con, batch):
+    import json
+    return json.loads(con.execute("SELECT archive_json FROM retire_batch WHERE id=?", (batch["id"],)).fetchone()[0])["journal"]
+
+
+def test_an_archive_does_not_cover_originals_parked_after_it_was_made(parked, con, tmp_path, monkeypatch):
+    """P0 (Codex): finishing a stopped retire adds files to the same batch; the old archive must stop counting."""
+    lib, dest, run, batch, folder = parked
+    retire.archive(con, batch["id"], str(tmp_path / "backup"))
+    real = retire._parked_albums
+
+    def more(j):
+        out = real(j)
+        out[999] = {"label": "late", "files": [{"file_id": 99999, "relpath": "late/01.mp3"}], "gone": [], "deleting": []}
+        return out
+    monkeypatch.setattr(retire, "_parked_albums", more)
+    st = retire.archive_state(con, con.execute("SELECT * FROM retire_batch").fetchone())
+    assert st["verified"] is False and "archive again" in st["why"]
+    assert retire.delete_requirements(con, con.execute("SELECT * FROM retire_batch").fetchone())["needs_no_backup_ack"]
+
+
 # ---- delete: the confirmation ----------------------------------------------------------------------------------
 def test_delete_needs_the_typed_word(parked, con):
     lib, dest, run, batch, folder = parked
