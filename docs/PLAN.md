@@ -152,8 +152,9 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
    owner on a phone over the home network: works.
 4. **Retire the originals**: ✅ design accepted ([ADR 0003](adr/0003-retire-originals.md)); build order: retire + restore +
    labelling, then Archive, then Delete.
-5. Read-only **collection health report**; a signed, notarized `.app`; icon (vector master, small-size tests,
-   macOS/iOS assets) for the existing concept.
+5. Read-only **collection health report**; a signed, notarized `.app`; ✅ icon for the chosen concept (vector
+   master, every size generated from one geometry, checked at 16–1024 px; Dock, favicon, iPhone home screen, macOS
+   `.icns`, iOS app icon). A subtle variant for a future player app, if one is made.
 6. Outside trial users when the above is solid.
 
 ## M2 backlog (original order)
