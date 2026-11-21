@@ -308,6 +308,10 @@ class App:
         dest = (body.get("dest") or settings.get(con, "dest") or self.dest or "").strip()
         if not dest:
             return {"error": "choose a destination folder first"}
+        from . import folders
+        chk = folders.check_folder(con, dest, "destination")
+        if chk["level"] == "error" and chk["code"] != "overlaps":      # an overlap keeps the plan's own message
+            return {"error": folders.explain(chk)}
         row = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()
         try:
             pid = plan.build(con, os.path.expanduser(dest), row["id"], nfc(body.get("path", "")))
@@ -607,6 +611,9 @@ def make_handler(app: App, port_ref: dict):
                                        "scan": app.scan_state})
                 if u.path == "/api/settings":
                     return self._json(app.settings_view(con))
+                if u.path == "/api/check_folder":                           # changes nothing
+                    from . import folders
+                    return self._json(folders.check_folder(con, q.get("path", ""), q.get("purpose", "destination")))
                 if u.path == "/api/retire_plan":          # the dry run: changes nothing
                     from . import retire
                     try:

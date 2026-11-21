@@ -82,6 +82,10 @@ def save(con: sqlite3.Connection, values: dict) -> dict:
                 raise SettingsError("sources: musicbrainz, deezer, discogs")
             v = ",".join(["musicbrainz"] + [p for p in ("deezer", "discogs") if p in parts])
         if n == "dest" and v:
+            from . import folders
+            r = folders.check_folder(con, v, "destination")
+            if r["level"] == "error":
+                raise SettingsError(folders.explain(r))
             v = os.path.abspath(os.path.expanduser(v))
         con.execute("INSERT OR REPLACE INTO meta VALUES(?, ?)", (f"setting:{n}", v.lower() if allowed else v))
     con.commit()
