@@ -71,6 +71,7 @@ reported. Files the run did not create are never touched. Empty folders may rema
 | Sources are never written | All writes go through the apply protocol into the destination; the destination may not overlap a collection root | tests; every trial checked all source sizes and modification times afterwards |
 | No partial file under a final name | Copy to a temporary name → tag → verify → publish; journal on the local disk first | crash tests at every step (`m0/EVIDENCE_REPORT.md` §6) |
 | Audio unchanged in the copies | After tagging, the copy's audio bytes (APE/WavPack/TTA) or audio packets (other formats) must equal the original's | tests; 1,800+ files in trials |
+| Tracks split from a cue-sheet image are lossless | Each track's decoded samples must equal the same samples of the image (before tagging), then the tagging check above | tests (the tracks joined again equal the image); real APE images from the NAS |
 | No overwrite at the destination (local disk) | Atomic exclusive rename (`renamex_np(RENAME_EXCL)` on APFS) or `link()+unlink()` | crash and race tests |
 | Undo removes only our unchanged copies | Content hash + file identity recorded at publish | tests; trials |
 

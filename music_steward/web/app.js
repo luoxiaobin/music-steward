@@ -780,6 +780,10 @@ async function openSettings() {
       radios("cue_encoding", [["utf-8-sig", "UTF-8", "readable by foobar2000 on Mac and Windows and most players"],
                               ["original", "Keep each cue's original encoding", "for old Chinese Windows players"]]), envNote("cue_encoding"),
       chk("setAlbumCue", "Write a cue sheet for albums of separate track files", v("album_cue") === "on", env("album_cue")), envNote("album_cue")),
+    h("section", {}, h("h3", {}, "Albums of one file with a cue sheet"),
+      radios("cue_albums", [["image", "Keep one file + cue sheet", "as they are; needs a cue-aware player (foobar2000, VOX…)"],
+                            ["tracks", "One file per track", "lossless FLAC, for music servers and phone players; MP3 images stay one file"]]),
+      envNote("cue_albums")),
     h("section", {}, h("h3", {}, "Online catalogues"),
       chk("srcMb", "MusicBrainz", true, true, "always"),
       chk("srcDeezer", "Deezer", srcs.includes("deezer"), env("sources")),
@@ -796,7 +800,7 @@ async function openSettings() {
       h("button", { type: "button", class: "btn", onclick: () => { dlg.close(); dlg.remove(); } }, "Cancel"),
       h("button", { type: "button", class: "btn btn-primary", onclick: async () => {
         const pick = n => dlg.querySelector(`input[name=${n}]:checked`)?.value;
-        const body = { script: pick("script"), year: pick("year"), cue_encoding: pick("cue_encoding"),
+        const body = { script: pick("script"), year: pick("year"), cue_encoding: pick("cue_encoding"), cue_albums: pick("cue_albums"),
           album_cue: dlg.querySelector("#setAlbumCue").checked ? "on" : "off",
           sources: ["musicbrainz", dlg.querySelector("#srcDeezer").checked && "deezer",
                     dlg.querySelector("#srcDiscogs").checked && "discogs"].filter(Boolean).join(","),

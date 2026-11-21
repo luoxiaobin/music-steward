@@ -94,7 +94,8 @@ def finish(con, run_id) -> dict:
                "complete_plan": planned is not None and planned == len(ops),
                "failed": [{"src": o["src"], "reason": o.get("reason")} for o in ops.values()
                           if o["history"][-1] in ("failed", "conflict", "aborted_source_changed",
-                                                  "aborted_audio_changed", "aborted_unsafe_destination")]}
+                                                  "aborted_audio_changed", "aborted_unsafe_destination",
+                                                  "aborted_split_mismatch")]}
     con.execute("UPDATE run SET finished_at=?, summary_json=? WHERE id=?", (time.time(), json.dumps(summary), run_id))
     con.commit()
     return summary

@@ -27,7 +27,7 @@ _libc = ctypes.CDLL(None, use_errno=True)
 RENAME_EXCL = 0x00000004
 TERMINAL = {"committed", "conflict", "already_existed", "aborted_source_changed",
             "aborted_audio_changed", "ownership_uncertain", "undone", "undo_refused_modified", "failed",
-            "aborted_unsafe_destination"}
+            "aborted_unsafe_destination", "aborted_split_mismatch"}
 
 
 def rename_excl(src, dst):
@@ -72,6 +72,16 @@ def choose_method(dest_root: Path) -> str:
         return "none"
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+
+def fsync_file(p: Path):
+    """Force a finished file onto the disk before it is published: after a power cut a file under its
+    final name must be complete (the journal then says committed and recovery leaves it alone)."""
+    fd = os.open(p, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 def fsync_dir(d: Path):
@@ -156,6 +166,44 @@ def _crash(point, crash_at):
         os._exit(137)
 
 
+def _cut(j: Journal, o: dict, src: Path, temp: Path, sp: dict, crash_at: str | None) -> bool:
+    """A track from a cue-sheet image: cut it (exclusive temp), check the source did not change and
+    that the track's samples equal the image's, journal 'copied'. False: aborted (journalled)."""
+    from .split import extract, verify
+    op = o["op"]
+    cue = sp.get("cue")
+    if cue:      # the track positions come from the cue sheet: it must be the one the plan was made from
+        try:
+            st = os.stat(cue["path"])
+            same = (st.st_size, st.st_mtime_ns) == (cue["size"], cue["mtime_ns"])
+        except FileNotFoundError:
+            same = False
+        if not same:
+            j.write({"op": op, "state": "aborted_source_changed", "ownership": "none",
+                     "reason": "the cue sheet changed since the plan was made"})
+            return False
+    os.close(os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644))
+    extract(str(src), str(temp), sp["start"], sp["end"], sp["rate"], sp.get("bits"), sp["src_ext"])
+    fsync_file(temp)
+    _crash("mid_copy", crash_at)
+    st2 = src.stat()
+    if st2.st_size != o["src_size"] or st2.st_mtime_ns != o["src_mtime_ns"]:
+        temp.unlink(missing_ok=True)
+        j.write({"op": op, "state": "aborted_source_changed", "ownership": "none",
+                 "reason": "source changed during the copy"})
+        return False
+    if not verify(str(src), str(temp), sp["start"], sp["end"], sp["rate"], sp.get("bits"), sp["src_ext"]):
+        temp.unlink(missing_ok=True)
+        j.write({"op": op, "state": "aborted_split_mismatch", "ownership": "none",
+                 "reason": "the track's audio differs from the same part of the image"})
+        return False
+    src_audio = copy_audio_fingerprint(str(temp), ".flac", "flac")
+    j.write({"op": op, "state": "copied", "src_sha": file_sha256(str(temp)), "src_audio": src_audio})
+    o["src_audio"] = src_audio
+    _crash("after_copy", crash_at)
+    return True
+
+
 def execute_op(j: Journal, o: dict, crash_at: str | None = None, guard=None):
     """guard(final) -> None, or the reason this path must not be written (see runner._guard)."""
     src, final, temp = Path(o["src"]), Path(o["final"]), Path(o["temp"])
@@ -163,12 +211,21 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None, guard=None):
     if state == "intent" and guard is not None and (why := guard(final)):
         j.write({"op": op, "state": "aborted_unsafe_destination", "ownership": "none", "reason": why})
         return
+    sp = (o.get("tags") or {}).get("split")      # a track cut from a cue-sheet image (apply/split.py)
     if state == "intent":
         generated = (o.get("tags") or {}).get("generated_text")   # a cue sheet written by the plan
         if "final_preexisting_sha" in o or final.exists():
-            want = hashlib.sha256(generated.encode("utf-8-sig")).hexdigest() if generated is not None \
-                else file_sha256(str(src))
-            same = final.exists() and file_sha256(str(final)) == want
+            if sp is not None:          # a track: the same samples count as the same file (tags may differ)
+                from .split import SplitError, verify
+                try:
+                    same = final.exists() and verify(str(src), str(final), sp["start"], sp["end"], sp["rate"],
+                                                     sp.get("bits"), sp["src_ext"])
+                except SplitError:
+                    same = False
+            else:
+                want = hashlib.sha256(generated.encode("utf-8-sig")).hexdigest() if generated is not None \
+                    else file_sha256(str(src))
+                same = final.exists() and file_sha256(str(final)) == want
             j.write({"op": op, "state": "already_existed" if same else "conflict",
                      "ownership": "already_existed" if same else "not_ours",
                      "reason": "identical file already at destination" if same else "a different file is already there"})
@@ -182,44 +239,55 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None, guard=None):
         if guard is not None and (why := guard(final)):      # the folders just made resolve somewhere else
             j.write({"op": op, "state": "aborted_unsafe_destination", "ownership": "none", "reason": why})
             return
-        h = hashlib.sha256()
-        fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
-        try:
-            if generated is not None:      # no source to copy: write the plan's text (src = a guard)
-                data = generated.encode("utf-8-sig")
-                os.write(fd, data)
-                h.update(data)
-            else:
-                with open(src, "rb") as fin:
-                    for i, buf in enumerate(iter(lambda: fin.read(CHUNK), b"")):
-                        os.write(fd, buf)
-                        h.update(buf)
-                        if i == 0:
-                            _crash("mid_copy", crash_at)  # copy started, not yet complete or journalled
-            os.fsync(fd)
-        finally:
-            os.close(fd)
-        st2 = src.stat()
-        if st2.st_size != o["src_size"] or st2.st_mtime_ns != o["src_mtime_ns"]:
-            temp.unlink(missing_ok=True)
-            j.write({"op": op, "state": "aborted_source_changed", "ownership": "none",
-                     "reason": "source changed during the copy"})
-            return
-        # the copy must be byte-identical to what was read from the source (local read, fast);
-        # the audio fingerprint is then taken from the LOCAL copy, not by re-reading the source
-        if file_sha256(str(temp)) != h.hexdigest():
-            temp.unlink(missing_ok=True)
-            j.write({"op": op, "state": "aborted_copy_mismatch", "ownership": "none",
-                     "reason": "the copy differs from the bytes read from the source"})
-            return
-        src_audio = copy_audio_fingerprint(str(temp), src.suffix, o["codec"]) if o["kind"] == "audio" else None
-        j.write({"op": op, "state": "copied", "src_sha": h.hexdigest(), "src_audio": src_audio})
-        o["src_audio"] = src_audio
-        _crash("after_copy", crash_at)
+        if sp is not None:
+            if not _cut(j, o, src, temp, sp, crash_at):
+                return
+        else:
+            h = hashlib.sha256()
+            fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+            try:
+                if generated is not None:      # no source to copy: write the plan's text (src = a guard)
+                    data = generated.encode("utf-8-sig")
+                    os.write(fd, data)
+                    h.update(data)
+                else:
+                    with open(src, "rb") as fin:
+                        for i, buf in enumerate(iter(lambda: fin.read(CHUNK), b"")):
+                            os.write(fd, buf)
+                            h.update(buf)
+                            if i == 0:
+                                _crash("mid_copy", crash_at)  # copy started, not yet complete or journalled
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            st2 = src.stat()
+            if st2.st_size != o["src_size"] or st2.st_mtime_ns != o["src_mtime_ns"]:
+                temp.unlink(missing_ok=True)
+                j.write({"op": op, "state": "aborted_source_changed", "ownership": "none",
+                         "reason": "source changed during the copy"})
+                return
+            # the copy must be byte-identical to what was read from the source (local read, fast);
+            # the audio fingerprint is then taken from the LOCAL copy, not by re-reading the source
+            if file_sha256(str(temp)) != h.hexdigest():
+                temp.unlink(missing_ok=True)
+                j.write({"op": op, "state": "aborted_copy_mismatch", "ownership": "none",
+                         "reason": "the copy differs from the bytes read from the source"})
+                return
+            src_audio = copy_audio_fingerprint(str(temp), src.suffix, o["codec"]) if o["kind"] == "audio" else None
+            j.write({"op": op, "state": "copied", "src_sha": h.hexdigest(), "src_audio": src_audio})
+            o["src_audio"] = src_audio
+            _crash("after_copy", crash_at)
         state = "copied"
     if state == "copied":
         if o["kind"] == "audio" and o.get("tags"):
             write_tags(str(temp), o["tags"], o["codec"])
+        if o["kind"] == "split":
+            write_tags(str(temp), {k: v for k, v in o["tags"].items() if k != "split"}, "flac")
+            from .split import add_picture, embedded_picture
+            sp_ = o["tags"]["split"]
+            pic = embedded_picture(str(src), sp_.get("src_codec"))     # the image's own cover, if it has one
+            if pic is not None:
+                add_picture(str(temp), pic)
         if o["kind"] == "cue" and (o.get("tags") or {}).get("cue_rewrite"):
             from ..cue import rewrite_bytes
             rw = o["tags"]["cue_rewrite"]
@@ -231,13 +299,16 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None, guard=None):
                 fh.write(data)
                 fh.flush()
                 os.fsync(fh.fileno())
-        if o["kind"] == "audio":
+        if o["kind"] in ("audio", "split"):
             after = copy_audio_fingerprint(str(temp), temp.suffix, o["codec"])
             if after != o.get("src_audio"):
                 temp.unlink(missing_ok=True)
                 j.write({"op": op, "state": "aborted_audio_changed", "ownership": "none",
                          "reason": "audio of the copy differs from the source after tagging"})
                 return
+        # tagging (and cutting a track) rewrites the temp file after the copy's own fsync: flush it again
+        # before it is published (Codex review on #7)
+        fsync_file(temp)
         st = temp.stat()
         j.write({"op": op, "state": "tagged", "tagged_sha": file_sha256(str(temp)), "temp_ino": st.st_ino})
         o.update(tagged_sha=file_sha256(str(temp)), temp_ino=st.st_ino)
