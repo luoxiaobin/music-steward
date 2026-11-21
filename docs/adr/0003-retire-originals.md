@@ -1,8 +1,9 @@
 # ADR 0003: Retire the originals — a guided, verified, reversible step
 
-* **Status:** Proposed (2026-11-21), revised the same day after the owner's direction: the parked originals are
-  clearly labelled, and **Archive** and **Delete** are offered in the app, each behind strong warnings and
-  confirmations. Needs the owner's answers to the **open decisions** before any code is written.
+* **Status:** **Accepted 2026-11-21** — the owner agreed to all nine decisions below, as recommended. Revised the
+  same day after the owner's direction: the parked originals are clearly labelled, and **Archive** and **Delete**
+  are offered in the app, each behind strong warnings and confirmations. Build order: retire + restore +
+  labelling; then Archive; then Delete (after real use of the others).
 * **Date:** 2026-11-21
 * **Deciders:** Kevin Luo
 
@@ -166,9 +167,9 @@ a *Your originals* section in the User guide, and the dialogs above.
   the "not carried over" list is complete (uncopied files, split-album cue sheets, repaired tags);
 * the README and MANIFEST are written before the first file moves, and list every file of the batch.
 
-## Open decisions for the owner
+## Decisions (all accepted by the owner, 2026-11-21, as recommended)
 
-| # | Question | Recommendation |
+| # | Question | Decision |
 |---|---|---|
 | 1 | Opt-in per collection folder, off by default? | **Yes** |
 | 2 | Require the redundancy tick (organized copy becomes the only copy once the parked originals are deleted)? | **Yes** |

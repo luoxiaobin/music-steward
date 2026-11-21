@@ -150,8 +150,8 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
    checked on real NAS APE images). Tried 2026-11-21: 4 real albums (3 APE, 1 FLAC; 51 tracks) split and served by
    Navidrome 0.64.2 — all tracks imported, Chinese titles, order, durations, year and covers right; played by the
    owner on a phone over the home network: works.
-4. **Retire the originals**: ✅ design written ([ADR 0003](adr/0003-retire-originals.md), proposed); next: the owner's
-   answers to its open decisions, then the build (retire / restore, scanner ignore, opt-in, tests).
+4. **Retire the originals**: ✅ design accepted ([ADR 0003](adr/0003-retire-originals.md)); build order: retire + restore +
+   labelling, then Archive, then Delete.
 5. Read-only **collection health report**; a signed, notarized `.app`; icon (vector master, small-size tests,
    macOS/iOS assets) for the existing concept.
 6. Outside trial users when the above is solid.
@@ -178,7 +178,7 @@ Cyrillic) on demand → Apple export (M4) → native phone apps only if a store 
 
 | Date | Decision | Record |
 |---|---|---|
-| 2026-11-21 | **Retire the originals: design proposed** — a move (never a delete) of verified albums' files into `<root>/_ORIGINALS/<run>/…` on the same volume, clearly labelled (README + manifest), per-root opt-in, dry run first, journalled, restorable; the app offers **Restore, Archive (verified copy) and Delete** (typed word, warnings, repeated checks) as separate confirmed actions. Awaits the owner's answers to nine open decisions | [ADR 0003](adr/0003-retire-originals.md) (proposed; revised: labelled `_ORIGINALS`, Archive and Delete offered in the app with warnings) |
+| 2026-11-21 | **Retire the originals: design accepted** — a move (never a delete) of verified albums' files into `<root>/_ORIGINALS/<run>/…` on the same volume, clearly labelled (README + manifest), per-root opt-in, dry run first, journalled, restorable; the app offers **Restore, Archive (verified copy) and Delete** (typed word, warnings, repeated checks) as separate confirmed actions. All nine decisions accepted by the owner | [ADR 0003](adr/0003-retire-originals.md) (accepted; revised: labelled `_ORIGINALS`, Archive and Delete offered in the app with warnings) |
 | 2026-11-20 | **Ongoing upkeep is a goal: album identity must not depend on file paths.** Identity follows the audio; renames and moves keep decisions; changed audio goes back to review | [ADR 0002](adr/0002-album-identity-independent-of-paths.md) (proposed) |
 | 2026-11-20 | **Cue-sheet albums: a setting** — keep the image + cue sheet (default, today's behaviour) or split into one file per track for servers and phone players. Splitting is lossless (FLAC/WAV image → FLAC tracks; APE → FLAC is a lossless re-encode, stated as such); the source stays untouched | this file |
 | 2026-11-20 | **Guided "retire the originals" step** wanted, so a full copy of a 3 TB collection is not a dead end. It changes the read-only principle, so it gets its own ADR before any code: never automatic, only after a verified copy, per-album and user-confirmed, re-verified at that moment, to the Trash/NAS recycle bin rather than deleted | ADR to write |
