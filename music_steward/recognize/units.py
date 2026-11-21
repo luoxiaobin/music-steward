@@ -152,24 +152,33 @@ def enqueue(con: sqlite3.Connection, root_id: int, units: list[dict], requeue: b
     c = {"queued": 0, "already_done": 0, "requeued": 0, "removed_stale": 0, "moved": 0}
     now = time.time()
     # An album whose folder was renamed or moved has a new key but the same files (file rows follow
-    # their content, ADR 0002): it is the same album -- move the unit, keeping its matches and decision
-    # (and do so before stale units are removed below)
-    keys = {u["key"] for u in units}
+    # their content, ADR 0002): it is the same album -- move the unit, keeping its matches and decision.
+    # Albums are matched by their FILES first and keys sorted out after, so a new album placed in the
+    # old folder (or two folders swapped) cannot take over a moved album's unit and decision (Codex
+    # review on #6). All of this happens before stale units are removed below.
+    moves = []
     for u in units:
-        if con.execute("SELECT 1 FROM unit WHERE root_id=? AND key=?", (root_id, u["key"])).fetchone():
-            continue
         ids = json.dumps(sorted(u["file_ids"]))
-        for old in con.execute("SELECT id, key, cue_file_id FROM unit WHERE root_id=? AND file_ids=? AND kind=?",
-                               (root_id, ids, u["kind"])).fetchall():
-            if old["key"] not in keys:
-                con.execute("UPDATE unit SET key=?, folder=?, label=?, cue_file_id=? WHERE id=?",
-                            (u["key"], u["folder"], u["label"], u.get("cue_file_id"), old["id"]))
-                if old["cue_file_id"] != u.get("cue_file_id"):
-                    # same image, another cue sheet (a moved sheet keeps its file row): its track layout
-                    # may differ from the one the decision was made on -- keep the decision, but review
-                    _flag(con, old["id"], CUE_REPLACED)
-                c["moved"] += 1
-                break
+        rows = con.execute("SELECT id, key, cue_file_id FROM unit WHERE root_id=? AND file_ids=? AND kind=?",
+                           (root_id, ids, u["kind"])).fetchall()
+        if rows and not any(r["key"] == u["key"] for r in rows):
+            moves.append((rows[0], u))
+    moving = {m["id"] for m, _ in moves}
+    for m, _ in moves:                       # free the old keys first (a swap of two folders included)
+        con.execute("UPDATE unit SET key=? WHERE id=?", (f"moving:{m['id']}", m["id"]))
+    for m, u in moves:
+        holder = con.execute("SELECT id FROM unit WHERE root_id=? AND key=?", (root_id, u["key"])).fetchone()
+        if holder and holder["id"] not in moving:
+            # the unit that held this key has other files: it is not this album (removed below as stale
+            # if its files are gone, like any album whose folder no longer holds it)
+            con.execute("UPDATE unit SET key=? WHERE id=?", (f"replaced:{holder['id']}", holder["id"]))
+        con.execute("UPDATE unit SET key=?, folder=?, label=?, cue_file_id=? WHERE id=?",
+                    (u["key"], u["folder"], u["label"], u.get("cue_file_id"), m["id"]))
+        if m["cue_file_id"] != u.get("cue_file_id"):
+            # same image, another cue sheet (a moved sheet keeps its file row): its track layout
+            # may differ from the one the decision was made on -- keep the decision, but review
+            _flag(con, m["id"], CUE_REPLACED)
+        c["moved"] += 1
     if scope is not None:
         keep = {u["key"] for u in units}
         for row in con.execute("SELECT id, key, folder FROM unit WHERE root_id=?", (root_id,)).fetchall():

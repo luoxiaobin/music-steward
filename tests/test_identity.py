@@ -233,3 +233,52 @@ def test_a_file_moved_and_retagged_loses_its_stale_hashes_but_a_rename_keeps_the
     one, two = con.execute(q.format(n=1)).fetchone(), con.execute(q.format(n=2)).fetchone()
     assert one["relpath"].startswith("Moved/") and one["file_sha256"]          # same bytes: hash kept
     assert two["relpath"].startswith("Moved/") and two["file_sha256"] is None  # new bytes: hash cleared
+
+
+def _albums(con):
+    return {r["folder"]: (r["id"], r["action"]) for r in con.execute(
+        "SELECT u.id, u.folder, d.action FROM unit u LEFT JOIN decision d ON d.unit_id=u.id")}
+
+
+def _two_albums(tmp_path, con):
+    lib = tmp_path / "lib"
+    for name, freq in (("A", 300), ("B", 700)):
+        for i in range(2):
+            tone(lib / name / f"{name}{i}.mp3", ["-c:a", "libmp3lame"], secs=1, freq=freq + 50 * i)
+    scan(con, lib)
+    units.enqueue(con, 1, units.plan_units(con, 1), scope="")
+    for (uid,) in con.execute("SELECT id FROM unit").fetchall():
+        con.execute("INSERT INTO decision(unit_id, action, decided_at) VALUES(?, 'accept', 0)", (uid,))
+    con.commit()
+    return lib
+
+
+def test_a_new_album_in_the_old_folder_cannot_take_the_moved_albums_decision(tmp_path, con):
+    """Codex review on #6: album moved A -> C, a different album added to A: the moved album lost its
+    decision to the newcomer."""
+    lib = _two_albums(tmp_path, con)
+    before = _albums(con)
+    os.rename(lib / "A", lib / "C")
+    for i in range(2):
+        tone(lib / "A" / f"new{i}.mp3", ["-c:a", "libmp3lame"], secs=1, freq=1500 + 50 * i)
+    scan(con, lib)
+    res = units.enqueue(con, 1, units.plan_units(con, 1), scope="")
+    after = _albums(con)
+    assert after["C"] == before["A"]                    # same unit, decision kept
+    assert after["B"] == before["B"]
+    assert after["A"][1] is None and after["A"][0] not in (before["A"][0], before["B"][0])
+    assert res["moved"] == 1 and res["removed_stale"] == 0
+
+
+def test_two_swapped_folders_keep_their_own_decisions(tmp_path, con):
+    lib = _two_albums(tmp_path, con)
+    con.execute("UPDATE decision SET action='skip' WHERE unit_id=(SELECT id FROM unit WHERE folder='B')")
+    con.commit()
+    before = _albums(con)
+    os.rename(lib / "A", lib / "tmp")
+    os.rename(lib / "B", lib / "A")
+    os.rename(lib / "tmp", lib / "B")
+    scan(con, lib)
+    units.enqueue(con, 1, units.plan_units(con, 1), scope="")
+    after = _albums(con)
+    assert after["A"] == before["B"] and after["B"] == before["A"]
