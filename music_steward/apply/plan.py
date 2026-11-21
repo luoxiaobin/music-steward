@@ -35,13 +35,30 @@ def _tags_for(c, t, kind) -> dict:
     }
 
 
-def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
+LOSSLESS = {"ape", "flac", "wavpack", "tta", "alac", "pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_s16be", "pcm_s24be"}
+
+
+def split_tracks(con=None) -> bool:
+    """Setting "Albums of one file with a cue sheet": 'tracks' splits lossless images into FLAC files,
+    one per track (for servers and phone players that do not read cue sheets)."""
+    from .. import settings
+    return settings.get(con, "cue_albums") == "tracks"
+
+
+def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None, notes=None):
     """A cue-sheet image album: copy the image (album-level tags) and a rewritten cue sheet
-    (new FILE name, album + track titles from the release, original encoding). No splitting."""
+    (new FILE name, album + track titles from the release, original encoding) -- or, with the
+    setting 'one file per track', a lossless FLAC file per track (_split_items)."""
     from .. import cue as cuemod
     from .naming import ext_for
     f = con.execute("SELECT * FROM file WHERE id=?", (json.loads(u["file_ids"])[0],)).fetchone()
     cf = con.execute("SELECT * FROM file WHERE id=?", (u["cue_file_id"],)).fetchone()
+    if split_tracks(con):
+        if (f["codec"] or "") in LOSSLESS:
+            return _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, cf)
+        if notes is not None:       # cutting lossy audio would mean re-encoding it: kept as one file
+            notes.append({"unit_id": u["id"], "label": u["label"], "type": "kept_image",
+                          "from": f["codec"], "to": "one file + cue sheet"})
     multi = (c["mediums"] or 1) > 1 and c.get("_disc") is not None
     stem = safe_component(f"{c['album']} (CD {c['_disc']})" if multi else c["album"], "Album")
     image_name = stem + ext_for(f["codec"], f["ext"])
@@ -72,6 +89,81 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
                                            "album": {"title": c["album"], "performer": c["artist"]},
                                            "tracks": tracks}}})
     new_stem_of[f["relpath"].rsplit(".", 1)[0]] = f"{adir}/{stem}"
+
+
+def _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, cf):
+    """One FLAC file per cue track, cut at the cue sheet's positions (frames of 1/75 s, so exact
+    sample positions) from a lossless image. The image itself is never changed; apply checks that
+    each track's decoded audio equals the same samples of the image."""
+    from .. import cue as cuemod
+    sheet = cuemod.parse(os.path.join(root_path, cf["fs_relpath"]))
+    own = cuemod.with_lengths(cuemod.file_for(sheet, f["relpath"].rsplit("/", 1)[-1]), f["duration"])
+    cand = {t["cue_track"]: dict(t) for t in con.execute("SELECT * FROM cand_cue_track WHERE candidate_id=?",
+                                                         (c["id"],))}
+    multi = (c["mediums"] or 1) > 1 and c.get("_disc") is not None
+    is_mb = (c.get("source") or "MusicBrainz") == "MusicBrainz"
+    mine = []
+    for i, t in enumerate(own.tracks, 1):
+        ct = cand.get(t.number, {})
+        title = (cue_titles or {}).get(str(t.number)) or ct.get("title") or t.title or f"Track {i}"
+        artist = ct.get("artist")
+        artist = _script(c["artist"] if artist and artist == c.get("_artist_from") else artist,
+                         c.get("_script", "keep")) or c["artist"]
+        nxt = own.tracks[i].start if i < len(own.tracks) else None
+        # the first track starts at the very beginning of the image: audio before its INDEX 01 (a
+        # pregap, "hidden" audio) is kept in it instead of being dropped (Codex review on #7). Gaps
+        # between tracks stay in the track before them; the tracks together cover the whole image
+        start = 0.0 if i == 1 else t.start
+        name = track_name(title, i, c["_disc"] if multi else None, c["mediums"], "flac", ".flac")
+        it = {"unit_id": u["id"], "file_id": f["id"], "kind": "split",
+              "src": os.path.join(root_path, f["fs_relpath"]), "dest_rel": f"{adir}/{name}",
+              "codec": "flac", "size": f["size"], "mtime": f["mtime_ns"],
+              "tags": {"title": title, "artist": artist, "album": c["album"], "albumartist": c["artist"],
+                       "track": i, "disc": f"{c['_disc']}/{c['mediums']}" if multi else None,
+                       "date": c["year"], "mb_trackid": ct.get("recording_id") if is_mb else None,
+                       "mb_albumid": c["album_id"] if is_mb else None,
+                       "split": {"start": start, "end": nxt, "src_ext": f["ext"], "src_codec": f["codec"],
+                                 "rate": f["sample_rate"], "bits": f["bits_per_sample"],
+                                 # the positions come from this cue sheet: checked unchanged at plan
+                                 # and apply time, like the image (Codex review on #7)
+                                 "cue": {"path": os.path.join(root_path, cf["fs_relpath"]),
+                                         "size": cf["size"], "mtime_ns": cf["mtime_ns"]}}}}
+        items.append(it)
+        mine.append(it)
+    # the image's own lyrics belong to the whole album, not to track 1: split them along the tracks
+    # below (None: the side-file loop must not copy the album's .lrc under one track's name)
+    image_stem = f["relpath"].rsplit(".", 1)[0]
+    new_stem_of[image_stem] = None
+    lrc = [x for x in con.execute("SELECT * FROM file WHERE root_id=? AND removed_at IS NULL AND kind='lrc' "
+                                  "AND relpath >= ? AND relpath < ?",
+                                  (f["root_id"], image_stem + ".", image_stem + ".\uffff")).fetchall()
+           if x["relpath"].rsplit(".", 1)[0] == image_stem]
+    if lrc and mine:
+        from ..lrc import decode, split as split_lrc, untimed_lines
+        src_lrc = os.path.join(root_path, lrc[0]["fs_relpath"])
+        with open(src_lrc, "rb") as fh:
+            text = decode(fh.read())
+        parts = split_lrc(text, [(it["tags"]["split"]["start"], it["tags"]["split"]["end"]) for it in mine],
+                          [it["tags"]["title"] for it in mine])
+        if untimed_lines(text) or not any(parts):
+            # lines that cannot be placed into a track (untimed lyrics): keep the original as well, as
+            # an album-level file, rather than silently losing them (Codex review on #7)
+            stem = safe_component(f"{c['album']} (CD {c['_disc']})" if multi else c["album"], "Album")
+            items.append({"unit_id": u["id"], "file_id": lrc[0]["id"], "kind": "lrc", "src": src_lrc,
+                          "dest_rel": f"{adir}/{stem}.lrc", "codec": None, "tags": {},
+                          "size": lrc[0]["size"], "mtime": lrc[0]["mtime_ns"]})
+        for it, text in zip(mine, parts):
+            if text is not None:
+                items.append({"unit_id": u["id"], "file_id": lrc[0]["id"], "kind": "lrc",
+                              "src": src_lrc, "dest_rel": it["dest_rel"].rsplit(".", 1)[0] + ".lrc", "codec": None,
+                              "tags": {"generated_text": text}, "size": lrc[0]["size"], "mtime": lrc[0]["mtime_ns"]})
+    if album_cues(con) and len(mine) >= 2:
+        stem = safe_component(f"{c['album']} (CD {c['_disc']})" if multi else c["album"], "Album")
+        text = album_cue_text(c, [{"file": it["dest_rel"].rsplit("/", 1)[-1], "title": it["tags"]["title"],
+                                   "artist": it["tags"]["artist"]} for it in mine], c.get("_disc"))
+        items.append({"unit_id": u["id"], "file_id": f["id"], "kind": "cue_new", "src": mine[0]["src"],
+                      "dest_rel": f"{adir}/{stem}.cue", "codec": None, "tags": {"generated_text": text},
+                      "size": f["size"], "mtime": f["mtime_ns"]})
 
 
 def album_cues(con=None) -> bool:
@@ -248,7 +340,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
             c["_disc"] = disc            # None: this unit holds the whole set (or it is unknown)
         new_stem_of = {}
         if u["kind"] == "cue":
-            _cue_items(con, u, c, adir, root_path, items, new_stem_of, ov.get("cue_titles") or {})
+            _cue_items(con, u, c, adir, root_path, items, new_stem_of, ov.get("cue_titles") or {}, notes)
         for fid in ([] if u["kind"] == "cue" else json.loads(u["file_ids"])):
             f = con.execute("SELECT * FROM file WHERE id=?", (fid,)).fetchone()
             t = tracks.get(fid)
@@ -282,6 +374,8 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                     continue
                 stem = s["relpath"].rsplit(".", 1)[0]
                 if s["kind"] == "lrc" and stem in new_stem_of:
+                    if new_stem_of[stem] is None:      # an image's lyrics, already split along its tracks
+                        continue
                     dest_rel = new_stem_of[stem] + ".lrc"
                 elif s["kind"] == "image" and u["kind"] in ("album", "cue") and COVER.match(s["relpath"].rsplit("/", 1)[-1]):
                     dest_rel = f"{adir}/{safe_component(s['relpath'].rsplit('/', 1)[-1])}"
@@ -303,8 +397,12 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
             it["status"], it["note"] = "duplicate_source", f"identical to {dup_units[it['unit_id']]}: copied once"
             continue
         st = os.stat(it["src"]) if os.path.exists(it["src"]) else None
+        cue = ((it.get("tags") or {}).get("split") or {}).get("cue")
+        cst = os.stat(cue["path"]) if cue and os.path.exists(cue["path"]) else None
         if st is None or st.st_size != it["size"] or st.st_mtime_ns != it["mtime"]:
             it["status"], it["note"] = "source_changed", "source changed or missing since the scan; re-scan"
+        elif cue and (cst is None or (cst.st_size, cst.st_mtime_ns) != (cue["size"], cue["mtime_ns"])):
+            it["status"], it["note"] = "source_changed", "cue sheet changed or missing since the scan; re-scan"
         elif (dest / it["dest_rel"]).exists():
             it["status"], it["note"] = "conflict_existing", "a file already exists at the destination"
         elif len(seen[collision_key(it["dest_rel"])]) > 1:
@@ -316,7 +414,9 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                "bytes": sum(i["size"] for i in items if i["status"] == "ok"),
                "albums": len({i["unit_id"] for i in items}), "script": script_rule(con),
                "album_cues": sum(i["kind"] == "cue_new" and i["status"] == "ok" for i in items),
-               "changes": {t: sum(n["type"] == t for n in notes) for t in ("artist_merged", "script", "original_year")},
+               "changes": {t: sum(n["type"] == t for n in notes)
+                           for t in ("artist_merged", "script", "original_year", "kept_image")},
+               "split_tracks": sum(i["kind"] == "split" and i["status"] == "ok" for i in items),
                "notes": notes[:1000], "left_out": left_out[:1000]}
     pid = con.execute("INSERT INTO plan(created_at, dest_root, root_id, scope, summary_json) VALUES(?,?,?,?,?)",
                       (time.time(), str(dest), root_id, scope, json.dumps(summary))).lastrowid
@@ -328,6 +428,11 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
     return pid
 
 
+def _cut(it: dict):
+    sp = (it.get("tags") or {}).get("split")
+    return (sp["start"], sp["end"]) if sp else None
+
+
 def _identical_albums(items: list[dict]) -> dict[int, str]:
     """The same album twice in the collection (李烁 好梦留人 in two folders): when every audio
     file of one album lands on the same destination as another album's file AND is
@@ -336,7 +441,7 @@ def _identical_albums(items: list[dict]) -> dict[int, str]:
     from ..hashing import file_sha256
     audio = defaultdict(list)
     for it in items:
-        if it["kind"] == "audio":
+        if it["kind"] in ("audio", "split"):
             audio[it["unit_id"]].append(it)
     by_dest = defaultdict(list)
     for uid, its in audio.items():
@@ -355,7 +460,9 @@ def _identical_albums(items: list[dict]) -> dict[int, str]:
             pairs = []
             for it in audio[other]:
                 mate = next((m for m in by_dest[collision_key(it["dest_rel"])] if m["unit_id"] == uid), None)
-                if mate is None or mate["size"] != it["size"]:
+                # tracks cut from the same image are the same only if cut at the same places (Codex
+                # review on #7: same titles, other boundaries)
+                if mate is None or mate["size"] != it["size"] or _cut(mate) != _cut(it):
                     break
                 pairs.append((mate, it))
             else:

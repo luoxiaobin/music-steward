@@ -15,6 +15,8 @@ SPEC = {
     "year": ("original", ("original", "release"), "MLT_YEAR", "Which year folder names and tags use"),
     "cue_encoding": ("utf-8-sig", ("utf-8-sig", "original"), "MLT_CUE_ENCODING", "Encoding of copied cue sheets"),
     "album_cue": ("on", ("on", "off"), "MLT_ALBUM_CUE", "Cue sheet for albums of separate track files"),
+    "cue_albums": ("image", ("image", "tracks"), "MLT_CUE_ALBUMS",
+                   "Albums of one file with a cue sheet: keep one file, or split into tracks"),
     "sources": ("musicbrainz,deezer,discogs", None, "MLT_SOURCES", "Online catalogues to search"),
     "dest": ("", None, None, "Default destination folder"),
     "language": ("auto", ("auto", "en", "zh-hans", "zh-hant", "fr-ca", "es-us"), "MLT_LANGUAGE", "Interface language"),
