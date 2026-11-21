@@ -118,18 +118,20 @@ PROPS = ("probe_status", "probe_error", "container", "codec", "duration", "durat
          "tag_format", "tags_json", "tag_issues_json", "content_id")
 
 
-def _moved_from(con, root: str, root_id: int, cid: str | None, f: _Found, claimed: set[int]) -> int | None:
-    """The known file this new path is, if its content is a known file's that is gone from its old
-    path (removed earlier, or not there any more). A copy whose original is still in place is a new
-    file: two locations, two rows."""
+def _moved_from(con, root: str, root_id: int, cid: str | None, f: _Found, claimed: set[int],
+                found_rels: set[str]) -> int | None:
+    """The known file this new path is, if its content is a known file's whose old path is gone.
+    A copy whose original is still in place is a new file: two locations, two rows. The old path
+    is checked on disk and against this scan's listing even when the row is marked removed: a
+    file restored to its old path is that row again, never a copy's (Codex review on #6)."""
     if not cid:
         return None
     best = None
-    for r in con.execute("SELECT id, fs_relpath, removed_at FROM file WHERE root_id=? AND content_id=?",
+    for r in con.execute("SELECT id, relpath, fs_relpath FROM file WHERE root_id=? AND content_id=?",
                          (root_id, cid)).fetchall():
-        if r["id"] in claimed:
+        if r["id"] in claimed or r["relpath"] in found_rels:
             continue
-        if r["removed_at"] is None and os.path.lexists(os.path.join(root, r["fs_relpath"])):
+        if os.path.lexists(os.path.join(root, r["fs_relpath"])):
             continue
         if best is None or os.path.basename(r["fs_relpath"]) == os.path.basename(f.fs_rel):
             best = r["id"]
@@ -257,6 +259,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
     # ---- 3. analyze new/changed files in parallel; write in this thread --
     done = 0
     claimed: set[int] = set()          # rows taken over by a moved file in this scan
+    found_rels = {f.rel for f in found}
     total = len(todo) + len(backfill)
     pool = ThreadPoolExecutor(max_workers=max(1, workers))
     try:
@@ -293,7 +296,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
             if vals["probe_status"] == "error":
                 c["n_probe_errors"] += 1
             k = known.get(f.rel)
-            moved = None if k else _moved_from(con, root, root_id, vals["content_id"], f, claimed)
+            moved = None if k else _moved_from(con, root, root_id, vals["content_id"], f, claimed, found_rels)
             if moved is not None:
                 # the same content, no longer at its old path: this file, moved or renamed. It keeps
                 # its row -- and so its albums, matches and decisions

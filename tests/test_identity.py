@@ -184,3 +184,31 @@ def test_a_replaced_cue_sheet_keeps_the_decision_but_asks_for_review(tmp_path, c
     u = _unit(con)
     assert u["id"] == uid and u["action"] == "accept" and "cue sheet was replaced" in u["stale_reason"]
     assert u["status"] == "queued"
+
+
+@pytest.mark.parametrize("copy_first", [True, False])
+def test_a_restored_file_and_a_new_copy_of_it_are_two_files(accepted, con, monkeypatch, copy_first):  # noqa: F811
+    """Codex review on #6: a copy could take over the row of a removed file restored in the same
+    scan (removed_at still set), leaving one row for two files."""
+    from music_steward import scanner
+    lib, _ = accepted
+    src = lib / "Ò¹º½/01 - x.mp3"
+    keep = lib.parent / "kept.mp3"
+    shutil.move(src, keep)
+    scan(con, lib)                                       # the file is now marked removed
+    assert con.execute("SELECT removed_at FROM file WHERE relpath LIKE '%01 - x.mp3'").fetchone()[0]
+    shutil.copy2(keep, src)                              # restored to its old path ...
+    (lib / "Copy").mkdir()
+    shutil.copy2(keep, lib / "Copy/01 - x.mp3")          # ... and a copy of it elsewhere
+    real = scanner.as_completed                          # make the order deterministic either way
+
+    def ordered(futs):
+        done = list(real(futs))
+        return sorted(done, key=lambda fu: ("Copy" in futs[fu].rel) != copy_first) if isinstance(futs, dict) and \
+            all(hasattr(v, "rel") for v in futs.values()) else done
+    monkeypatch.setattr(scanner, "as_completed", ordered)
+    r = scan(con, lib)
+    rows = con.execute("SELECT relpath, fs_relpath, removed_at FROM file WHERE relpath LIKE '%01 - x.mp3'").fetchall()
+    assert sorted((x["relpath"], x["fs_relpath"], x["removed_at"]) for x in rows) == [
+        ("Copy/01 - x.mp3", "Copy/01 - x.mp3", None), ("Ò¹º½/01 - x.mp3", "Ò¹º½/01 - x.mp3", None)]
+    assert r.counts["n_moved"] == 0
