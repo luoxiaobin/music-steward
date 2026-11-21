@@ -88,7 +88,7 @@ async function renderPlan(id) {
         h("button", { type: "button", class: "btn", onclick: () => { P.planId = null; renderPlanBuilder(); } }, "New plan"),
         applyBtn)),
     busy ? progressCard(job, ok) : null,
-    !busy && job.result && ["apply", "resume"].includes(job.kind) && job.result.status === "stopped"
+    !busy && job.result && ["apply", "resume", "retry"].includes(job.kind) && job.result.status === "stopped"
       ? h("div", { class: "card banner" }, h("strong", {}, "Stopped. "), job.result.abort_reason) : null,
     doneForYou(s, dups),
     previewTree(ok.concat(items.filter(i => i.kind === "cue_new" && i.status === "ok" && !ok.includes(i)))),
@@ -115,7 +115,11 @@ async function renderPlan(id) {
                         if (!await ask("Remove the copies this run created? Files you changed since are kept.")) return;
                         await post("/api/undo", { id: r.id }); pollPlan(id); } }, "Undo run"), " ",
                       h("button", { type: "button", class: "btn", disabled: busy, onclick: async () => {
-                        await post("/api/resume", { id: r.id }); pollPlan(id); } }, "Resume")])]])) : null,
+                        await post("/api/resume", { id: r.id }); pollPlan(id); } }, "Resume"),
+                      ...((r.summary.states || {}).failed ? [" ", h("button", { type: "button", class: "btn primary", disabled: busy,
+                        title: "Try the failed files again, e.g. after reconnecting the drive", onclick: async () => {
+                          await post("/api/retry", { id: r.id }); pollPlan(id); } }, `Retry failed (${r.summary.states.failed})`)] : [])])]])) : null,
+    failedList(p.runs, rows),
     h("div", { class: "card" }, h("h2", { class: "h2" }, "Tag changes ",
         h("span", { class: "muted small", style: "font-weight:400" }, `${diffs.length} changes in ${audio.length} files · written to the copies only`)),
       h("div", { style: "overflow-x:auto" }, rows(diffs.slice(0, 200), [
@@ -139,6 +143,20 @@ async function renderPlan(id) {
 }
 
 // ---- apply progress: bytes done (items run in plan order), ETA, Stop
+function failedList(runs, rows) {
+  // what went wrong, per file, for runs not undone (the reasons are the journal's own words)
+  const rowsOut = [];
+  for (const r of runs) {
+    if (r.undone_at) continue;
+    for (const f of (r.summary.failed || [])) rowsOut.push({ run: r.id, src: f.src, reason: f.reason });
+  }
+  if (!rowsOut.length) return null;
+  return h("div", { class: "card block" }, h("h2", { class: "h2" }, "Not copied ", h("span", { class: "badge b-conflict" }, rowsOut.length)),
+    rows(rowsOut.slice(0, 200), [["Run", x => h("td", {}, `#${x.run}`)], ["Source", x => h("td", { class: "mono" }, x.src.split("/").slice(-2).join("/"))],
+                                 ["Why", x => h("td", { class: "muted" }, x.reason || "")]]),
+    h("p", { class: "muted small" }, "Failed files can be tried again with Retry failed. Conflicts and changed sources need a new plan."));
+}
+
 function progressCard(job, ok) {
   const doneN = job.done || 0, total = job.total || ok.length;
   const bytes = ok.reduce((a, i) => a + (i.src_size || 0), 0);
@@ -149,11 +167,11 @@ function progressCard(job, ok) {
   const mins = x => x < 90 ? `${Math.round(x)} s` : `${Math.round(x / 60)} min`;
   return h("div", { class: "card" },
     h("div", { style: "display:flex;gap:12px;align-items:center;flex-wrap:wrap" },
-      h("strong", {}, job.kind === "apply" ? "Copying" : job.kind === "resume" ? "Resuming" : "Undoing"),
+      h("strong", {}, job.kind === "apply" ? "Copying" : job.kind === "resume" ? "Resuming" : job.kind === "retry" ? "Retrying" : "Undoing"),
       h("span", { class: "muted small" }, `${doneN} / ${total} files` +
         (job.kind === "apply" && bytes ? ` · ${fmtSize(doneB)} of ${fmtSize(bytes)}` : "") +
         (el > 3 && doneB ? ` · ${fmtSize(doneB / el)}/s` : "") + (eta != null ? ` · about ${mins(eta)} left` : "")),
-      ["apply", "resume"].includes(job.kind) ? h("button", { type: "button", class: "btn", style: "margin-left:auto",
+      ["apply", "resume", "retry"].includes(job.kind) ? h("button", { type: "button", class: "btn", style: "margin-left:auto",
         onclick: async e => { e.target.disabled = true; e.target.textContent = "Stopping after this file…";
                               const r = await post("/api/stop", {}); if (r.error) tell(r.error); } }, "Stop") : null),
     h("div", { class: "pbar" }, h("div", { style: `width:${Math.round(frac * 100)}%` })),

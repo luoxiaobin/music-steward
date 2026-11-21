@@ -277,6 +277,22 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None, guard=None):
         j.write({"op": op, "state": "committed", "ownership": "created"})
 
 
+def retry_failed(j: Journal) -> int:
+    """Make the run's 'failed' files retryable (drive disconnected, disk full...): each goes back
+    to the state it was in when it failed, and recover() then decides from the files, as after a
+    crash -- so a copy that had in fact been published is recognised as ours, not re-copied.
+    Conflicts and changed sources stay as they are: retrying cannot fix them."""
+    n = 0
+    for op, o in j.ops().items():
+        h = o["history"]
+        if h[-1] != "failed":
+            continue
+        prev = next((s for s in reversed(h[:-1]) if s not in TERMINAL), "intent")
+        j.write({"op": op, "state": prev, "retry_of": "failed", "reason": None})
+        n += 1
+    return n
+
+
 def recover(j: Journal) -> list[dict]:
     """Bring every unfinished op to a resumable or terminal state, from the files."""
     out = []

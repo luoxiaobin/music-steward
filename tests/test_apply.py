@@ -375,3 +375,39 @@ def test_a_collection_folder_added_after_planning_blocks_apply_and_resume(accept
     res = runner.apply(con, pid, journal_root=tmp_path / "j")
     assert "overlaps" in res["error"] and not con.execute("SELECT 1 FROM run").fetchone()
     assert not list(dest.rglob("*"))
+
+
+def test_retry_failed_copies_files_that_failed_and_resume_alone_does_not(accepted, con, tmp_path, monkeypatch):
+    """A file that hit an error (drive gone, disk full) is final for Resume; Retry failed tries it again."""
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    real = protocol.write_tags
+
+    def flaky(path, tags, codec):
+        if "夜航" in tags.get("title", ""):
+            raise OSError(5, "Input/output error")            # e.g. the share dropped
+        return real(path, tags, codec)
+    monkeypatch.setattr(protocol, "write_tags", flaky)
+    res = runner.apply(con, pid, journal_root=tmp_path / "j")
+    assert res["states"] == {"committed": 3, "failed": 1}, res
+    assert "Input/output error" in res["failed"][0]["reason"]
+    assert not list(dest.rglob(".*mlt-*"))                      # no temp file left behind
+    monkeypatch.setattr(protocol, "write_tags", real)          # reconnected
+    assert runner.resume(con, res["run"])["states"] == {"committed": 3, "failed": 1}
+    again = runner.resume(con, res["run"], retry_failed=True)
+    assert again["retried"] == 1 and again["states"] == {"committed": 4} and again["failed"] == [], again
+    assert (dest / "周海晴/夜航 (2004)/02 - 夜航.mp3").exists()
+    assert runner.undo(con, res["run"])["actions"] == {"removed": 4}   # one run, undo removes everything
+
+
+def test_retry_failed_recognises_a_copy_that_was_in_fact_published(accepted, con, tmp_path):
+    """A failure after the rename (the journal write failed): retry must see the copy as ours."""
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    res = runner.apply(con, pid, journal_root=tmp_path / "j")
+    j = protocol.Journal(Path(res["journal"]))
+    op, o = next((k, v) for k, v in j.ops().items() if v["kind"] == "audio")
+    j.write({"op": op, "state": "failed", "ownership": "none", "reason": "OSError: journal write failed"})
+    again = runner.resume(con, res["run"], retry_failed=True)
+    assert again["states"] == {"committed": 4}, again
+    assert runner.undo(con, res["run"])["actions"] == {"removed": 4}

@@ -100,7 +100,8 @@ def finish(con, run_id) -> dict:
     return summary
 
 
-def resume(con, run_id, progress=None, stop=None) -> dict:
+def resume(con, run_id, progress=None, stop=None, retry_failed: bool = False) -> dict:
+    """Finish an interrupted run. retry_failed: also try again the files that failed (Retry failed)."""
     r = con.execute("SELECT * FROM run WHERE id=?", (run_id,)).fetchone()
     j = protocol.Journal(Path(r["journal"]))
     if "planned" not in j.meta():           # interrupted while being planned: journal the rest first
@@ -111,9 +112,10 @@ def resume(con, run_id, progress=None, stop=None) -> dict:
         check_destination(con, dest)
     except PlanError as e:
         return {"error": str(e)}
+    retried = protocol.retry_failed(j) if retry_failed else 0
     decisions = protocol.recover(j)
     protocol.run_all(j, progress=progress, stop=stop, guard=_guard(con, dest))
-    return {"recovered": decisions, **finish(con, run_id)}
+    return {"recovered": decisions, "retried": retried, **finish(con, run_id)}
 
 
 def undo(con, run_id) -> dict:
