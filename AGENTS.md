@@ -43,7 +43,10 @@ originals.* Treat these as **P0** (block the PR):
 Also flag (P1): user decisions silently changed by a re-match or a bulk action (bulk actions touch undecided albums,
 or exactly the selected ones); data (album titles, paths, tags) being translated by the UI translator
 (`web/i18n.js` must only match interface text); Chinese text handling (GBK/Big5 repair, Simplified/Traditional,
-NFC) regressions; missing tests for new behaviour; user-visible changes without a `CHANGELOG.md` entry.
+NFC) regressions; missing tests for new behaviour; user-visible changes without a `CHANGELOG.md` entry; **organized
+copies that a Subsonic-standard server would no longer serve correctly** (required feature: every album once, all
+tracks in order, titles/artists/years/durations from the plan — `tests/test_subsonic.py` checks it against Navidrome;
+it covers albums of separate track files and cue-sheet albums split into tracks).
 
 Style: small focused modules, comments explain *why* (often a measured finding on the real collection), tests
 generate their own audio with FFmpeg.
