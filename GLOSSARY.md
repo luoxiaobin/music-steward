@@ -56,8 +56,12 @@ A collection folder whose drive or share is not available on this Mac right now.
 _Avoid_: offline, missing, unavailable
 
 **Not found**:
-An album whose files are not at its collection folder's current location. Its decision is kept.
+An exception raised on an album whose files are not at its collection folder's current location. The album and its decision are unchanged, and it clears when the files return.
 _Avoid_: missing, deleted, removed
+
+**No match**:
+An album whose folder has no online release behind it. It is kept, and the owner can accept its own information and edit every field.
+_Avoid_: not found, unknown, failed
 
 **Share identity**:
 The host and share name behind a collection folder on the network, kept on this Mac only and never with a password, so a new mount point of the same share can be suggested.

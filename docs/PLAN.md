@@ -158,7 +158,10 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
    `.icns`, iOS app icon). A subtle variant for a future player app, if one is made.
 6. **Collection folders** ([ADR 0004](adr/0004-collection-folders.md), proposed): after Folder check, Archive and Delete
    — the not-connected message and *Change path*; later *Add* and *Hide*.
-7. Outside trial users when the above is solid.
+7. **Lifecycle fixes** ([docs/LIFECYCLES.md](LIFECYCLES.md)): a *Retired* album state and the *not found* exception, so
+   Retire → rescan → Recognize folder no longer drops decisions (bug confirmed 2026-11-21); one readable history of
+   events; per-track artist in *Edit fields*.
+8. Outside trial users when the above is solid.
 
 ## M2 backlog (original order)
 
