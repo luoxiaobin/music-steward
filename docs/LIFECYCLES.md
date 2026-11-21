@@ -93,7 +93,7 @@ stateDiagram-v2
 
 | Exception | Raised when | Effect | Cleared |
 |---|---|---|---|
-| Not found ◇ | a complete scan finds none of the album's files at the location (and they are not parked) | shown as a warning; plans leave it out; nothing else changes | its files return, or the owner discards the album |
+| Not found ◇ | a complete scan finds none of the album's files at the location (and they are not parked) | shown as a warning; plans leave it out; nothing else changes | its files return, or the owner confirms *Remove…* (or leaves it for now) |
 | Audio changed ✓ | the audio or cue sheet differs from what was decided on | decision kept but flagged; left out of plans; queued again | the owner accepts again |
 | Not connected ◇ | the collection folder's drive or share is not available | writing actions disabled; nothing is marked | it is connected again |
 
@@ -187,7 +187,11 @@ Stopped → Complete* with some albums *kept* when their checks fail. Neither ch
   (album, album artist, year, disc, track titles). **Gap:** a per-track artist (singer) cannot be edited yet; it is
   needed for compilations and collections of singles.
 
+* **Removing a not-found album.** The warning is never resolved by the app. The owner chooses, per album or for all
+  not-found albums of a folder: **Leave for now** (the default; nothing changes, the warning stays, the decision is
+  kept) or **Remove…** (a confirmation names what goes: the album record, its decision, matches and edits; nothing on
+  disk is touched). Removal is recorded in the history. If the files return later, a scan finds them as a new album.
+
 ## Open questions
 
-* ❓ **Discarding a not-found album.** One album, all not-found albums of a folder, or both? (Recommended: both, each
-  with a confirmation, since it drops the owner's decision.)
+None at the moment.
