@@ -118,24 +118,86 @@ PROPS = ("probe_status", "probe_error", "container", "codec", "duration", "durat
          "tag_format", "tags_json", "tag_issues_json", "content_id")
 
 
-def _moved_from(con, root: str, root_id: int, cid: str | None, f: _Found, claimed: set[int],
-                found_rels: set[str]) -> int | None:
-    """The known file this new path is, if its content is a known file's whose old path is gone.
-    A copy whose original is still in place is a new file: two locations, two rows. The old path
-    is checked on disk and against this scan's listing even when the row is marked removed: a
-    file restored to its old path is that row again, never a copy's (Codex review on #6)."""
-    if not cid:
-        return None
-    best = None
-    for r in con.execute("SELECT id, relpath, fs_relpath FROM file WHERE root_id=? AND content_id=?",
-                         (root_id, cid)).fetchall():
-        if r["id"] in claimed or r["relpath"] in found_rels:
-            continue
-        if os.path.lexists(os.path.join(root, r["fs_relpath"])):
-            continue
-        if best is None or os.path.basename(r["fs_relpath"]) == os.path.basename(f.fs_rel):
-            best = r["id"]
-    return best
+def _write(con, row_id: int, f: _Found, vals: dict, scan_id: int, clear_hashes: bool):
+    con.execute(
+        "UPDATE file SET relpath=?, fs_relpath=?, kind=?, ext=?, size=?, mtime_ns=?, last_scan=?, removed_at=NULL, "
+        + ", ".join(f"{p}=?" for p in PROPS) +
+        (", file_sha256=NULL, audio_hash=NULL, audio_hash_method=NULL, hash_error=NULL, hashed_size=NULL, "
+         "hashed_mtime_ns=NULL" if clear_hashes else "") + " WHERE id=?",
+        (f.rel, f.fs_rel, f.kind, f.ext, f.size, f.mtime_ns, scan_id, *vals.values(), row_id))
+
+
+def _insert(con, root_id: int, f: _Found, vals: dict, scan_id: int):
+    con.execute(
+        "INSERT INTO file(root_id, relpath, fs_relpath, kind, ext, size, mtime_ns, first_scan, last_scan, "
+        + ", ".join(PROPS) + ") VALUES(" + ",".join("?" * (9 + len(PROPS))) + ")",
+        (root_id, f.rel, f.fs_rel, f.kind, f.ext, f.size, f.mtime_ns, scan_id, scan_id, *vals.values()))
+
+
+def _settle(con, root: str, root_id: int, scan_id: int, held: list, claimed: set[int], found_rels: set[str],
+            c: dict):
+    """Decide, by content, which known row each held path is (ADR 0002).
+
+    A row is a file; it follows its content. A held path takes the row of a known file with the same
+    content whose own path no longer holds it -- because that path is gone, or because it now holds
+    other content (two album folders swapped, with the same file names in both: Codex review on #6).
+    Otherwise a path keeps its own row (its content changed: the decisions on it are flagged) or gets a
+    new one. A row whose path was taken and whose content is found nowhere is removed (and flagged).
+    Written in one go: paths are freed first, since two rows may trade places."""
+    from .recognize.units import flag_changed
+    if not held:
+        return
+    own = {k["id"] for _f, _v, k in held if k}           # rows whose path now holds other content
+    taken: set[int] = set()
+    plan = []
+    rest = []
+    for f, v, k in sorted(held, key=lambda x: x[0].rel):
+        donor = None
+        for r in con.execute("SELECT id, relpath, fs_relpath FROM file WHERE root_id=? AND content_id=? ORDER BY id",
+                             (root_id, v["content_id"])).fetchall():
+            if r["id"] in taken or r["id"] in claimed or (k is not None and r["id"] == k["id"]):
+                continue
+            free = r["id"] in own or (r["relpath"] not in found_rels
+                                      and not os.path.lexists(os.path.join(root, r["fs_relpath"])))
+            if free and (donor is None or os.path.basename(r["fs_relpath"]) == os.path.basename(f.fs_rel)):
+                donor = r["id"]
+        if donor is not None:
+            taken.add(donor)
+            plan.append((f, v, k, donor))
+        else:
+            rest.append((f, v, k))
+    for f, v, k in rest:
+        if k is not None and k["id"] not in taken:
+            taken.add(k["id"])
+            plan.append((f, v, k, k["id"]))
+        else:
+            plan.append((f, v, k, None))
+    lost = own - taken
+    movers = [rid for f, v, k, rid in plan if rid is not None and (k is None or rid != k["id"])]
+    for rid in movers:                                   # free the paths first
+        con.execute("UPDATE file SET relpath=? WHERE id=?", (f"\x00moving/{rid}", rid))
+    if lost:
+        flag_changed(con, sorted(lost))
+        for rid in lost:
+            # its path now holds a file that came from elsewhere, and its own content is nowhere
+            con.execute("UPDATE file SET relpath = relpath || ?, removed_at=? WHERE id=?",
+                        (f" (replaced, scan {scan_id})", time.time(), rid))
+        c["_lost"] = len(lost)
+    for f, v, k, rid in plan:
+        if rid is None:
+            c["n_new"] += 1
+            _insert(con, root_id, f, v, scan_id)
+        elif k is not None and rid == k["id"]:
+            c["n_changed"] += 1                          # same path, other content
+            flag_changed(con, [rid])
+            _write(con, rid, f, v, scan_id, clear_hashes=True)
+        else:
+            c["n_moved"] += 1                            # this row's file, now at this path
+            claimed.add(rid)
+            old = con.execute("SELECT size, mtime_ns FROM file WHERE id=?", (rid,)).fetchone()
+            # a pure move keeps the bytes and so the saved hashes (hashing a NAS is slow); moved and
+            # retagged: the whole-file hashes are stale
+            _write(con, rid, f, v, scan_id, clear_hashes=(old["size"], old["mtime_ns"]) != (f.size, f.mtime_ns))
 
 
 def resolve(con: sqlite3.Connection, path: str) -> tuple[str, str]:
@@ -260,6 +322,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
     done = 0
     claimed: set[int] = set()          # rows taken over by a moved file in this scan
     found_rels = {f.rel for f in found}
+    held: list = []                    # (found, values, known row or None): settled after the reads
     total = len(todo) + len(backfill)
     pool = ThreadPoolExecutor(max_workers=max(1, workers))
     try:
@@ -296,44 +359,24 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
             if vals["probe_status"] == "error":
                 c["n_probe_errors"] += 1
             k = known.get(f.rel)
-            moved = None if k else _moved_from(con, root, root_id, vals["content_id"], f, claimed, found_rels)
-            if moved is not None:
-                # the same content, no longer at its old path: this file, moved or renamed. It keeps
-                # its row -- and so its albums, matches and decisions
-                c["n_moved"] += 1
-                claimed.add(moved)
-                old = con.execute("SELECT size, mtime_ns FROM file WHERE id=?", (moved,)).fetchone()
-                # a pure rename keeps the bytes, so the saved hashes stay valid (hashing a NAS is slow);
-                # moved AND retagged: the whole-file hashes are stale (Codex review on #6)
-                same = (old["size"], old["mtime_ns"]) == (f.size, f.mtime_ns)
-                con.execute(
-                    "UPDATE file SET relpath=?, fs_relpath=?, kind=?, ext=?, size=?, mtime_ns=?, last_scan=?, "
-                    "removed_at=NULL, " + ", ".join(f"{p}=?" for p in PROPS) +
-                    ("" if same else ", file_sha256=NULL, audio_hash=NULL, audio_hash_method=NULL, hash_error=NULL, "
-                                     "hashed_size=NULL, hashed_mtime_ns=NULL") + " WHERE id=?",
-                    (f.rel, f.fs_rel, f.kind, f.ext, f.size, f.mtime_ns, scan_id, *vals.values(), moved))
+            cid = vals["content_id"]
+            seen.add(f.rel)
+            if cid and ((k and k["content_id"] != cid) or (not k and con.execute(
+                    "SELECT 1 FROM file WHERE root_id=? AND content_id=? LIMIT 1", (root_id, cid)).fetchone())):
+                # a path that now holds other content, or a new path holding known content: it may be a
+                # file that moved (folders swapped, renamed, a file moved in) -- decided once every file
+                # has been read (_settle). Nothing is written for it before then, so an interrupted scan
+                # simply sees it as changed again next time
+                held.append((f, vals, k))
             elif k:
                 c["n_changed"] += 1
-                if k["content_id"] != vals["content_id"] or not vals["content_id"]:
-                    # in the same transaction as the new content_id below: an interrupted scan must
-                    # never record the new content without flagging the decisions made on the old one
+                if k["content_id"] != cid or not cid:
                     from .recognize.units import flag_changed
-                    flag_changed(con, [k["id"]])
-                con.execute(
-                    "UPDATE file SET fs_relpath=?, kind=?, ext=?, size=?, mtime_ns=?, last_scan=?, "
-                    "removed_at=NULL, " + ", ".join(f"{p}=?" for p in PROPS) + ", "
-                    "file_sha256=NULL, audio_hash=NULL, audio_hash_method=NULL, hash_error=NULL, "
-                    "hashed_size=NULL, hashed_mtime_ns=NULL WHERE id=?",
-                    (f.fs_rel, f.kind, f.ext, f.size, f.mtime_ns, scan_id, *vals.values(), k["id"]))
+                    flag_changed(con, [k["id"]])     # same transaction as the new content_id below
+                _write(con, k["id"], f, vals, scan_id, clear_hashes=True)
             else:
                 c["n_new"] += 1
-                con.execute(
-                    "INSERT INTO file(root_id, relpath, fs_relpath, kind, ext, size, mtime_ns, "
-                    "first_scan, last_scan, " + ", ".join(PROPS) + ") VALUES(" +
-                    ",".join("?" * (9 + len(PROPS))) + ")",
-                    (root_id, f.rel, f.fs_rel, f.kind, f.ext, f.size, f.mtime_ns, scan_id, scan_id,
-                     *vals.values()))
-            seen.add(f.rel)
+                _insert(con, root_id, f, vals, scan_id)
             if done % COMMIT_EVERY == 0:
                 con.commit()
                 if progress:
@@ -349,6 +392,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
         pool.shutdown(wait=False, cancel_futures=True)
     if progress:
         progress(done, total)
+    _settle(con, root, root_id, scan_id, held, claimed, found_rels, c)
 
     # ---- 4. removals: only after a complete walk, never under failed dirs --
     if not _root_ok(root):
@@ -361,7 +405,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
             if rel not in seen and k["removed_at"] is None and not under_failed(rel) and k["id"] not in claimed]
     now = time.time()
     con.executemany("UPDATE file SET removed_at=? WHERE id=?", [(now, i) for i in gone])
-    c["n_removed"] = len(gone)
+    c["n_removed"] = len(gone) + c.pop("_lost", 0)
     for (rel,) in con.execute("SELECT relpath FROM dir_note WHERE root_id=? AND last_scan<>?",
                               (root_id, scan_id)).fetchall():
         if rel == subkey or in_scope(rel):

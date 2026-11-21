@@ -148,15 +148,19 @@ def test_an_interrupted_scan_never_saves_changed_audio_without_the_flag(accepted
     end -- an interrupt in between left the decision unflagged for good."""
     from music_steward import scanner
     lib, _ = accepted
+    q = "SELECT content_id, size FROM file WHERE relpath LIKE '%02 - x.mp3'"
+    old = tuple(con.execute(q).fetchone())
     tone(lib / "Ò¹º½/02 - x.mp3", ["-c:a", "libmp3lame"], secs=3, freq=1200)
     monkeypatch.setattr(scanner, "COMMIT_EVERY", 1)
 
     def stop(done, total):
-        raise KeyboardInterrupt                        # right after the first file is committed
+        raise KeyboardInterrupt                        # right after a commit
     with pytest.raises(KeyboardInterrupt):
         scan(con, lib, progress=stop)
     con.rollback()                                     # anything not committed is lost
-    assert _unit(con)["stale_reason"]                  # committed together with the new content_id
+    saved = tuple(con.execute(q).fetchone())
+    # either nothing about the new audio was saved, or it was saved together with the flag
+    assert saved == old or _unit(con)["stale_reason"]
     scan(con, lib)
     assert _unit(con)["stale_reason"]
 
@@ -282,3 +286,53 @@ def test_two_swapped_folders_keep_their_own_decisions(tmp_path, con):
     units.enqueue(con, 1, units.plan_units(con, 1), scope="")
     after = _albums(con)
     assert after["A"] == before["B"] and after["B"] == before["A"]
+
+
+def test_swapped_folders_with_the_same_file_names_keep_their_own_decisions(tmp_path, con):
+    """Codex review on #6: A/01.mp3 and B/01.mp3 swapped -- every path still exists, so the rows were
+    overwritten in place and the accept and the skip ended up on the other album's recordings."""
+    lib = tmp_path / "lib"
+    for name, freq in (("A", 300), ("B", 700)):
+        for i in (1, 2):
+            tone(lib / name / f"0{i}.mp3", ["-c:a", "libmp3lame"], secs=1, freq=freq + 50 * i)
+    scan(con, lib)
+    units.enqueue(con, 1, units.plan_units(con, 1), scope="")
+    for (uid, folder) in con.execute("SELECT id, folder FROM unit").fetchall():
+        con.execute("INSERT INTO decision(unit_id, action, decided_at) VALUES(?, ?, 0)",
+                    (uid, "accept" if folder == "A" else "skip"))
+    con.commit()
+    before = _albums(con)
+    file_of = {r["content_id"]: r["id"] for r in con.execute("SELECT id, content_id FROM file")}
+    os.rename(lib / "A", lib / "tmp")
+    os.rename(lib / "B", lib / "A")
+    os.rename(lib / "tmp", lib / "B")
+    r = scan(con, lib)
+    assert (r.counts["n_moved"], r.counts["n_changed"], r.counts["n_new"], r.counts["n_removed"]) == (4, 0, 0, 0)
+    assert {r["content_id"]: r["id"] for r in con.execute("SELECT id, content_id FROM file")} == file_of
+    units.enqueue(con, 1, units.plan_units(con, 1), scope="")
+    after = _albums(con)
+    assert after["A"] == before["B"] and after["B"] == before["A"]      # skip and accept followed the audio
+    assert con.execute("SELECT count(*) FROM decision WHERE stale_reason IS NOT NULL").fetchone()[0] == 0
+
+
+def test_a_file_replaced_by_one_moved_in_from_elsewhere(tmp_path, con):
+    """X/01.mp3 moved over Y/01.mp3 (whose own audio is now nowhere): the row follows X's audio, Y's
+    old row is removed and its album flagged."""
+    lib = tmp_path / "lib"
+    tone(lib / "X/01.mp3", ["-c:a", "libmp3lame"], secs=1, freq=300)
+    tone(lib / "Y/01.mp3", ["-c:a", "libmp3lame"], secs=1, freq=900)
+    scan(con, lib)
+    units.enqueue(con, 1, units.plan_units(con, 1), scope="")
+    for (uid,) in con.execute("SELECT id FROM unit").fetchall():
+        con.execute("INSERT INTO decision(unit_id, action, decided_at) VALUES(?, 'accept', 0)", (uid,))
+    con.commit()
+    x_id = con.execute("SELECT id FROM file WHERE relpath='X/01.mp3'").fetchone()[0]
+    y_id = con.execute("SELECT id FROM file WHERE relpath='Y/01.mp3'").fetchone()[0]
+    os.replace(lib / "X/01.mp3", lib / "Y/01.mp3")
+    r = scan(con, lib)
+    assert (r.counts["n_moved"], r.counts["n_removed"]) == (1, 1)
+    assert con.execute("SELECT relpath FROM file WHERE id=?", (x_id,)).fetchone()[0] == "Y/01.mp3"
+    assert con.execute("SELECT removed_at FROM file WHERE id=?", (y_id,)).fetchone()[0]
+    flagged = con.execute("SELECT u.folder FROM unit u JOIN decision d ON d.unit_id=u.id "
+                          "WHERE d.stale_reason IS NOT NULL").fetchall()
+    assert [f[0] for f in flagged] == ["Y"]
