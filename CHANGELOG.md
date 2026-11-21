@@ -7,6 +7,15 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 ## [Unreleased]
 
 ### Added
+- **Folder check**: wherever you type a folder (Settings → Default destination folder, the plan's Destination) the
+  app now tells you, as you type, whether it is written correctly, whether it exists, and whether it can be used —
+  and refuses to save or build with one that cannot. It recognises a **network address** such as
+  `//nas/music/Ape.Flac` or `smb://nas/music/…` (which no program can open directly), finds the same share if it
+  is connected, and offers the path as it appears on this Mac (`/Volumes/music/Ape.Flac`) with a "Use this path"
+  button. It also says when a drive is not connected, when the parent folder is missing (and the closest existing
+  folder), when it is a file, when the app may not write there, and when it is inside your collection. Settings now
+  explains that the destination is where copies are written, not the folder to scan, and lists the collection folders.
+  A destination that fails the check is no longer stored first and complained about afterwards.
 - **Retire originals** ([ADR 0003](docs/adr/0003-retire-originals.md)): after a copy is verified, set the originals
   aside so you end up with one organized library — optional, off until you allow it per collection folder
   (Settings → Retiring originals). On the plan screen, **Retire originals…** re-checks every album (all files copied;
