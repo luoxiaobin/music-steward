@@ -163,3 +163,54 @@ def test_applying_again_finds_the_same_tracks_already_there(split_album, con, tm
     runner.apply(con, first, journal_root=tmp_path / "j")
     again = runner.apply(con, second, journal_root=tmp_path / "j")
     assert again["states"] == {"already_existed": 3}, again
+
+
+def test_audio_before_the_first_track_is_kept_in_it(tmp_path, con, monkeypatch):
+    """Codex review on #7: a cue whose first INDEX 01 is not at 0 (a pregap, hidden audio) lost
+    the audio before it. The tracks together must cover the whole image."""
+    monkeypatch.setenv("MLT_CUE_ALBUMS", "tracks")
+    lib = tmp_path / "lib"
+    img = noise(lib / "HTOA/image.flac", 6)
+    sheet = CUE.replace("old image name.wav", "image.flac").replace(
+        '    INDEX 01 00:00:00\n', '    INDEX 00 00:00:00\n    INDEX 01 00:01:00\n', 1)
+    assert "INDEX 01 00:01:00" in sheet
+    (lib / "HTOA/image.cue").write_bytes(sheet.encode("gbk"))
+    scan(con, lib)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["kind"] == "cue"])
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    con.execute("UPDATE unit SET status='done', n_tracks=3")
+    cid = local.add(con, uid)
+    con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                "VALUES(?, 'accept', ?, 0, 'local')", (uid, cid))
+    con.commit()
+    dest = tmp_path / "out"
+    res = runner.apply(con, plan.build(con, str(dest), 1), journal_root=tmp_path / "j")
+    assert res["states"] == {"committed": 3}
+    tracks = sorted(dest.rglob("*.flac"))
+    assert b"".join(samples(t) for t in tracks) == samples(img)        # nothing before track 1 lost
+
+
+def test_identical_images_cut_differently_are_not_duplicates(tmp_path, con, monkeypatch):
+    """Codex review on #7: the same image in two folders with cue sheets of the same titles but
+    other boundaries was copied once -- the other album's tracks silently dropped."""
+    import shutil
+    monkeypatch.setenv("MLT_CUE_ALBUMS", "tracks")
+    lib = tmp_path / "lib"
+    noise(lib / "A/image.flac", 6)
+    (lib / "A/image.cue").write_bytes(CUE.replace("old image name.wav", "image.flac").encode("gbk"))
+    (lib / "B").mkdir()
+    shutil.copy2(lib / "A/image.flac", lib / "B/image.flac")
+    (lib / "B/image.cue").write_bytes(CUE.replace("old image name.wav", "image.flac")
+                                      .replace("INDEX 01 00:04:00", "INDEX 01 00:03:00").encode("gbk"))
+    scan(con, lib)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["kind"] == "cue"])
+    for (uid,) in con.execute("SELECT id FROM unit").fetchall():
+        con.execute("UPDATE unit SET status='done', n_tracks=3 WHERE id=?", (uid,))
+        cid = local.add(con, uid)
+        con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                    "VALUES(?, 'accept', ?, 0, 'local')", (uid, cid))
+    con.commit()
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
+    assert p["summary"]["duplicate_albums_skipped"] == 0
+    assert "duplicate_source" not in {i["status"] for i in p["items"]}
+    assert "conflict_duplicate" in {i["status"] for i in p["items"]}      # a visible conflict instead

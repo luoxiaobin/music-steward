@@ -110,6 +110,10 @@ def _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, 
         artist = _script(c["artist"] if artist and artist == c.get("_artist_from") else artist,
                          c.get("_script", "keep")) or c["artist"]
         nxt = own.tracks[i].start if i < len(own.tracks) else None
+        # the first track starts at the very beginning of the image: audio before its INDEX 01 (a
+        # pregap, "hidden" audio) is kept in it instead of being dropped (Codex review on #7). Gaps
+        # between tracks stay in the track before them; the tracks together cover the whole image
+        start = 0.0 if i == 1 else t.start
         name = track_name(title, i, c["_disc"] if multi else None, c["mediums"], "flac", ".flac")
         it = {"unit_id": u["id"], "file_id": f["id"], "kind": "split",
               "src": os.path.join(root_path, f["fs_relpath"]), "dest_rel": f"{adir}/{name}",
@@ -118,7 +122,7 @@ def _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, 
                        "track": i, "disc": f"{c['_disc']}/{c['mediums']}" if multi else None,
                        "date": c["year"], "mb_trackid": ct.get("recording_id") if is_mb else None,
                        "mb_albumid": c["album_id"] if is_mb else None,
-                       "split": {"start": t.start, "end": nxt, "src_ext": f["ext"], "src_codec": f["codec"],
+                       "split": {"start": start, "end": nxt, "src_ext": f["ext"], "src_codec": f["codec"],
                                  "rate": f["sample_rate"], "bits": f["bits_per_sample"]}}}
         items.append(it)
         mine.append(it)
@@ -389,6 +393,11 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
     return pid
 
 
+def _cut(it: dict):
+    sp = (it.get("tags") or {}).get("split")
+    return (sp["start"], sp["end"]) if sp else None
+
+
 def _identical_albums(items: list[dict]) -> dict[int, str]:
     """The same album twice in the collection (李烁 好梦留人 in two folders): when every audio
     file of one album lands on the same destination as another album's file AND is
@@ -416,7 +425,9 @@ def _identical_albums(items: list[dict]) -> dict[int, str]:
             pairs = []
             for it in audio[other]:
                 mate = next((m for m in by_dest[collision_key(it["dest_rel"])] if m["unit_id"] == uid), None)
-                if mate is None or mate["size"] != it["size"]:
+                # tracks cut from the same image are the same only if cut at the same places (Codex
+                # review on #7: same titles, other boundaries)
+                if mate is None or mate["size"] != it["size"] or _cut(mate) != _cut(it):
                     break
                 pairs.append((mate, it))
             else:
