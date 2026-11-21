@@ -96,6 +96,11 @@ its own disc number; they go into one album folder.
 
 Every decision is saved at once and can be undone; albums left undecided are simply left out of the plan.
 
+**Renaming or moving folders in your collection is fine**: on the next scan the app recognises the files by their
+audio, and their albums keep your decisions. If an album's **audio** changes after you decided (a file replaced by
+another recording), it is marked **Audio changed · decide again** and left out of plans until you decide again.
+Changing only tags does not count.
+
 ## 6. Find anything: search
 
 The search box at the top (or **/**, **⌘K**) finds albums, folders and tracks across the whole collection: any part

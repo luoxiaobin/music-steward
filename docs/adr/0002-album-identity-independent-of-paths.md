@@ -1,6 +1,7 @@
 # ADR 0002: Album identity independent of file paths
 
-* **Status:** Proposed. Direction accepted 2026-11-20; cost measured 2026-11-20; design below awaits the owner's OK.
+* **Status:** Accepted 2026-11-20 (design below approved by the owner; implemented in `identity.py`, the scanner and
+  `recognize/units.py`).
 * **Date:** 2026-11-20
 * **Deciders:** Kevin Luo
 
@@ -66,11 +67,26 @@ padding exceeded, MP3 with a large picture).
    cost nothing): SHA-256 of the audio region's length, its first 64 KiB and its last 64 KiB. The audio region
    excludes ID3v2 / FLAC metadata blocks in front and APEv2 / ID3v1 at the end, so tag edits do not change it.
    Expected cost: on the order of the first scan again (≈ 1–2 h for 3 TB), once.
-2. **Confirmed identity, the full audio hash, only where the bytes are read anyway**: when an album is copied by
-   Apply (the copy reads every byte) and for duplicate checks the user asks for. Never a whole-collection hash.
-3. Limitation, accepted: a change confined to the middle of the audio (same length, same first and last 64 KiB) keeps
-   the identity. The scan still sees the file as changed (size or date), and the confirmed hash at Apply catches it
-   before a copy is made from a stale decision.
+2. **Moves**: a new path whose content is a known file that is gone from its old path takes over that file's row
+   (so units, matches and decisions follow); a copy next to its original is a new file. A unit whose key changed but
+   whose files are the same is the same album, re-keyed.
+3. **Changes**: a changed file (size or date) whose content identity changed flags the decisions on its albums
+   (`decision.stale_reason`), queues them again, and plans leave them out until the album is decided again.
+4. Full audio hash: still only where the bytes are read anyway (Apply's audio check, duplicate checks the user asks
+   for). Never a whole-collection hash.
+5. Limitations, accepted: an edit confined to the middle of the audio (same length, same first and last 64 KiB)
+   keeps the identity, so the decision is kept (it is the same recording). For formats whose tags live inside the
+   audio container (WAV, MP4, WMA) a tag edit changes the identity and the album goes back to review — the safe
+   direction.
+
+## Migration check (2026-11-20, a copy of the app database, folder 音乐Ape)
+
+Scan with the new code: 6,891 unchanged files, identities filled in for all in **194 s (28 ms per file)**; 0 moved,
+0 changed, 0 removed; all 141 accepted and 3 skipped decisions kept, none flagged. 68 files have no identity by
+design (2 unreadable audio files, 66 large non-audio files). 108 identities are shared by two files; full audio
+hashes of 8 of those groups: 7 the same audio, and 1 the same 78-minute FLAC recording in two folders differing in
+2 blocks of 4 KiB at 97 % (most likely a read error in one copy) — the accepted limitation 5, harmless here (both
+files exist, so neither is taken for a move). Extrapolated to the whole collection: ≈ 1.1 h, once.
 
 ## Consequences
 

@@ -343,11 +343,14 @@ def _identical_albums(items: list[dict]) -> dict[int, str]:
         for it in its:
             by_dest[collision_key(it["dest_rel"])].append(it)
     skipped: dict[int, str] = {}
-    for uid in sorted(audio):
+    # the copy kept is the one whose folder sorts first -- the same on every plan, not whichever
+    # album happened to get the lower id (ids follow the order in which a scan finished reading)
+    order = sorted(audio, key=lambda u: (min(it["src"] for it in audio[u]), u))
+    for i, uid in enumerate(order):
         if uid in skipped:
             continue
-        for other in sorted(audio):
-            if other <= uid or other in skipped or len(audio[other]) != len(audio[uid]):
+        for other in order[i + 1:]:
+            if other in skipped or len(audio[other]) != len(audio[uid]):
                 continue
             pairs = []
             for it in audio[other]:
