@@ -28,6 +28,7 @@ import csv
 import errno
 import json
 import os
+import shutil
 import sqlite3
 import stat
 import time
@@ -36,6 +37,7 @@ from pathlib import Path
 from . import identity as idmod
 from . import settings
 from .apply import protocol
+from .apply import runner as _runner
 from .hashing import copy_audio_fingerprint, file_sha256
 
 ORIGINALS = "_ORIGINALS"           # the holding folder; the scanner ignores it (paths.JUNK_NAMES)
@@ -47,6 +49,9 @@ OK_STATES = ("committed", "already_existed")
 
 class RetireError(Exception):
     pass
+
+
+_DELETED = "\0deleted"      # in a `moved` map: this original was parked and has since been deleted
 
 
 class _Skip(Exception):
@@ -70,9 +75,10 @@ def _stat_same(path: str, size: int, mtime_ns: int) -> None:
         raise _Skip("the original changed since it was copied")
 
 
-def _identity_same(path: str, f: sqlite3.Row) -> None:
-    """The content identity recorded by the scan (ADR 0002) still matches the file on disk."""
-    if f["removed_at"] is not None:
+def _identity_same(path: str, f: sqlite3.Row, parked: bool = False) -> None:
+    """The content identity recorded by the scan (ADR 0002) still matches the file on disk.
+    parked: the file has been set aside, so the scan has long marked it removed -- that is expected."""
+    if f["removed_at"] is not None and not parked:
         raise _Skip("the original is no longer in the inventory; scan the folder again")
     if f["content_id"] is None:
         raise _Skip("the original has no identity yet; scan its folder again first")
@@ -129,6 +135,8 @@ def _verify_copy(run: "Run", op: dict, item: dict, src: str | None = None) -> st
         if state == "committed" and op.get("src_audio"):
             if _fp(str(final), op.get("codec")) != op["src_audio"]:
                 raise _Skip("the audio of the organized copy changed")
+        elif src == _DELETED:
+            pass        # the original has been deleted; the copy was proved identical before that began
         else:       # already there when the run started: prove it equals the original now
             src = src or op["src"]
             if sp is not None:
@@ -151,7 +159,7 @@ def _verify_copy(run: "Run", op: dict, item: dict, src: str | None = None) -> st
         import hashlib
         if file_sha256(str(final)) != hashlib.sha256(gen.encode("utf-8-sig")).hexdigest():
             raise _Skip("an existing file at the destination is not the planned one")
-    elif file_sha256(str(final)) != file_sha256(src or op["src"]):
+    elif src != _DELETED and file_sha256(str(final)) != file_sha256(src or op["src"]):
         raise _Skip("an existing file at the destination is not a copy of the original")
     return None
 
@@ -195,11 +203,13 @@ class Run:
         return self.ops.get(f"i{item['seq']}")
 
 
-def check_album(con: sqlite3.Connection, run: Run, unit_id: int, moved: dict[int, str] | None = None) -> dict:
+def check_album(con: sqlite3.Connection, run: Run, unit_id: int, moved: dict[int, str] | None = None,
+                strict: bool = False) -> dict:
     """Is this album retirable right now? {eligible, reason, files, flags, kind}. Never raises on an
     album's own problems: they are the 'reason'.
     moved: {file id: where it is now} for files of this album that are already parked -- when an album
-    that was interrupted is resumed, everything else is checked again exactly as for a first time."""
+    that was interrupted is resumed, everything else is checked again exactly as for a first time.
+    strict: for deleting what is parked, the parked files must also have their recorded time and content."""
     items = run.units[unit_id]
     unit = con.execute("SELECT label, folder FROM unit WHERE id=?", (unit_id,)).fetchone()
     out = {"unit_id": unit_id, "label": unit["label"] if unit else str(unit_id),
@@ -209,9 +219,9 @@ def check_album(con: sqlite3.Connection, run: Run, unit_id: int, moved: dict[int
         dup = [i for i in items if i["status"] == "duplicate_source"]
         if dup:
             out["kind"] = "duplicate"
-            out["files"] = _check_duplicate(con, run, items, dup, out["flags"], moved or {})
+            out["files"] = _check_duplicate(con, run, items, dup, out["flags"], moved or {}, strict)
         else:
-            out["files"] = _check_album(con, run, items, out["flags"], moved or {})
+            out["files"] = _check_album(con, run, items, out["flags"], moved or {}, strict)
         out["bytes"] = sum(f["size"] for f in out["files"])
         out["eligible"] = bool(out["files"])
         if not out["files"]:
@@ -224,14 +234,20 @@ def check_album(con: sqlite3.Connection, run: Run, unit_id: int, moved: dict[int
 
 
 def _file_entry(con, run: Run, f: sqlite3.Row, size: int, mtime_ns: int, kind: str,
-                parked: str | None = None) -> dict:
+                parked: str | None = None, strict: bool = False) -> dict:
+    if parked == _DELETED:                       # deleted earlier in this very delete: nothing left to check
+        return {"file_id": f["id"], "relpath": f["fs_relpath"], "path": None, "size": size, "mtime_ns": mtime_ns,
+                "content_id": f["content_id"], "kind": kind, "already_moved": True, "deleted": True}
     if parked is not None:                       # already set aside: it must still be there, the same size
         try:
-            ok = os.stat(parked).st_size == size
+            st = os.lstat(parked)
+            ok = stat.S_ISREG(st.st_mode) and st.st_size == size and (not strict or st.st_mtime_ns == mtime_ns)
         except OSError:
             ok = False
         if not ok:
             raise _Skip("a file that was set aside is missing or changed")
+        if strict:                               # before anything is deleted: the very content that was verified
+            _identity_same(parked, f, parked=True)
         return {"file_id": f["id"], "relpath": f["fs_relpath"], "path": parked, "size": size, "mtime_ns": mtime_ns,
                 "content_id": f["content_id"], "kind": kind, "already_moved": True}
     path = os.path.join(run.root, f["fs_relpath"])
@@ -242,7 +258,8 @@ def _file_entry(con, run: Run, f: sqlite3.Row, size: int, mtime_ns: int, kind: s
             "content_id": f["content_id"], "kind": kind}
 
 
-def _check_album(con, run: Run, items: list[dict], flags: list[str], moved: dict[int, str]) -> list[dict]:
+def _check_album(con, run: Run, items: list[dict], flags: list[str], moved: dict[int, str],
+                 strict: bool = False) -> list[dict]:
     sources: dict[int, dict] = {}                # file_id -> {"items": [...], "ops": [...]}
     for it in items:
         if it["status"] != "ok":
@@ -267,7 +284,7 @@ def _check_album(con, run: Run, items: list[dict], flags: list[str], moved: dict
             _coverage(split_ops)
         op0 = s["ops"][0]
         files.append(_file_entry(con, run, f, op0["src_size"], op0["src_mtime_ns"], s["items"][0]["kind"],
-                                 parked=moved.get(fid)))
+                                 parked=moved.get(fid), strict=strict))
     # an album split into tracks: its original cue sheet is not copied (it only defined the cuts), but
     # it belongs to the image that goes: it moves with it, if it is the very sheet the cuts came from
     cut_ops = [o for o in (run.op(i) for i in items) if o and (o.get("tags") or {}).get("split")]
@@ -276,12 +293,13 @@ def _check_album(con, run: Run, items: list[dict], flags: list[str], moved: dict
         row = con.execute("SELECT cue_file_id FROM unit WHERE id=?", (items[0]["unit_id"],)).fetchone()
         f = con.execute("SELECT * FROM file WHERE id=?", (row["cue_file_id"],)).fetchone() if row and row[0] else None
         if cue and f is not None and f["id"] not in sources:
-            files.append(_file_entry(con, run, f, cue["size"], cue["mtime_ns"], "cue", parked=moved.get(f["id"])))
+            files.append(_file_entry(con, run, f, cue["size"], cue["mtime_ns"], "cue", parked=moved.get(f["id"]),
+                                     strict=strict))
     return files
 
 
 def _check_duplicate(con, run: Run, items: list[dict], dup: list[dict], flags: list[str],
-                     moved: dict[int, str]) -> list[dict]:
+                     moved: dict[int, str], strict: bool = False) -> list[dict]:
     """A byte-identical duplicate of an album that was copied once (plan: duplicate_source). Its files go
     only if each is byte-identical to the source of the file that was copied and verified."""
     from .apply.naming import collision_key
@@ -304,9 +322,10 @@ def _check_duplicate(con, run: Run, items: list[dict], dup: list[dict], flags: l
         f = con.execute("SELECT * FROM file WHERE id=?", (it["file_id"],)).fetchone()
         if f is None:
             raise _Skip("an original is no longer in the inventory")
-        e = _file_entry(con, run, f, it["src_size"], it["src_mtime_ns"], it["kind"], parked=moved.get(it["file_id"]))
+        e = _file_entry(con, run, f, it["src_size"], it["src_mtime_ns"], it["kind"], parked=moved.get(it["file_id"]),
+                        strict=strict)
         want = top.get("src_sha")
-        if want is None or file_sha256(e["path"]) != want:
+        if not e.get("deleted") and (want is None or file_sha256(e["path"]) != want):
             raise _Skip("a file is not byte-identical to the one that was copied")
         files.append(e)
     flags.append("a duplicate of an album that was copied once")
@@ -580,7 +599,8 @@ def _check_batch_paths(root: str, folder: str, root_real: str | None) -> None:
 
 
 _DB_STATE = {"intent": "intent", "claimed": "intent", "moved": "moved", "skipped": "skipped", "conflict": "conflict",
-             "missing": "missing", "restoring": "moved", "restore_claimed": "moved", "restored": "restored"}
+             "missing": "missing", "restoring": "moved", "restore_claimed": "moved", "restored": "restored",
+             "deleting": "moved", "deleted": "deleted"}
 
 
 def _upsert(con, batch, *, file_id, unit, album, relpath, size, mtime_ns, content_id, kind, state) -> None:
@@ -824,7 +844,7 @@ def restore(con: sqlite3.Connection, batch_id: int, unit_ids: set[int] | None = 
     restored, blocked, missing = 0, [], []
     for op, o in j.ops().items():
         last = o["history"][-1]
-        if not op.startswith("f") or last not in ("moved", "restoring", "restore_claimed"):
+        if not op.startswith("f") or last not in ("moved", "restoring", "restore_claimed", "deleting"):
             continue
         if unit_ids is not None and o.get("unit") not in unit_ids:
             continue
@@ -882,6 +902,318 @@ def _tidy_dirs(folder: str) -> None:
                 pass
 
 
+# ---- archive and delete (ADR 0003) ------------------------------------------------------------------
+DELETE_WORD = "DELETE"
+LOST_KEYS = ("tags_files", "split_cues", "rewritten_cues", "split_lyrics")
+
+
+def _open_batch(con: sqlite3.Connection, batch_id: int):
+    """The batch, its run and its journal -- after the same checks as restore: retiring allowed, the run
+    not undone, and no link on the way to the originals folder (or to the collection folder itself)."""
+    batch = con.execute("SELECT * FROM retire_batch WHERE id=?", (batch_id,)).fetchone()
+    if batch is None:
+        raise RetireError("no such batch")
+    run = Run(con, batch["run_id"])
+    require_allowed(con, run.root_id)
+    _check_batch_paths(run.root, batch["folder"], batch["root_real"])
+    return batch, run, protocol.Journal(Path(batch["journal"]))
+
+
+def _parked_albums(j: protocol.Journal) -> dict[int, dict]:
+    """{unit id: {"label", "files"}} for the files that are in _ORIGINALS now (journal state moved, or a
+    delete that was started but not recorded). The journal holds each album's whole file list."""
+    ops, out = j.ops(), {}
+    for op, o in ops.items():
+        if not (op.startswith("a") and "files" in o):
+            continue
+        state = lambda f: ops.get(f"f{f['file_id']}", {}).get("history", [None])[-1]   # noqa: E731
+        files = [f for f in o["files"] if state(f) in ("moved", "deleting")]
+        if files:
+            out[int(op[1:])] = {"label": o.get("label", ""), "files": files,
+                                "gone": [f["file_id"] for f in o["files"] if state(f) == "deleted"],
+                                "deleting": [f["file_id"] for f in files if state(f) == "deleting"]}
+    return out
+
+
+def _nearest_existing(path: Path) -> Path:
+    p = path
+    while not p.exists() and p != p.parent:
+        p = p.parent
+    return p
+
+
+# ---- archive: a verified copy of the parked originals somewhere else ---------------------------------------
+def _archive_dest(run: Run, batch: sqlite3.Row, target: str) -> Path:
+    name = os.path.basename(run.root.rstrip(os.sep)) or "collection"
+    return Path(target).expanduser() / f"{name}-originals" / batch["key"]
+
+
+def _archive_files(batch: sqlite3.Row, j: protocol.Journal) -> list[tuple[str, str]]:
+    """(source path, path relative to the archive) for every parked file, plus the batch's README and manifest."""
+    folder = batch["folder"]
+    out = [(os.path.join(folder, f["relpath"]), f["relpath"])
+           for info in _parked_albums(j).values() for f in info["files"]]
+    out += [(os.path.join(folder, README), README), (os.path.join(folder, MANIFEST), MANIFEST)]
+    return out
+
+
+def archive_preview(con: sqlite3.Connection, batch_id: int, target: str) -> dict:
+    """What archiving to `target` would copy and whether the place is suitable. Changes nothing."""
+    from .apply.plan import PlanError, check_destination
+    batch, run, j = _open_batch(con, batch_id)
+    files = _archive_files(batch, j)
+    out = {"files": len(files), "bytes": sum(os.path.getsize(p) for p, _ in files if os.path.isfile(p)),
+           "target": target, "dest": None, "free": None, "same_drive": None, "enough": None, "error": None}
+    if not target or not os.path.isabs(os.path.expanduser(target)):
+        out["error"] = "choose a folder, with its full path"
+        return out
+    dest = _archive_dest(run, batch, target)
+    try:
+        check_destination(con, dest)
+    except PlanError as e:
+        out["error"] = str(e)
+        return out
+    anc = _nearest_existing(dest)
+    out.update(dest=str(dest), free=shutil.disk_usage(anc).free,
+               same_drive=os.stat(anc).st_dev == os.stat(run.root).st_dev)
+    out["enough"] = out["free"] > out["bytes"] + 64 * 1024 * 1024
+    if not out["enough"]:
+        out["error"] = "there is not enough free space at that place"
+    return out
+
+
+def archive(con: sqlite3.Connection, batch_id: int, target: str | None = None, progress=None, stop=None) -> dict:
+    """Copy the parked originals (and the batch's README and manifest) to `target`, every file checked by
+    its SHA-256 and published without ever overwriting -- the very engine that copies the organized files.
+    The parked originals stay where they are. An archive that is still unfinished (stopped, interrupted) is
+    continued, failed files retried; otherwise a new one is started -- to `target`, or to the same place as
+    the last one -- and files already there that are identical are recognised, not copied again."""
+    batch, run, j = _open_batch(con, batch_id)
+    cur = json.loads(batch["archive_json"] or "{}")
+    redo = bool(cur) and cur.get("status") in ("running", "stopped")
+    if redo:
+        dest, jpath = Path(cur["dest_root"]), Path(cur["journal"])
+    else:
+        target = target or cur.get("target") or ""
+        pre = archive_preview(con, batch_id, target)
+        if pre["error"]:
+            raise RetireError(pre["error"])
+        dest = Path(pre["dest"])
+        jpath = _journal_dir(con) / f"archive-{batch['key']}-{time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    method = protocol.choose_method(dest)
+    if method == "none":
+        raise RetireError(f"{dest} supports no safe (no-overwrite) way to copy files")
+    aj = protocol.Journal(jpath)
+    files = _archive_files(batch, j)
+    if not redo:
+        for i, (src, rel) in enumerate(files):
+            st = os.stat(src)
+            protocol.plan_op(aj, batch["key"], f"x{i}", Path(src), dest / rel, "archive", None, {}, method,
+                             st.st_size, st.st_mtime_ns)
+        aj.write({"op": "_run", "state": "planned", "planned": len(files)})
+        cur = {"target": str(target), "dest_root": str(dest), "journal": str(jpath), "planned": len(files),
+               "bytes": sum(os.stat(s).st_size for s, _ in files), "started_at": time.time()}
+    else:
+        protocol.retry_failed(aj)                          # files that failed are tried again; the rest is as it was
+        protocol.recover(aj)
+    cur.update(status="running", verified=False)
+    con.execute("UPDATE retire_batch SET archive_json=? WHERE id=?", (json.dumps(cur), batch_id))
+    con.commit()
+    protocol.run_all(aj, progress=progress, stop=stop, guard=_runner._guard(con, dest))
+    ops = aj.ops()
+    done = sum(1 for o in ops.values() if o["history"][-1] in OK_STATES)
+    stopped = stop is not None and stop.is_set()
+    cur.update(status="stopped" if stopped else "complete", finished_at=time.time(), copied=done,
+               verified=(not stopped and done == cur["planned"]),
+               problems=[{"path": o["src"], "reason": o.get("reason") or o["history"][-1]}
+                         for o in ops.values() if o["history"][-1] not in OK_STATES and o["history"][-1] != "intent"][:50])
+    con.execute("UPDATE retire_batch SET archive_json=? WHERE id=?", (json.dumps(cur), batch_id))
+    con.commit()
+    return {"batch": batch_id, "status": cur["status"], "verified": cur["verified"], "files": done,
+            "planned": cur["planned"], "bytes": cur["bytes"], "dest": str(dest), "problems": cur["problems"]}
+
+
+def archive_state(con: sqlite3.Connection, batch: sqlite3.Row) -> dict:
+    """Is there a verified archive of this batch, and is it still all there? (Existence and size of every
+    archived file: cheap; the SHA-256 check was made when each file was copied.)"""
+    cur = json.loads(batch["archive_json"] or "{}")
+    out = {"exists": bool(cur), "verified": False, "status": cur.get("status"), "dest": cur.get("dest_root"),
+           "target": cur.get("target"),
+           "files": cur.get("copied", 0), "planned": cur.get("planned", 0), "bytes": cur.get("bytes", 0),
+           "finished_at": cur.get("finished_at"), "problems": cur.get("problems", []), "why": None}
+    if not (cur.get("status") == "complete" and cur.get("verified")):
+        out["why"] = "no complete archive" if not cur else "the archive is not finished or not verified"
+        return out
+    ops = protocol.Journal(Path(cur["journal"])).ops()
+    for o in ops.values():
+        try:
+            ok = o["history"][-1] in OK_STATES and os.path.getsize(o["final"]) == o["src_size"]
+        except OSError:
+            ok = False
+        if not ok:
+            out["why"] = "a file of the archive is missing or has changed size"
+            return out
+    out["verified"] = True
+    return out
+
+
+# ---- delete: free the space, once the user is sure ------------------------------------------------------------
+def delete_requirements(con: sqlite3.Connection, batch: sqlite3.Row) -> dict:
+    """What the confirmation must include: a tick that there is no backup when no verified archive exists,
+    and a tick that the copies were played when the batch is younger than the cooling-off period."""
+    arch = archive_state(con, batch)
+    days = int(settings.get(con, "retire_cooloff_days"))
+    age = (time.time() - (batch["created_at"] or 0)) / 86400
+    return {"archive": arch, "has_archive": arch["verified"], "needs_no_backup_ack": not arch["verified"],
+            "age_days": age, "cooloff_days": days, "young": age < days}
+
+
+def _lost_notes(con: sqlite3.Connection, run: Run, uid: int) -> dict:
+    """What deleting an album's originals loses that the organized copy does not carry: original tag values
+    that were changed or repaired, the original cue sheet of an album split into tracks, cue sheets and
+    lyrics that were rewritten or split."""
+    notes = dict.fromkeys(LOST_KEYS, 0)
+    keys = ("title", "artist", "album", "albumartist", "track", "disc", "date")
+    for it in run.units.get(uid, []):
+        tags = it["tags"]
+        if it["kind"] == "audio":
+            f = con.execute("SELECT tags_json FROM file WHERE id=?", (it["file_id"],)).fetchone()
+            cur = json.loads(f["tags_json"] or "{}") if f else {}
+            if any(tags.get(k) not in (None, "") and str(tags[k]) != str(cur.get(k) or "") for k in keys):
+                notes["tags_files"] += 1
+        elif it["kind"] == "cue" and tags.get("cue_rewrite"):
+            notes["rewritten_cues"] += 1
+        elif it["kind"] == "lrc" and tags.get("generated_text") is not None:
+            notes["split_lyrics"] += 1
+    if any(it["kind"] == "split" for it in run.units.get(uid, [])):
+        notes["split_cues"] += 1
+    return notes
+
+
+def _delete_checks(con: sqlite3.Connection, batch: sqlite3.Row, run: Run, j: protocol.Journal,
+                   unit_ids: set[int] | None = None) -> list[dict]:
+    """Every album with parked files, checked AGAIN now, strictly: the organized copy is there with the audio the
+    journal recorded, and each parked file is exactly the one that was set aside (size, time, content)."""
+    albums = []
+    for uid, info in sorted(_parked_albums(j).items()):
+        if unit_ids is not None and uid not in unit_ids:
+            continue
+        moved = {f["file_id"]: os.path.join(batch["folder"], f["relpath"]) for f in info["files"]}
+        moved.update({fid: _DELETED for fid in info["gone"]})            # already deleted: counts as done
+        # a delete that was started and whose file is gone: the crash came after the unlink, before its record
+        moved.update({fid: _DELETED for fid in info["deleting"] if not os.path.lexists(moved[fid])})
+        res = check_album(con, run, uid, moved, strict=True) if uid in run.units else \
+            {"eligible": False, "reason": "no longer part of the run", "flags": []}
+        albums.append({"unit_id": uid, "label": info["label"], "files": info["files"],
+                       "eligible": res["eligible"], "reason": res.get("reason"), "flags": res.get("flags", []),
+                       "bytes": sum(f["size"] for f in info["files"]),
+                       "lost": _lost_notes(con, run, uid) if res["eligible"] else dict.fromkeys(LOST_KEYS, 0)})
+    return albums
+
+
+def delete_preview(con: sqlite3.Connection, batch_id: int) -> dict:
+    """What deleting would remove, after repeating the checks. Changes nothing."""
+    batch, run, j = _open_batch(con, batch_id)
+    albums = _delete_checks(con, batch, run, j)
+    ok = [a for a in albums if a["eligible"]]
+    lost = {k: sum(a["lost"][k] for a in ok) for k in LOST_KEYS}
+    return {"batch": batch_id, "folder": batch["folder"], "albums": [{k: v for k, v in a.items() if k != "files"} | {"n_files": len(a["files"])} for a in albums],
+            "albums_ok": len(ok), "files_ok": sum(len(a["files"]) for a in ok), "bytes_ok": sum(a["bytes"] for a in ok),
+            "albums_kept": len(albums) - len(ok), "lost": lost, **delete_requirements(con, batch)}
+
+
+def delete(con: sqlite3.Connection, batch_id: int, typed: str, acks: dict | None = None, progress=None, stop=None,
+           unit_ids: set[int] | None = None) -> dict:
+    """Permanently delete the parked originals of albums that verify. Irreversible, so it refuses unless the
+    confirmation is complete -- the typed word, the tick for 'no backup' when there is no verified archive,
+    the tick for 'I played the copies' while the batch is young -- and it repeats every check first.
+    Journal-first, one file at a time; only files inside this batch's folder; never through a link; a parked
+    file that changed since it was set aside is left alone. Resumable: run it again."""
+    acks = acks or {}
+    if typed != DELETE_WORD:
+        raise RetireError(f"type the word {DELETE_WORD} to confirm")
+    batch, run, j = _open_batch(con, batch_id)
+    req = delete_requirements(con, batch)
+    if req["needs_no_backup_ack"] and not acks.get("no_backup"):
+        raise RetireError("there is no verified archive: tick that you understand you have no backup of the organized copies")
+    if req["young"] and not acks.get("checked"):
+        raise RetireError(f"these originals were set aside less than {req['cooloff_days']} days ago: "
+                          "tick that you have played the organized copies and checked them")
+    _settle_inflight(con, batch, j, run.root)
+    _reconcile(con, batch, j)
+    folder, root = batch["folder"], run.root
+    _keep_manifest_record(con, batch)
+    albums = _delete_checks(con, batch, run, j, unit_ids)
+    todo = sum(len(a["files"]) for a in albums if a["eligible"])
+    kept = [{"unit_id": a["unit_id"], "label": a["label"], "reason": a["reason"]} for a in albums if not a["eligible"]]
+    deleted, freed, done, stopped = 0, 0, 0, False
+    for a in albums:
+        if not a["eligible"]:
+            continue
+        for f in a["files"]:
+            if stop is not None and stop.is_set():
+                stopped = True
+                break
+            op, parked = f"f{f['file_id']}", os.path.join(folder, f["relpath"])
+            row = dict(file_id=f["file_id"], unit=a["unit_id"], album=a["label"], relpath=f["relpath"], size=f["size"],
+                       mtime_ns=f["mtime_ns"], content_id=f["content_id"], kind=f["kind"])
+            why = _delete_one(con, batch, j, root, folder, op, parked, row)
+            if why is None:
+                deleted += 1
+                freed += f["size"]
+            else:
+                kept.append({"unit_id": a["unit_id"], "label": a["label"], "reason": f"{f['relpath']}: {why}"})
+            done += 1
+            if progress:
+                progress(done, todo)
+        if stopped:
+            break
+    _tidy_dirs(folder)
+    prev = json.loads(batch["delete_json"] or "{}")
+    rec = {"deleted": prev.get("deleted", 0) + deleted, "bytes": prev.get("bytes", 0) + freed, "kept": kept,
+           "status": "stopped" if stopped else "complete", "finished_at": time.time()}
+    con.execute("UPDATE retire_batch SET delete_json=? WHERE id=?", (json.dumps(rec), batch_id))
+    con.commit()
+    return {"batch": batch_id, "status": rec["status"], "deleted": deleted, "bytes": freed, "kept": kept,
+            "total_deleted": rec["deleted"]}
+
+
+def _delete_one(con, batch, j, root: str, folder: str, op: str, parked: str, row: dict) -> str | None:
+    """Delete one parked file after one more look at it. None when it is gone; else why it was kept."""
+    if _has_link(root, parked) or not _inside(parked, folder):
+        return "a link, or a path outside the originals folder; never touched"
+    try:
+        st = os.lstat(parked)
+    except FileNotFoundError:
+        _record(con, batch, j, op, row, "deleted", note="already gone")       # crash after the unlink, before its record
+        return None
+    except OSError as e:
+        return f"cannot be read ({e.strerror or e})"
+    if not stat.S_ISREG(st.st_mode) or (st.st_size, st.st_mtime_ns) != (row["size"], row["mtime_ns"]):
+        return "changed since it was set aside; left alone"
+    f = con.execute("SELECT * FROM file WHERE id=?", (row["file_id"],)).fetchone()
+    try:
+        if f is not None:
+            _identity_same(parked, f, parked=True)
+    except _Skip as e:
+        return f"{e}; left alone"
+    j.write({"op": op, "state": "deleting"})                       # the intent, durable before the file goes
+    os.unlink(parked)
+    _sync_dir_of(parked)
+    _record(con, batch, j, op, row, "deleted")
+    return None
+
+
+def _keep_manifest_record(con: sqlite3.Connection, batch: sqlite3.Row) -> None:
+    """The record of what was deleted outlives the folder: the manifest is copied into the app's own data."""
+    src = os.path.join(batch["folder"], MANIFEST)
+    keep = _journal_dir(con).parent / "deleted"
+    dst = keep / f"{batch['key']}.MANIFEST.csv"
+    if os.path.isfile(src) and not dst.exists():
+        keep.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+
+
 # ---- for the UI ------------------------------------------------------------------------------------
 def batches(con: sqlite3.Connection, run_ids: list[int]) -> list[dict]:
     if not run_ids:
@@ -893,5 +1225,10 @@ def batches(con: sqlite3.Connection, run_ids: list[int]) -> list[dict]:
         d["summary"] = json.loads(d.pop("summary_json") or "{}")
         d["moved"] = con.execute("SELECT count(*) FROM retired_file WHERE batch_id=? AND state='moved'",
                                  (b["id"],)).fetchone()[0]
+        d["deleted"] = con.execute("SELECT count(*) FROM retired_file WHERE batch_id=? AND state='deleted'",
+                                   (b["id"],)).fetchone()[0]
+        d["archive"] = archive_state(con, b)
+        d["delete"] = json.loads(d.pop("delete_json") or "{}")
+        d.pop("archive_json", None)
         out.append(d)
     return out

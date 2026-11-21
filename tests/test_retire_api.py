@@ -103,3 +103,64 @@ def test_a_collection_folder_without_the_opt_in_refuses_the_job(api, con):
     res = wait()
     assert res["status"] == "error" and "not allowed" in res["abort_reason"]
     assert len(list((lib / ALBUM).iterdir())) == 4 and not (lib / retire.ORIGINALS).exists()
+
+
+def _batch_through_the_api(api, con):
+    lib, dest, run, get, post, wait = api
+    pid = con.execute("SELECT plan_id FROM run WHERE id=?", (run,)).fetchone()[0]
+    post("/api/retire", {"id": run, "ack": True})
+    wait()
+    return pid, get(f"/api/plan/{pid}")["originals"][0]["id"]
+
+
+def test_the_archive_preview_and_job(api, con):
+    lib, dest, run, get, post, wait = api
+    pid, bid = _batch_through_the_api(api, con)
+    backup = str(dest.parent / "backup")
+    assert "overlaps" in get(f"/api/archive_plan?batch={bid}&target={lib}/backup")["error"]
+    pre = get(f"/api/archive_plan?batch={bid}&target={backup}")
+    assert pre["error"] is None and pre["files"] == 6 and pre["same_drive"] is True
+    assert post("/api/archive", {"id": bid, "target": backup}) == {"started": True}
+    res = wait()
+    assert (res["status"], res["verified"], res["files"]) == ("complete", True, 6), res
+    b = get(f"/api/plan/{pid}")["originals"][0]
+    assert b["archive"]["verified"] is True and b["archive"]["dest"].endswith(b["key"])
+    assert "api_key" not in str(b) and "archive_json" not in b
+    post("/api/archive", {"id": bid, "target": str(lib / "backup")})
+    assert wait()["status"] == "error"                                      # the job refuses it too
+
+
+def test_the_delete_confirmation_is_enforced_on_the_server(api, con):
+    from music_steward import settings
+    lib, dest, run, get, post, wait = api
+    settings.save(con, {"retire_cooloff_days": "0"})
+    pid, bid = _batch_through_the_api(api, con)
+    pre = get(f"/api/delete_plan?batch={bid}")
+    assert (pre["albums_ok"], pre["files_ok"], pre["needs_no_backup_ack"], pre["has_archive"]) == (1, 4, True, False)
+    parked = sorted(p for p in (lib / retire.ORIGINALS).rglob("*") if p.is_file())
+    for body, text in (({"id": bid}, "DELETE"), ({"id": bid, "typed": "delete"}, "DELETE"),
+                       ({"id": bid, "typed": "DELETE"}, "no verified archive"),
+                       ({"id": bid, "typed": "DELETE", "ack_no_backup": "yes"}, "no verified archive"),
+                       ({"id": bid, "typed": "DELETE", "ack_no_backup": 1}, "no verified archive")):
+        post("/api/delete", body)
+        res = wait()
+        assert res["status"] == "error" and text in res["abort_reason"], (body, res)
+        assert sorted(p for p in (lib / retire.ORIGINALS).rglob("*") if p.is_file()) == parked    # nothing deleted
+    post("/api/delete", {"id": bid, "typed": "DELETE", "ack_no_backup": True})
+    res = wait()
+    assert (res["status"], res["deleted"], res["kept"]) == ("complete", 4, [])
+    b = get(f"/api/plan/{pid}")["originals"][0]
+    assert b["deleted"] == 4 and b["moved"] == 0 and b["delete"]["deleted"] == 4
+
+
+def test_a_young_batch_needs_the_played_them_tick_even_with_an_archive(api, con):
+    lib, dest, run, get, post, wait = api
+    pid, bid = _batch_through_the_api(api, con)                             # cooling-off stays at its default, 7 days
+    post("/api/archive", {"id": bid, "target": str(dest.parent / "backup")})
+    assert wait()["verified"] is True
+    pre = get(f"/api/delete_plan?batch={bid}")
+    assert pre["young"] is True and pre["has_archive"] is True and pre["cooloff_days"] == 7
+    post("/api/delete", {"id": bid, "typed": "DELETE"})
+    assert "played the organized copies" in wait()["abort_reason"]
+    post("/api/delete", {"id": bid, "typed": "DELETE", "ack_checked": True})
+    assert wait()["deleted"] == 4

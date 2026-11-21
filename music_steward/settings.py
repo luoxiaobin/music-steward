@@ -19,6 +19,8 @@ SPEC = {
                    "Albums of one file with a cue sheet: keep one file, or split into tracks"),
     "sources": ("musicbrainz,deezer,discogs", None, "MLT_SOURCES", "Online catalogues to search"),
     "dest": ("", None, None, "Default destination folder"),
+    "retire_cooloff_days": ("7", ("0", "1", "3", "7", "14", "30"), None,
+                            "Days after setting originals aside before deleting them needs an extra confirmation"),
     "language": ("auto", ("auto", "en", "zh-hans", "zh-hant", "fr-ca", "es-us"), "MLT_LANGUAGE", "Interface language"),
 }
 _ENV_TRUE = {"1": "on", "0": "off"}   # MLT_ALBUM_CUE=1/0

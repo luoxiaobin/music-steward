@@ -181,21 +181,21 @@ class App:
             return None
         return p
 
-    def start_job(self, kind: str, root: str, path: str = "") -> dict:
+    def start_job(self, kind: str, root: str, path: str = "", extra: dict | None = None) -> dict:
         """Background scan or hash of a root or one of its sub-folders. One job at a time."""
-        if kind in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "recognize_unit"):
+        if kind in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "archive", "delete", "recognize_unit"):
             root = root or self.roots[0]
             if not str(path).isdigit():
                 return {"error": "bad id"}
         root = os.path.abspath(root)
         if root not in self.roots:
             return {"error": "not a configured root"}
-        if kind in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "recognize_unit"):
+        if kind in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "archive", "delete", "recognize_unit"):
             pass
         elif path and (".." in path.split("/") or path.startswith("/")):
             return {"error": "bad path"}
         target = os.path.join(root, str(path)) if path else root
-        if kind not in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "recognize_unit") and not os.path.realpath(target).startswith(os.path.realpath(root)):
+        if kind not in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "archive", "delete", "recognize_unit") and not os.path.realpath(target).startswith(os.path.realpath(root)):
             return {"error": "bad path"}
         with self._lock:
             if self.scan_state.get("running"):
@@ -226,16 +226,19 @@ class App:
                                                                  "(Resume continues the run)")
                     if res.get("error"):
                         res["status"], res["abort_reason"] = "error", res["error"]
-                elif kind in ("retire", "retire_resume", "restore"):
+                elif kind in ("retire", "retire_resume", "restore", "archive", "delete"):
                     from . import retire
                     n = int(path)
+                    ex = extra or {}
                     try:
                         r = (retire.retire(con, n, progress=prog, stop=self._stop) if kind == "retire"
                              else retire.resume(con, n, progress=prog, stop=self._stop) if kind == "retire_resume"
-                             else retire.restore(con, n))
+                             else retire.archive(con, n, ex.get("target"), progress=prog, stop=self._stop) if kind == "archive"
+                             else retire.delete(con, n, ex.get("typed", ""), ex.get("acks"), progress=prog, stop=self._stop)
+                             if kind == "delete" else retire.restore(con, n))
                         res = {"status": "complete", **r}
-                        if self._stop.is_set() and kind != "restore":
-                            res.update(status="stopped", abort_reason="stopped by you (Resume continues it)")
+                        if self._stop.is_set() and kind not in ("restore",):
+                            res.update(status="stopped", abort_reason="stopped by you (run it again to continue)")
                     except retire.RetireError as e:
                         res = {"status": "error", "abort_reason": str(e)}
                 elif kind == "recognize_unit":
@@ -294,7 +297,8 @@ class App:
         return self.settings_view(con)
 
     def stop_job(self) -> dict:
-        if not self.scan_state.get("running") or self.scan_state.get("kind") not in ("recognize", "apply", "resume", "retry", "retire", "retire_resume"):
+        if not self.scan_state.get("running") or self.scan_state.get("kind") not in ("recognize", "apply", "resume", "retry", "retire", "retire_resume",
+                                                                              "archive", "delete"):
             return {"error": "only a running recognition or apply can be stopped"}
         self._stop.set()
         return {"stopping": True}
@@ -607,6 +611,13 @@ def make_handler(app: App, port_ref: dict):
                                        "scan": app.scan_state})
                 if u.path == "/api/settings":
                     return self._json(app.settings_view(con))
+                if u.path in ("/api/archive_plan", "/api/delete_plan"):    # previews: change nothing
+                    from . import retire
+                    try:
+                        return self._json(retire.archive_preview(con, _int(q.get("batch")), q.get("target", ""))
+                                          if u.path == "/api/archive_plan" else retire.delete_preview(con, _int(q.get("batch"))))
+                    except retire.RetireError as e:
+                        return self._json({"error": str(e)})
                 if u.path == "/api/retire_plan":          # the dry run: changes nothing
                     from . import retire
                     try:
@@ -695,6 +706,12 @@ def make_handler(app: App, port_ref: dict):
             if u.path in ("/api/apply", "/api/undo", "/api/resume", "/api/retry"):
                 kind = u.path.rsplit("/", 1)[1]
                 return self._json(app.start_job(kind, "", str(body.get("id", ""))))
+            if u.path in ("/api/archive", "/api/delete"):
+                kind = u.path.rsplit("/", 1)[1]
+                extra = ({"target": str(body.get("target", ""))} if kind == "archive" else
+                         {"typed": str(body.get("typed", "")),
+                          "acks": {"no_backup": body.get("ack_no_backup") is True, "checked": body.get("ack_checked") is True}})
+                return self._json(app.start_job(kind, "", str(body.get("id", "")), extra))
             if u.path in ("/api/retire", "/api/retire_resume", "/api/restore"):
                 kind = u.path.rsplit("/", 1)[1]
                 if kind == "retire" and body.get("ack") is not True:

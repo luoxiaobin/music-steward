@@ -220,31 +220,145 @@ async function retireDialog(runId, planId) {
 const reasonLi = (label, ...reasons) => h("li", {}, h("strong", { "data-no-translate": "" }, label), " — ",
   ...reasons.flatMap((x, i) => [i ? "; " : null, h("span", {}, x)].filter(Boolean)));
 
+// ---- Archive and Delete of the parked originals (ADR 0003)
+async function archiveDialog(b, planId) {
+  const input = h("input", { type: "text", id: "archTarget", "data-no-translate": "", placeholder: "/Volumes/Backup  (outside your collection)",
+                             value: (b.archive && b.archive.target) || "" });
+  const info = h("div", { class: "small", style: "margin-top:8px" });
+  const go = h("button", { type: "button", class: "btn btn-primary", disabled: true }, "Copy and verify");
+  const dlg = h("dialog", { class: "appdialog settings" });
+  const close = () => { dlg.close(); dlg.remove(); };
+  let timer = null;
+  const check = async () => {
+    go.disabled = true;
+    const target = input.value.trim();
+    if (!target) { info.replaceChildren(); return; }
+    info.replaceChildren(h("span", { class: "muted" }, "Checking the place…"));
+    const d = await api(`/api/archive_plan?batch=${b.id}&target=${encodeURIComponent(target)}`);
+    if (target !== input.value.trim()) return;                         // typed on meanwhile
+    if (d.error) { info.replaceChildren(h("span", { class: "err" }, d.error)); return; }
+    go.disabled = false;
+    info.replaceChildren(...[
+      h("div", {}, h("strong", {}, `Files ${d.files} · ${fmtSize(d.bytes)}`), `  ·  ${fmtSize(d.free)} free there`),
+      h("div", { class: "muted xsmall" }, "They are copied into ", h("span", { class: "mono", "data-no-translate": "" }, d.dest)),
+      d.same_drive ? h("div", { class: "banner" }, h("strong", {}, "Same drive. "),
+        "This is the same drive as your collection: if the drive fails, the archive is lost with it.") : null].filter(Boolean));
+  };
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(check, 500); });
+  go.addEventListener("click", async () => {
+    const r = await post("/api/archive", { id: b.id, target: input.value.trim() });
+    close();
+    if (r.error) return tell(r.error);
+    pollPlan(planId);
+  });
+  dlg.replaceChildren(h("h2", { class: "h2" }, "Archive the originals"),
+    h("p", { class: "small" }, "Copies these original files to a place you choose — an external drive or another share — and checks every file, " +
+      "so you have a backup. The originals stay where they are."),
+    h("div", { style: "display:flex;gap:8px" }, input, chooseButton(input)), info,
+    h("div", { class: "btnrow" }, h("button", { type: "button", class: "btn", onclick: close }, "Cancel"), go));
+  document.body.append(dlg);
+  dlg.showModal();
+  if (input.value) check();
+  input.focus();
+}
+
+async function deleteDialog(b, planId) {
+  const dlg = h("dialog", { class: "appdialog settings" }, h("h2", { class: "h2" }, "Delete the originals"),
+    h("p", { class: "muted" }, "Checking the organized copies again…"));
+  document.body.append(dlg);
+  dlg.showModal();
+  const close = () => { dlg.close(); dlg.remove(); };
+  let d;
+  try { d = await api(`/api/delete_plan?batch=${b.id}`); } catch (e) { d = { error: String(e) }; }
+  if (d.error) {
+    dlg.replaceChildren(h("h2", { class: "h2" }, "Delete the originals"), h("p", { class: "err" }, d.error),
+      h("div", { class: "btnrow" }, h("button", { type: "button", class: "btn btn-primary", onclick: close }, "OK")));
+    return;
+  }
+  const kept = d.albums.filter(a => !a.eligible), L = d.lost || {};
+  const typed = h("input", { type: "text", id: "delTyped", autocomplete: "off", "data-no-translate": "", placeholder: "DELETE" });
+  const ackBackup = h("input", { type: "checkbox", id: "delAckBackup" }), ackPlayed = h("input", { type: "checkbox", id: "delAckPlayed" });
+  const go = h("button", { type: "button", class: "btn", disabled: true, style: "background:var(--conflict);border-color:var(--conflict);color:#fff",
+    onclick: async () => {
+      const r = await post("/api/delete", { id: b.id, typed: typed.value, ack_no_backup: ackBackup.checked, ack_checked: ackPlayed.checked });
+      close();
+      if (r.error) return tell(r.error);
+      pollPlan(planId);
+    } }, `Delete forever: files ${d.files_ok} (${fmtSize(d.bytes_ok)})`);
+  const ready = () => { go.disabled = !(d.files_ok && typed.value === "DELETE" && (!d.needs_no_backup_ack || ackBackup.checked) && (!d.young || ackPlayed.checked)); };
+  for (const el of [typed, ackBackup, ackPlayed]) { el.addEventListener("input", ready); el.addEventListener("change", ready); }
+  const lostItems = [
+    L.tags_files ? `Original tag values in files: ${L.tags_files} (including garbled text that was repaired)` : null,
+    L.split_cues ? `Original cue sheets of albums split into tracks: ${L.split_cues}` : null,
+    L.rewritten_cues ? `Original cue sheets that were rewritten: ${L.rewritten_cues}` : null,
+    L.split_lyrics ? `Original lyrics files that were split per track: ${L.split_lyrics}` : null].filter(Boolean);
+  dlg.replaceChildren(...[
+    h("h2", { class: "h2" }, "Delete the originals"),
+    h("p", {}, h("strong", {}, `Albums ${d.albums_ok} · files ${d.files_ok} · ${fmtSize(d.bytes_ok)}`),
+      " would be deleted from the originals folder, freeing that space."),
+    h("div", { class: "callout callout-red" }, h("strong", {}, "This cannot be undone. There is no Trash.")),
+    d.has_archive
+      ? h("div", { class: "callout callout-green" }, h("strong", {}, "A verified archive exists: "), "a checked copy of these originals is at ",
+          h("span", { class: "mono", "data-no-translate": "" }, d.archive.dest))
+      : h("div", { class: "callout callout-red" }, h("strong", {}, "No archive. "),
+          "After this, the organized copy is your only copy. Music Steward does not make backups."),
+    lostItems.length ? h("div", { class: "small", style: "margin-top:10px" }, h("strong", {}, "Not carried over to the organized copies, and lost for good:"),
+      h("ul", {}, lostItems.map(t => h("li", {}, t)))) : null,
+    kept.length ? h("details", {}, h("summary", {}, h("strong", {}, "Albums that stay where they are "),
+      h("span", { class: "badge b-conflict" }, kept.length)),
+      h("ul", { class: "small" }, kept.slice(0, 100).map(a => reasonLi(a.label, a.reason)))) : null,
+    d.young ? h("label", { class: "small", style: "display:block;margin-top:10px" }, ackPlayed,
+      " I have played the organized copies and checked them.") : null,
+    d.needs_no_backup_ack ? h("label", { class: "small", style: "display:block;margin-top:6px" }, ackBackup,
+      " I understand I have no backup of the organized copies.") : null,
+    h("div", { style: "margin-top:12px" }, h("label", { for: "delTyped", class: "strong small" }, "Type the word DELETE to confirm"), typed),
+    h("div", { class: "btnrow" }, h("button", { type: "button", class: "btn", onclick: close }, "Cancel"), go)
+  ].filter(Boolean));
+  typed.focus();
+}
+
 function originalsCard(p, id, busy, rows) {
   if (!(p.originals || []).length) return null;
-  const state = b => b.restored_at ? "Restored to the collection" : b.status === "running" ? "Interrupted — Finish setting aside to continue"
+  const state = b => b.restored_at ? "Restored to the collection" : b.deleted && !b.moved ? "Originals deleted"
+    : b.status === "running" ? "Interrupted — Finish setting aside to continue"
     : b.status === "stopped" ? "Stopped — Finish setting aside to continue" : "Set aside (can be restored)";
   return h("div", { class: "card" }, h("h2", { class: "h2" }, "Originals set aside"),
     h("p", { class: "muted small" }, "These original files were set aside, unchanged, in the folder shown; each folder has a README. " +
-      "What you can do with them: restore them here; archive them (copy the folder to a backup drive); or delete them to save space " +
+      "What you can do with them: restore them; archive them (a checked copy on a backup drive); or delete them to save space " +
       "— only after you have played the organized copies and have a backup of them. Deleting cannot be undone."),
     rows(p.originals, [["Set aside on", b => h("td", {}, new Date(b.created_at * 1000).toLocaleString())],
       ["Albums", b => h("td", {}, String((b.summary || {}).albums ?? 0))],
       ["Files · size", b => h("td", {}, `${b.moved} · ${fmtSize((b.summary || {}).bytes || 0)}`)],
       ["Originals folder", b => h("td", { class: "mono", style: "word-break:break-all", "data-no-translate": "" }, b.folder)],
-      ["Status", b => h("td", {}, state(b))],
+      ["Status", b => h("td", {}, h("div", {}, state(b)),
+        b.archive && b.archive.verified ? h("div", { class: "ok small" }, h("strong", {}, "Archived and verified"), " ",
+          h("span", { class: "mono", "data-no-translate": "" }, b.archive.dest)) : null,
+        b.archive && b.archive.exists && !b.archive.verified ? h("div", { class: "warn small" }, "Archive not finished or not verified") : null)],
       ["", b => h("td", {}, [
         ["running", "stopped"].includes(b.status) && !b.restored_at ? h("button", { type: "button", class: "btn", disabled: busy,
           onclick: async () => { await post("/api/retire_resume", { id: b.id }); pollPlan(id); } }, "Finish setting aside") : null, " ",
         b.moved && !b.restored_at ? h("button", { type: "button", class: "btn", disabled: busy, onclick: async () => {
           if (!await ask(`Move ${b.moved} files back to where they were? Anything that has appeared at an original place since is left alone and reported.`, "Restore originals")) return;
-          await post("/api/restore", { id: b.id }); pollPlan(id); } }, "Restore originals") : null])]]));
+          await post("/api/restore", { id: b.id }); pollPlan(id); } }, "Restore originals") : null, " ",
+        b.moved && !b.restored_at ? h("button", { type: "button", class: "btn", disabled: busy, onclick: () => archiveDialog(b, id) }, "Archive originals…") : null, " ",
+        b.moved && !b.restored_at ? h("button", { type: "button", class: "btn", disabled: busy, onclick: () => deleteDialog(b, id) }, "Delete originals…") : null])]]));
 }
 
 function retireResult(job, busy) {
   const r = job.result;
-  if (busy || !r || !["retire", "retire_resume", "restore"].includes(job.kind)) return null;
+  if (busy || !r || !["retire", "retire_resume", "restore", "archive", "delete"].includes(job.kind)) return null;
   if (r.status === "error") return h("div", { class: "card banner" }, h("strong", {}, "Not done. "), r.abort_reason);
+  if (job.kind === "archive") {
+    return h("div", { class: "card banner" }, h("strong", {}, r.verified ? "Archived and verified. " : r.status === "stopped" ? "Stopped. " : "Not complete. "),
+      `Files copied and checked: ${r.files} of ${r.planned} in `, h("span", { class: "mono", "data-no-translate": "" }, r.dest),
+      (r.problems || []).length ? h("ul", { class: "small" }, r.problems.slice(0, 10).map(x => h("li", {}, h("span", { class: "mono", "data-no-translate": "" }, x.path.split("/").slice(-2).join("/")), " — ", x.reason))) : null);
+  }
+  if (job.kind === "delete") {
+    const kept = r.kept || [];
+    return h("div", { class: "card banner" }, h("strong", {}, r.status === "stopped" ? "Stopped. " : "Done. "), `Files deleted: ${r.deleted} (${fmtSize(r.bytes)})`,
+      kept.length ? h("details", {}, h("summary", {}, h("strong", {}, "Albums that stay where they are "), h("span", { class: "badge b-conflict" }, kept.length)),
+        h("ul", { class: "small" }, kept.slice(0, 50).map(a => reasonLi(a.label, a.reason)))) : null);
+  }
   if (job.kind === "restore") {
     return h("div", { class: "card banner" }, h("strong", {}, `Restored files: ${r.restored}. `),
       (r.blocked || []).length ? h("div", {}, "Left where they are (something is at the original place now): ",
@@ -270,11 +384,12 @@ function progressCard(job, ok) {
   return h("div", { class: "card" },
     h("div", { style: "display:flex;gap:12px;align-items:center;flex-wrap:wrap" },
       h("strong", {}, {apply: "Copying", resume: "Resuming", retry: "Retrying", retire: "Setting originals aside",
-                       retire_resume: "Finishing setting originals aside", restore: "Restoring originals"}[job.kind] || "Undoing"),
+                       retire_resume: "Finishing setting originals aside", restore: "Restoring originals",
+                       archive: "Archiving the originals", delete: "Deleting the originals"}[job.kind] || "Undoing"),
       h("span", { class: "muted small" }, `${doneN} / ${total} ${["retire", "retire_resume"].includes(job.kind) ? "albums" : "files"}` +
         (job.kind === "apply" && bytes ? ` · ${fmtSize(doneB)} of ${fmtSize(bytes)}` : "") +
         (el > 3 && doneB ? ` · ${fmtSize(doneB / el)}/s` : "") + (eta != null ? ` · about ${mins(eta)} left` : "")),
-      ["apply", "resume", "retry", "retire", "retire_resume"].includes(job.kind) ? h("button", { type: "button", class: "btn", style: "margin-left:auto",
+      ["apply", "resume", "retry", "retire", "retire_resume", "archive", "delete"].includes(job.kind) ? h("button", { type: "button", class: "btn", style: "margin-left:auto",
         onclick: async e => { e.target.disabled = true; e.target.textContent = "Stopping after this file…";
                               const r = await post("/api/stop", {}); if (r.error) tell(r.error); } }, "Stop") : null),
     h("div", { class: "pbar" }, h("div", { style: `width:${Math.round(frac * 100)}%` })),
