@@ -102,11 +102,22 @@ def _fp(path: str, codec: str | None) -> str:
         raise _Skip(f"the organized copy cannot be read ({type(e).__name__})") from e
 
 
-def _verify_copy(op: dict, item: dict, src: str | None = None) -> str | None:
+def _copy_is_separate(run: "Run", final: Path) -> None:
+    """The organized copy is a file of its own: no link on its path (a copy replaced by a link to its
+    original, or an album folder that is a link, would let the original vouch for itself, and moving
+    the original would leave the 'copy' dangling), and it does not resolve into the collection."""
+    if _has_link(run.plan["dest_root"], str(final)):
+        raise _Skip("the organized copy is, or sits behind, a link: it cannot vouch for the original")
+    if _inside(str(final), run.root):
+        raise _Skip("the organized copy resolves into the collection folder")
+
+
+def _verify_copy(run: "Run", op: dict, item: dict, src: str | None = None) -> str | None:
     """The organized copy of one item is intact. Returns a note when it differs only in a way that does
     not block (a side file the user edited), else None; raises _Skip when it does not verify.
     src: where the original is now, when it has already been parked (resuming an album)."""
     final, kind = Path(op["final"]), item["kind"]
+    _copy_is_separate(run, final)
     state = op["history"][-1]
     if state not in OK_STATES:
         raise _Skip(f"not copied ({state})")
@@ -239,7 +250,7 @@ def _check_album(con, run: Run, items: list[dict], flags: list[str], moved: dict
         op = run.op(it)
         if op is None:
             raise _Skip("part of the album was not copied (the run was stopped before it)")
-        note = _verify_copy(op, it, src=moved.get(it["file_id"]))
+        note = _verify_copy(run, op, it, src=moved.get(it["file_id"]))
         if note and note not in flags:
             flags.append(note)
         if it["kind"] in SOURCE_KINDS:
@@ -289,7 +300,7 @@ def _check_duplicate(con, run: Run, items: list[dict], dup: list[dict], flags: l
         top = run.op(twin) if twin else None
         if top is None or top["history"][-1] not in OK_STATES:
             raise _Skip("the copy of this album that was kept is not verified")
-        _verify_copy(top, twin)
+        _verify_copy(run, top, twin)
         f = con.execute("SELECT * FROM file WHERE id=?", (it["file_id"],)).fetchone()
         if f is None:
             raise _Skip("an original is no longer in the inventory")
@@ -566,13 +577,16 @@ def _reconcile(con: sqlite3.Connection, batch: sqlite3.Row, j: protocol.Journal)
     con.commit()
 
 
-def _is_parked(orig: str, parked: str, last_state: str | None, size: int, mtime_ns: int) -> bool:
+def _is_parked(root: str, orig: str, parked: str, last_state: str | None, size: int, mtime_ns: int) -> bool:
     """Is this file already in the originals folder? The journal says so after the move; after a crash
-    between the rename and its record, or between a link and the unlink, the disk is the truth."""
+    between the rename and its record, or between a link and the unlink, the disk is the truth -- read
+    only through paths with no link on them."""
     if last_state == "moved":
         return True
-    p_ours, o_ours = _is_ours(parked, size, mtime_ns), _is_ours(orig, size, mtime_ns)
-    return bool(p_ours and (not o_ours or _same_inode(orig, parked)))
+    if _has_link(root, parked):
+        return False
+    o_ours = not _has_link(root, orig) and _is_ours(orig, size, mtime_ns)
+    return bool(_is_ours(parked, size, mtime_ns) and (not o_ours or _same_inode(orig, parked)))
 
 
 def _row_of(o: dict) -> dict:
@@ -580,20 +594,26 @@ def _row_of(o: dict) -> dict:
                 size=o.get("size"), mtime_ns=o.get("mtime_ns"), content_id=o.get("content_id"), kind=o.get("kind"))
 
 
-def _settle_inflight(con: sqlite3.Connection, batch: sqlite3.Row, j: protocol.Journal) -> None:
+def _settle_inflight(con: sqlite3.Connection, batch: sqlite3.Row, j: protocol.Journal, root: str) -> None:
     """A crash between the rename and its journal record leaves a file parked while the journal still says
     'intent' (or 'claimed'). The disk is the truth: record those moves, so that Restore sees them and no
     check that later halts an album can strand them. Also finishes a link-method move (one inode, two
-    names). Must run before anything filters operations by their journal state."""
+    names). Must run before anything filters operations by their journal state. Nothing is ever unlinked
+    through a link: both names must have no link on any component of their path (an original folder that
+    was moved away and replaced by a link is not followed)."""
     for op, o in j.ops().items():
         if not op.startswith("f") or "src" not in o or o["history"][-1] not in ("intent", "claimed"):
             continue
         orig, parked, size, mtime = o["src"], o["dst"], o["size"], o["mtime_ns"]
-        p_ours, o_ours = _is_ours(parked, size, mtime), _is_ours(orig, size, mtime)
-        if p_ours and o_ours and _same_inode(orig, parked):        # a link-method move that lost power before the unlink
+        if _has_link(root, parked):
+            continue                                             # cannot vouch for anything behind a link
+        orig_clean = not _has_link(root, orig)
+        p_ours = _is_ours(parked, size, mtime)
+        o_ours = orig_clean and _is_ours(orig, size, mtime)
+        if p_ours and o_ours and _same_inode(orig, parked):      # a link-method move that lost power before the unlink
             os.unlink(orig)
             o_ours = False
-        if p_ours and not o_ours:                                  # our file is parked; whatever is at the old name is not it
+        if p_ours and not o_ours:                                # our file is parked; whatever is at the old name is not it
             _record(con, batch, j, op, _row_of(o), "moved", ino=os.lstat(parked).st_ino)
 
 
@@ -637,8 +657,8 @@ def _finish_album(con, batch: sqlite3.Row, j: protocol.Journal, root: str, uid: 
             _upsert(con, batch, state="intent", **row)
         s_there, d_there = os.path.lexists(src), os.path.lexists(dst)
         if s_there and d_there:
-            if _same_inode(src, dst):                             # a link-method move that crashed before the unlink
-                os.unlink(src)
+            if not _has_link(root, src) and not _has_link(root, dst) and _same_inode(src, dst):
+                os.unlink(src)                                         # a link-method move that crashed before the unlink
                 s_there = False
             elif hist and hist[-1] == "claimed" and _is_placeholder(dst, o.get("placeholder_ino")):
                 os.unlink(dst)                                         # our own empty placeholder from a crashed move
@@ -742,7 +762,7 @@ def resume(con: sqlite3.Connection, batch_id: int, progress=None, stop=None) -> 
     require_allowed(con, run.root_id)
     _check_batch_paths(run.root, batch["folder"])
     j = protocol.Journal(Path(batch["journal"]))
-    _settle_inflight(con, batch, j)
+    _settle_inflight(con, batch, j, run.root)
     _reconcile(con, batch, j)
     ops, halted = j.ops(), []
     for op, o in ops.items():
@@ -750,7 +770,7 @@ def resume(con: sqlite3.Connection, batch_id: int, progress=None, stop=None) -> 
             continue
         uid, files = int(op[1:]), o["files"]
         moved = {f["file_id"]: os.path.join(batch["folder"], f["relpath"]) for f in files
-                 if _is_parked(f["path"], os.path.join(batch["folder"], f["relpath"]),
+                 if _is_parked(run.root, f["path"], os.path.join(batch["folder"], f["relpath"]),
                                ops.get(f"f{f['file_id']}", {}).get("history", [None])[-1], f["size"], f["mtime_ns"])}
         album = check_album(con, run, uid, moved) if uid in run.units else \
             {"eligible": False, "reason": "no longer part of the run"}
@@ -775,7 +795,7 @@ def restore(con: sqlite3.Connection, batch_id: int, unit_ids: set[int] | None = 
     root = con.execute("SELECT path FROM root WHERE id=?", (batch["root_id"],)).fetchone()["path"]
     _check_batch_paths(root, batch["folder"])
     j = protocol.Journal(Path(batch["journal"]))
-    _settle_inflight(con, batch, j)
+    _settle_inflight(con, batch, j, root)
     _reconcile(con, batch, j)
     restored, blocked, missing = 0, [], []
     for op, o in j.ops().items():

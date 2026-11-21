@@ -700,3 +700,60 @@ def test_two_names_of_one_regular_file_are_recognised_but_a_link_is_not(tmp_path
     assert retire._same_inode(str(a), str(b)) is True
     assert retire._same_inode(str(a), str(c)) is False and retire._same_inode(str(c), str(a)) is False
     assert retire._same_inode(str(a), str(tmp_path / "missing")) is False
+
+
+def test_an_organized_copy_replaced_by_a_link_to_its_original_does_not_vouch_for_it(applied, con):
+    """P0 (Codex, round 4): the copy check followed the link and accepted the original itself as the copy;
+    retiring then moved the original and left the organized file dangling."""
+    lib, dest, run = applied
+    copy = next(dest.rglob("01 - *.mp3"))
+    copy.unlink()
+    os.symlink(lib / ALBUM / "01 - x.mp3", copy)               # the 'copy' is now a link to the original
+    before = snapshot(lib)
+    skipped_with(con, run, "link")
+    assert snapshot(lib) == before and not (lib / retire.ORIGINALS).exists()
+
+
+def test_a_symlinked_organized_album_folder_does_not_vouch_either(applied, con, tmp_path):
+    lib, dest, run = applied
+    album_dir = next(dest.rglob("01 - *.mp3")).parent
+    elsewhere = tmp_path / "elsewhere"
+    shutil.move(str(album_dir), str(elsewhere))
+    os.symlink(elsewhere, album_dir)                           # every track now sits behind a link
+    skipped_with(con, run, "link")
+    assert len(list((lib / ALBUM).iterdir())) == 4
+
+
+def test_a_destination_that_resolves_into_the_collection_is_refused(applied, con):
+    """The organized copies are real files, but they now live INSIDE the collection (the destination moved
+    there and left a link): retiring the originals next to them is not retiring to a separate place."""
+    lib, dest, run = applied
+    inside = lib / "Organized"
+    shutil.move(str(dest), str(inside))
+    os.symlink(inside, dest)
+    res = retire.dry_run(con, run)
+    assert res["albums_ok"] == 0 and "collection folder" in res["albums"][0]["reason"]
+    assert len(list((lib / ALBUM).iterdir())) == 4
+
+
+def test_recovery_never_unlinks_through_a_replaced_album_folder(applied, con, monkeypatch, tmp_path):
+    """P0 (Codex, round 4): a link-method move crashed before its unlink; the original album folder was then
+    moved outside the collection and replaced by a link -- Resume and Restore deleted the file out there."""
+    lib, dest, run = applied
+    _crash_midway(monkeypatch, "after_link")
+    with pytest.raises(Crash):
+        retire.retire(con, run)
+    monkeypatch.setattr(retire, "_rename_noreplace", retire._rename_noreplace)
+    batch = con.execute("SELECT * FROM retire_batch").fetchone()
+    outside = tmp_path / "outside"
+    shutil.move(str(lib / ALBUM), str(outside))
+    os.symlink(outside, lib / ALBUM)
+    kept = {p.name: sha(p) for p in outside.iterdir()}
+    assert len(kept) == 3                                      # the 2nd file (still hard-linked) and two never touched
+    retire.resume(con, batch["id"])
+    assert {p.name: sha(p) for p in outside.iterdir()} == kept
+    try:
+        retire.restore(con, batch["id"])
+    except retire.RetireError:
+        pass
+    assert {p.name: sha(p) for p in outside.iterdir()} == kept
