@@ -96,6 +96,7 @@ see the [User guide](docs/USER_GUIDE.md#11-your-originals-optional)). What can s
 | [Configuration](docs/CONFIGURATION.md) | naming defaults with examples, settings, credentials, data locations, privacy |
 | [Architecture](docs/ARCHITECTURE.md) | components, processes, safety boundaries, tests |
 | [Feature sheet](docs/FEATURE_SHEET.md), [Plan](docs/PLAN.md), [Evidence report](m0/EVIDENCE_REPORT.md) | product overview, roadmap and decisions, measured experiments |
+| [Glossary](GLOSSARY.md) | the words used in the product, its screens and its documents |
 | [AGENTS.md](AGENTS.md), [SECURITY.md](SECURITY.md) | contributing (people and coding agents), reporting a security problem |
 
 ## Command line
