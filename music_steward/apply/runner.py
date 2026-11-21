@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import time
 import uuid
@@ -9,7 +10,27 @@ from pathlib import Path
 
 from .. import db as dbmod
 from . import protocol
-from .plan import load
+from .plan import PlanError, check_destination, load
+
+
+def _guard(con: sqlite3.Connection, dest: Path):
+    """Checked for every file just before it is written: the plan was checked when it was built,
+    but folders can change before (or while) it is applied -- a destination subfolder replaced by
+    a link into the collection, a collection folder added later. Paths are resolved, so links count."""
+    roots = [os.path.realpath(r) for (r,) in con.execute("SELECT path FROM root")]
+    droot = os.path.realpath(dest)
+
+    def inside(p: str, top: str) -> bool:
+        return p == top or p.startswith(top.rstrip("/") + "/")
+
+    def guard(final: Path) -> str | None:
+        p = os.path.realpath(final)
+        if any(inside(p, r) or inside(r, p) for r in roots):
+            return "this path leads into your collection (through a link); nothing written"
+        if not inside(p, droot):
+            return "this path leads outside the destination folder (through a link); nothing written"
+        return None
+    return guard
 
 
 def journal_dir() -> Path:
@@ -19,6 +40,10 @@ def journal_dir() -> Path:
 def apply(con: sqlite3.Connection, plan_id: int, progress=None, journal_root: Path | None = None, stop=None) -> dict:
     p = load(con, plan_id)
     dest = Path(p["dest_root"])
+    try:
+        check_destination(con, dest)          # again: links and collection folders may have changed
+    except PlanError as e:
+        return {"error": str(e)}
     dest.mkdir(parents=True, exist_ok=True)
     method = protocol.choose_method(dest)
     if method == "none":
@@ -30,7 +55,7 @@ def apply(con: sqlite3.Connection, plan_id: int, progress=None, journal_root: Pa
                       (plan_id, run_key, str(jpath), method, time.time())).lastrowid
     con.commit()
     _journal_plan(j, run_key, p, dest, method)
-    protocol.run_all(j, progress=progress, stop=stop)
+    protocol.run_all(j, progress=progress, stop=stop, guard=_guard(con, dest))
     return finish(con, rid)
 
 
@@ -69,7 +94,7 @@ def finish(con, run_id) -> dict:
                "complete_plan": planned is not None and planned == len(ops),
                "failed": [{"src": o["src"], "reason": o.get("reason")} for o in ops.values()
                           if o["history"][-1] in ("failed", "conflict", "aborted_source_changed",
-                                                  "aborted_audio_changed")]}
+                                                  "aborted_audio_changed", "aborted_unsafe_destination")]}
     con.execute("UPDATE run SET finished_at=?, summary_json=? WHERE id=?", (time.time(), json.dumps(summary), run_id))
     con.commit()
     return summary
@@ -81,8 +106,13 @@ def resume(con, run_id, progress=None, stop=None) -> dict:
     if "planned" not in j.meta():           # interrupted while being planned: journal the rest first
         p = load(con, r["plan_id"])
         _journal_plan(j, r["run_key"], p, Path(p["dest_root"]), r["method"])
+    dest = Path(load(con, r["plan_id"])["dest_root"])
+    try:
+        check_destination(con, dest)
+    except PlanError as e:
+        return {"error": str(e)}
     decisions = protocol.recover(j)
-    protocol.run_all(j, progress=progress, stop=stop)
+    protocol.run_all(j, progress=progress, stop=stop, guard=_guard(con, dest))
     return {"recovered": decisions, **finish(con, run_id)}
 
 

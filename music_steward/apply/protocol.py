@@ -26,7 +26,8 @@ CHUNK = 1 << 20
 _libc = ctypes.CDLL(None, use_errno=True)
 RENAME_EXCL = 0x00000004
 TERMINAL = {"committed", "conflict", "already_existed", "aborted_source_changed",
-            "aborted_audio_changed", "ownership_uncertain", "undone", "undo_refused_modified", "failed"}
+            "aborted_audio_changed", "ownership_uncertain", "undone", "undo_refused_modified", "failed",
+            "aborted_unsafe_destination"}
 
 
 def rename_excl(src, dst):
@@ -155,9 +156,13 @@ def _crash(point, crash_at):
         os._exit(137)
 
 
-def execute_op(j: Journal, o: dict, crash_at: str | None = None):
+def execute_op(j: Journal, o: dict, crash_at: str | None = None, guard=None):
+    """guard(final) -> None, or the reason this path must not be written (see runner._guard)."""
     src, final, temp = Path(o["src"]), Path(o["final"]), Path(o["temp"])
     op, state = o["op"], o["history"][-1]
+    if state == "intent" and guard is not None and (why := guard(final)):
+        j.write({"op": op, "state": "aborted_unsafe_destination", "ownership": "none", "reason": why})
+        return
     if state == "intent":
         generated = (o.get("tags") or {}).get("generated_text")   # a cue sheet written by the plan
         if "final_preexisting_sha" in o or final.exists():
@@ -174,6 +179,9 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
                      "reason": "source changed since the plan was made"})
             return
         final.parent.mkdir(parents=True, exist_ok=True)
+        if guard is not None and (why := guard(final)):      # the folders just made resolve somewhere else
+            j.write({"op": op, "state": "aborted_unsafe_destination", "ownership": "none", "reason": why})
+            return
         h = hashlib.sha256()
         fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
         try:
@@ -313,14 +321,15 @@ def recover(j: Journal) -> list[dict]:
     return out
 
 
-def run_all(j: Journal, crash_at: str | None = None, crash_op: str | None = None, progress=None, stop=None):
+def run_all(j: Journal, crash_at: str | None = None, crash_op: str | None = None, progress=None, stop=None,
+            guard=None):
     """stop: a threading.Event -- checked between files; the rest stay 'intent' (Resume continues)."""
     ops = [(op, o) for op, o in j.ops().items() if o["history"][-1] not in TERMINAL]
     for i, (op, o) in enumerate(ops, 1):
         if stop is not None and stop.is_set():
             break
         try:
-            execute_op(j, o, crash_at if op == crash_op else None)
+            execute_op(j, o, crash_at if op == crash_op else None, guard)
         except Exception as e:  # one bad file must not stop the run; the journal says what happened
             Path(o["temp"]).unlink(missing_ok=True)
             j.write({"op": op, "state": "failed", "ownership": "none", "reason": f"{type(e).__name__}: {e}"[:300]})

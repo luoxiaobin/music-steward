@@ -338,3 +338,40 @@ def test_a_torn_last_journal_line_does_not_swallow_the_next_record(tmp_path):
         fh.write('{"op": "b", "sta')              # crash mid-write: no newline
     j.write({"op": "c", "state": "intent"})
     assert set(j.ops()) == {"a", "c"}
+
+
+def test_a_link_into_the_collection_made_after_planning_is_never_written_through(accepted, con, tmp_path):
+    """The plan checked the destination; then the album's folder at the destination became a link
+    into the collection. Apply must refuse those files, not write into the collection."""
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    before = snapshot(lib)
+    (dest / "周海晴").mkdir(parents=True)
+    os.symlink(lib / "Ò¹º½", dest / "周海晴/夜航 (2004)")
+    res = runner.apply(con, pid, journal_root=tmp_path / "j")
+    assert res["states"] == {"aborted_unsafe_destination": 4}, res
+    assert all("collection" in f["reason"] for f in res["failed"])
+    assert snapshot(lib) == before                     # nothing written into the collection
+
+
+def test_a_link_out_of_the_destination_is_refused(accepted, con, tmp_path):
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    dest.mkdir()
+    os.symlink(elsewhere, dest / "周海晴")
+    res = runner.apply(con, pid, journal_root=tmp_path / "j")
+    assert res["states"] == {"aborted_unsafe_destination": 4}, res
+    assert not list(elsewhere.rglob("*"))
+
+
+def test_a_collection_folder_added_after_planning_blocks_apply_and_resume(accepted, con, tmp_path):
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    dest.mkdir()
+    con.execute("INSERT INTO root(path, added_at) VALUES(?, 0)", (str(dest),))
+    con.commit()
+    res = runner.apply(con, pid, journal_root=tmp_path / "j")
+    assert "overlaps" in res["error"] and not con.execute("SELECT 1 FROM run").fetchone()
+    assert not list(dest.rglob("*"))
