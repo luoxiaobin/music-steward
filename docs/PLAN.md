@@ -138,6 +138,20 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
     English, 简体中文, 繁體中文 (OpenCC Taiwan phrasing), Français (Canada), Español (EE. UU.), chosen in Settings.
     Still on the list: apply to the NAS, a double-clickable signed app.
 
+## Next (strategy review, 2026-11-20)
+
+1. **Correctness fixes**, each with a failure-injection test: write the whole journal before a run counts as
+   started (no silent omissions); re-check the destination at apply time, including symlinks; map each audio file of
+   a multi-FILE cue to its own tracks (matcher, track mapping, own info, plan); **Retry failed** for a run.
+2. **Album identity independent of paths** ([ADR 0002](adr/0002-album-identity-independent-of-paths.md)): measure
+   the hashing cost on the NAS, settle the design, migrate. Also fixes "changed source keeps its accepted match".
+3. **Cue-sheet albums setting**: keep image + cue, or split into tracks; check the result in Navidrome and a phone
+   player.
+4. **Retire the originals**: ADR first (it changes the read-only principle), then a guided, verified, per-album step.
+5. Read-only **collection health report**; a signed, notarized `.app`; icon (vector master, small-size tests,
+   macOS/iOS assets) for the existing concept.
+6. Outside trial users when the above is solid.
+
 ## M2 backlog (original order)
 
 1. ✅ `serve` + read-only inventory browser (three-pane, per the Review & Plan mockups)
@@ -160,6 +174,11 @@ Cyrillic) on demand → Apple export (M4) → native phone apps only if a store 
 
 | Date | Decision | Record |
 |---|---|---|
+| 2026-11-20 | **Ongoing upkeep is a goal: album identity must not depend on file paths.** Identity follows the audio; renames and moves keep decisions; changed audio goes back to review | [ADR 0002](adr/0002-album-identity-independent-of-paths.md) (proposed) |
+| 2026-11-20 | **Cue-sheet albums: a setting** — keep the image + cue sheet (default, today's behaviour) or split into one file per track for servers and phone players. Splitting is lossless (FLAC/WAV image → FLAC tracks; APE → FLAC is a lossless re-encode, stated as such); the source stays untouched | this file |
+| 2026-11-20 | **Guided "retire the originals" step** wanted, so a full copy of a 3 TB collection is not a dead end. It changes the read-only principle, so it gets its own ADR before any code: never automatic, only after a verified copy, per-album and user-confirmed, re-verified at that moment, to the Trash/NAS recycle bin rather than deleted | ADR to write |
+| 2026-11-20 | **Distribution and pricing deferred**: build something good and useful first, then decide what a payment would buy (signed builds, updates, support). No App Store work for now | this file |
+| 2026-11-20 | **Validation: the owner only for now**; outside trial users later. Every measured number is from one collection, labelled by its owner — say so wherever it is quoted | this file |
 | 2026-11-19 | **Names in the copies are written in Simplified Chinese** (artist, album artist, album; also cue track performers), so one artist never lands in two folders (鄧麗君 / 邓丽君). Track titles keep their spelling; the user's own edits are kept as typed. `MLT_SCRIPT=traditional|keep` changes it | this file |
 | 2026-11-19 | **Original release year** for folder names and tags (MusicBrainz first release, Discogs master), else the matched release's year; an edited year wins | this file |
 | 2026-11-18 | NAS publish method: `claim_rename` (O_EXCL placeholder, then rename); local disk keeps `RENAME_EXCL` | `m0/EVIDENCE_REPORT.md` §6.7 |
