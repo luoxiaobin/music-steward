@@ -141,3 +141,46 @@ def test_a_changed_cue_sheet_flags_its_album(tmp_path, con):
     scan(con, lib)
     assert "changed" in con.execute("SELECT stale_reason FROM decision").fetchone()[0]
     assert json.loads(con.execute("SELECT file_ids FROM unit").fetchone()[0])        # the album is still there
+
+
+def test_an_interrupted_scan_never_saves_changed_audio_without_the_flag(accepted, con, monkeypatch):  # noqa: F811
+    """Codex review on #6: the new content_id was committed every N files, the flag only at the
+    end -- an interrupt in between left the decision unflagged for good."""
+    from music_steward import scanner
+    lib, _ = accepted
+    tone(lib / "Ò¹º½/02 - x.mp3", ["-c:a", "libmp3lame"], secs=3, freq=1200)
+    monkeypatch.setattr(scanner, "COMMIT_EVERY", 1)
+
+    def stop(done, total):
+        raise KeyboardInterrupt                        # right after the first file is committed
+    with pytest.raises(KeyboardInterrupt):
+        scan(con, lib, progress=stop)
+    con.rollback()                                     # anything not committed is lost
+    assert _unit(con)["stale_reason"]                  # committed together with the new content_id
+    scan(con, lib)
+    assert _unit(con)["stale_reason"]
+
+
+def test_a_replaced_cue_sheet_keeps_the_decision_but_asks_for_review(tmp_path, con):
+    """Codex review on #6: the same image with a new cue sheet (another name, another layout) moved
+    the old decision over silently."""
+    from .test_cue import CUE
+    lib = tmp_path / "lib"
+    a = lib / "HIFI"
+    tone(a / "image.flac", ["-c:a", "flac"], secs=6)
+    (a / "image.cue").write_bytes(CUE.replace("old image name.wav", "image.wav").encode("gbk"))
+    scan(con, lib)
+    units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["kind"] == "cue"], scope="")
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    con.execute("UPDATE unit SET status='done'")
+    con.execute("INSERT INTO decision(unit_id, action, decided_at) VALUES(?, 'accept', 0)", (uid,))
+    con.commit()
+    (a / "image.cue").unlink()
+    two = CUE.replace("old image name.wav", "image.wav").replace("INDEX 01 00:04:00", "INDEX 01 00:03:00")
+    (a / "new name.cue").write_bytes(two.encode("gbk"))
+    scan(con, lib)
+    res = units.enqueue(con, 1, [u for u in units.plan_units(con, 1) if u["kind"] == "cue"], scope="")
+    assert res["moved"] == 1
+    u = _unit(con)
+    assert u["id"] == uid and u["action"] == "accept" and "cue sheet was replaced" in u["stale_reason"]
+    assert u["status"] == "queued"

@@ -119,7 +119,8 @@ def plan_units(con: sqlite3.Connection, root_id: int, subpath: str = "") -> list
     return units
 
 
-CHANGED = "the audio of {n} file(s) changed since you decided; review this album again"
+CHANGED = "its audio or cue sheet changed since you decided; review this album again"
+CUE_REPLACED = "its cue sheet was replaced since you decided; review this album again"
 
 
 def flag_changed(con: sqlite3.Connection, file_ids: list[int]) -> int:
@@ -128,16 +129,18 @@ def flag_changed(con: sqlite3.Connection, file_ids: list[int]) -> int:
     left out of plans until the album is decided again. Returns the number of albums flagged."""
     if not file_ids:
         return 0
-    changed = set(file_ids)
-    hit: dict[int, int] = {}
-    for u in con.execute("SELECT id, file_ids, cue_file_id FROM unit").fetchall():
-        n = len(changed & set(json.loads(u["file_ids"]))) + (u["cue_file_id"] in changed)
-        if n:
-            hit[u["id"]] = n
-    for uid, n in hit.items():
-        con.execute("UPDATE unit SET status='queued', queued_at=? WHERE id=? AND status<>'running'", (time.time(), uid))
-        con.execute("UPDATE decision SET stale_reason=? WHERE unit_id=?", (CHANGED.format(n=n), uid))
+    marks = ",".join("?" * len(file_ids))
+    hit = [r[0] for r in con.execute(
+        f"SELECT DISTINCT u.id FROM unit u, json_each(u.file_ids) j WHERE j.value IN ({marks}) "
+        f"UNION SELECT id FROM unit WHERE cue_file_id IN ({marks})", (*file_ids, *file_ids))]
+    for uid in hit:
+        _flag(con, uid, CHANGED)
     return len(hit)
+
+
+def _flag(con: sqlite3.Connection, uid: int, reason: str):
+    con.execute("UPDATE unit SET status='queued', queued_at=? WHERE id=? AND status<>'running'", (time.time(), uid))
+    con.execute("UPDATE decision SET stale_reason=? WHERE unit_id=?", (reason, uid))
 
 
 def enqueue(con: sqlite3.Connection, root_id: int, units: list[dict], requeue: bool = False,
@@ -156,11 +159,15 @@ def enqueue(con: sqlite3.Connection, root_id: int, units: list[dict], requeue: b
         if con.execute("SELECT 1 FROM unit WHERE root_id=? AND key=?", (root_id, u["key"])).fetchone():
             continue
         ids = json.dumps(sorted(u["file_ids"]))
-        for old in con.execute("SELECT id, key FROM unit WHERE root_id=? AND file_ids=? AND kind=?",
+        for old in con.execute("SELECT id, key, cue_file_id FROM unit WHERE root_id=? AND file_ids=? AND kind=?",
                                (root_id, ids, u["kind"])).fetchall():
             if old["key"] not in keys:
                 con.execute("UPDATE unit SET key=?, folder=?, label=?, cue_file_id=? WHERE id=?",
                             (u["key"], u["folder"], u["label"], u.get("cue_file_id"), old["id"]))
+                if old["cue_file_id"] != u.get("cue_file_id"):
+                    # same image, another cue sheet (a moved sheet keeps its file row): its track layout
+                    # may differ from the one the decision was made on -- keep the decision, but review
+                    _flag(con, old["id"], CUE_REPLACED)
                 c["moved"] += 1
                 break
     if scope is not None:

@@ -110,6 +110,8 @@ def _content_id(path: str, kind: str, probe_ok: bool) -> str:
         return ""
 
 
+COMMIT_EVERY = 200     # files per transaction while scanning
+
 PROPS = ("probe_status", "probe_error", "container", "codec", "duration", "duration_estimated",
          "bit_rate", "bit_rate_estimated", "sample_rate", "channels", "bits_per_sample",
          "audio_offset", "content_note",
@@ -255,7 +257,6 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
     # ---- 3. analyze new/changed files in parallel; write in this thread --
     done = 0
     claimed: set[int] = set()          # rows taken over by a moved file in this scan
-    content_changed: list[int] = []    # file ids whose content differs from what was decided on
     total = len(todo) + len(backfill)
     pool = ThreadPoolExecutor(max_workers=max(1, workers))
     try:
@@ -269,7 +270,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
                 if not _root_ok(root):
                     pool.shutdown(cancel_futures=True)
                     return abort("root disappeared while reading files")
-            if done % 200 == 0:
+            if done % COMMIT_EVERY == 0:
                 con.commit()
                 if progress:
                     progress(done, total)
@@ -305,7 +306,10 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
             elif k:
                 c["n_changed"] += 1
                 if k["content_id"] != vals["content_id"] or not vals["content_id"]:
-                    content_changed.append(k["id"])
+                    # in the same transaction as the new content_id below: an interrupted scan must
+                    # never record the new content without flagging the decisions made on the old one
+                    from .recognize.units import flag_changed
+                    flag_changed(con, [k["id"]])
                 con.execute(
                     "UPDATE file SET fs_relpath=?, kind=?, ext=?, size=?, mtime_ns=?, last_scan=?, "
                     "removed_at=NULL, " + ", ".join(f"{p}=?" for p in PROPS) + ", "
@@ -321,7 +325,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
                     (root_id, f.rel, f.fs_rel, f.kind, f.ext, f.size, f.mtime_ns, scan_id, scan_id,
                      *vals.values()))
             seen.add(f.rel)
-            if done % 200 == 0:
+            if done % COMMIT_EVERY == 0:
                 con.commit()
                 if progress:
                     progress(done, total)
@@ -336,9 +340,6 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
         pool.shutdown(wait=False, cancel_futures=True)
     if progress:
         progress(done, total)
-    if content_changed:
-        from .recognize.units import flag_changed
-        flag_changed(con, content_changed)
 
     # ---- 4. removals: only after a complete walk, never under failed dirs --
     if not _root_ok(root):
