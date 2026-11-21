@@ -119,14 +119,50 @@ def plan_units(con: sqlite3.Connection, root_id: int, subpath: str = "") -> list
     return units
 
 
+CHANGED = "the audio of {n} file(s) changed since you decided; review this album again"
+
+
+def flag_changed(con: sqlite3.Connection, file_ids: list[int]) -> int:
+    """Files whose content changed (the scan saw a different content_id): their albums go back to
+    the queue, and a decision made on the old audio is flagged -- kept, so it can be confirmed, but
+    left out of plans until the album is decided again. Returns the number of albums flagged."""
+    if not file_ids:
+        return 0
+    changed = set(file_ids)
+    hit: dict[int, int] = {}
+    for u in con.execute("SELECT id, file_ids, cue_file_id FROM unit").fetchall():
+        n = len(changed & set(json.loads(u["file_ids"]))) + (u["cue_file_id"] in changed)
+        if n:
+            hit[u["id"]] = n
+    for uid, n in hit.items():
+        con.execute("UPDATE unit SET status='queued', queued_at=? WHERE id=? AND status<>'running'", (time.time(), uid))
+        con.execute("UPDATE decision SET stale_reason=? WHERE unit_id=?", (CHANGED.format(n=n), uid))
+    return len(hit)
+
+
 def enqueue(con: sqlite3.Connection, root_id: int, units: list[dict], requeue: bool = False,
             scope: str | None = None) -> dict:
     """Insert units; existing ones (same key) keep their results unless requeue.
     With scope (the folder that was planned, "" = whole root), units in that folder that the
     new plan no longer contains are removed -- e.g. a folder now recognised as a cue album --
     so a file can never sit in two units (and be copied twice)."""
-    c = {"queued": 0, "already_done": 0, "requeued": 0, "removed_stale": 0}
+    c = {"queued": 0, "already_done": 0, "requeued": 0, "removed_stale": 0, "moved": 0}
     now = time.time()
+    # An album whose folder was renamed or moved has a new key but the same files (file rows follow
+    # their content, ADR 0002): it is the same album -- move the unit, keeping its matches and decision
+    # (and do so before stale units are removed below)
+    keys = {u["key"] for u in units}
+    for u in units:
+        if con.execute("SELECT 1 FROM unit WHERE root_id=? AND key=?", (root_id, u["key"])).fetchone():
+            continue
+        ids = json.dumps(sorted(u["file_ids"]))
+        for old in con.execute("SELECT id, key FROM unit WHERE root_id=? AND file_ids=? AND kind=?",
+                               (root_id, ids, u["kind"])).fetchall():
+            if old["key"] not in keys:
+                con.execute("UPDATE unit SET key=?, folder=?, label=?, cue_file_id=? WHERE id=?",
+                            (u["key"], u["folder"], u["label"], u.get("cue_file_id"), old["id"]))
+                c["moved"] += 1
+                break
     if scope is not None:
         keep = {u["key"] for u in units}
         for row in con.execute("SELECT id, key, folder FROM unit WHERE root_id=?", (root_id,)).fetchall():

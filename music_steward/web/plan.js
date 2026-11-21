@@ -91,6 +91,10 @@ async function renderPlan(id) {
     !busy && job.result && ["apply", "resume", "retry"].includes(job.kind) && job.result.status === "stopped"
       ? h("div", { class: "card banner" }, h("strong", {}, "Stopped. "), job.result.abort_reason) : null,
     doneForYou(s, dups),
+    (s.left_out || []).length ? h("div", { class: "card block" }, h("h2", { class: "h2" }, "Left out · audio changed since you decided ",
+        h("span", { class: "badge b-conflict" }, s.left_out.length)),
+      rows(s.left_out, [["Album", x => h("td", {}, x.label)], ["Folder", x => h("td", { class: "mono" }, (x.folder || ".") + "/")]]),
+      h("p", { class: "muted small" }, "Decide these albums again in review, then build a new plan.")) : null,
     previewTree(ok.concat(items.filter(i => i.kind === "cue_new" && i.status === "ok" && !ok.includes(i)))),
     h("div", { class: "cards" },
       h("div", { class: "card" }, h("div", { class: "lbl" }, "Source root"), h("div", { class: "mono", style: "margin-top:6px" }, S.root.path),

@@ -157,7 +157,10 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
                  ("decision", "release_key", "TEXT"), ("unit", "notice", "TEXT"),
                  ("unit", "search_json", "TEXT"), ("decision", "overrides_json", "TEXT"),
                  ("unit", "cue_file_id", "INTEGER"), ("unit", "n_tracks", "INTEGER"),
-                 ("candidate", "origin_json", "TEXT"), ("candidate", "original_year", "INTEGER")]
+                 ("candidate", "origin_json", "TEXT"), ("candidate", "original_year", "INTEGER"),
+                 # ADR 0002: identity follows the content; a decision made on different audio is flagged
+                 ("file", "content_id", "TEXT"), ("decision", "stale_reason", "TEXT"),
+                 ("scan", "n_moved", "INTEGER")]
 
 
 _READY: set[str] = set()   # databases already set up by this process
@@ -185,6 +188,7 @@ def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
     for table, col, typ in ADDED_COLUMNS:
         if col not in {r[1] for r in con.execute(f"PRAGMA table_info({table})")}:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+    con.execute("CREATE INDEX IF NOT EXISTS file_content ON file(root_id, content_id)")
     # runs recorded before the rename point at journals under the old folder (only if any do)
     if not OLD_APP_DIR.exists() and APP_DIR.exists() and con.execute(
             "SELECT 1 FROM run WHERE journal LIKE ? LIMIT 1", (str(OLD_APP_DIR) + "%",)).fetchone():

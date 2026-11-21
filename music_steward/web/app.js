@@ -334,7 +334,8 @@ async function renderUnits(where) {
     const tr = h("tr", { tabindex: "0", "data-unit": u.id, "aria-selected": String(S.selectedUnit === u.id),
                          onclick: () => selectUnit(u.id, tr), onkeydown: e => { if (e.key === "Enter") selectUnit(u.id, tr); } },
       h("td", { class: "selcol", onclick: e => e.stopPropagation() }, box),
-      h("td", {}, h("div", { class: "strong" }, u.label), h("div", { class: "sub mono" }, (u.folder || ".") + "/")),
+      h("td", {}, h("div", { class: "strong" }, u.label), h("div", { class: "sub mono" }, (u.folder || ".") + "/"),
+        u.decision && u.decision.stale_reason ? h("div", { class: "warn small strong" }, "Audio changed · decide again") : null),
       h("td", {}, u.kind === "track" ? "track" : u.kind === "cue" ? `${u.n_tracks || "?"} (cue)` : u.n_files),
       h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${yearText(t)}${t.country ? " · " + t.country : ""}`,
                          u.evidence && u.evidence.title_agrees ? h("span", { class: "ok small" }, "  title ✓")
@@ -444,6 +445,8 @@ function renderUnitDetail(d) {
         : `${d.folder || "."}/ · ${d.n_files} file${d.n_files > 1 ? "s" : ""} · ${d.kind}`),
       d.status === "error" ? h("div", { class: "banner" }, h("strong", {}, "Recognition failed. "), (d.error || "").split("\n")[0]) : null,
       d.notice ? h("div", { class: "banner" }, h("strong", {}, "Matched again. "), d.notice) : null,
+      d.decision && d.decision.stale_reason ? h("div", { class: "banner" }, h("strong", {}, "Audio changed since you decided. "),
+        "This album is left out of plans until you decide again (Accept, Own info or Skip).") : null,
       d.acoustid_used === 0 ? h("div", { class: "banner" }, "Matched without fingerprints (no AcoustID key).") : null,
       d.repaired ? h("div", { class: "banner" }, h("strong", {}, "Text decoding repaired before matching. "),
         `${d.repaired} of ${d.n_files} file${d.n_files > 1 ? "s" : ""} had garbled GBK/Big5 tags; the repaired text was used to search. ` +

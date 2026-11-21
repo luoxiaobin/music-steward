@@ -8,6 +8,9 @@ Read-only on the collection. Guarantees:
   * if the ROOT disappears (unplugged drive, dropped share) the scan aborts and
     marks NOTHING as removed -- known files stay as they were
   * folders that could not be listed keep their known files (not marked removed)
+  * identity follows the content (ADR 0002): every file gets a content_id; a new path whose content
+    is a known file that is no longer at its old path is that file, moved (it keeps its row, so its
+    albums and decisions); a changed file whose content_id changed flags the decisions made on it
 """
 from __future__ import annotations
 
@@ -18,6 +21,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
+from .identity import identity
 from .paths import ext_of, is_junk, kind_of, nfc
 from .probe import ProbeError, probe
 from .tags import read_tags
@@ -68,6 +72,7 @@ def _analyze(root: str, item: _Found) -> dict:
     path = os.path.join(root, item.fs_rel)
     out = {"probe_status": None}
     if item.kind != "audio":
+        out["content_id"] = _content_id(path, item.kind, True)
         return out
     if not os.path.exists(path):
         raise FileNotFoundError(path)
@@ -91,13 +96,42 @@ def _analyze(root: str, item: _Found) -> dict:
             raise FileNotFoundError(path)
         out.update(tag_format=None, tags_json=None,
                    tag_issues_json=json.dumps([{"kind": "tag_read_error", "error": str(e)[:300]}]))
+    out["content_id"] = _content_id(path, item.kind, out["probe_status"] == "ok")
     return out
+
+
+def _content_id(path: str, kind: str, probe_ok: bool) -> str:
+    """'' = looked, none (unreadable audio, a large non-audio file): not looked at again."""
+    try:
+        return identity(path, kind, probe_ok) or ""
+    except FileNotFoundError:
+        raise
+    except OSError:
+        return ""
 
 
 PROPS = ("probe_status", "probe_error", "container", "codec", "duration", "duration_estimated",
          "bit_rate", "bit_rate_estimated", "sample_rate", "channels", "bits_per_sample",
          "audio_offset", "content_note",
-         "tag_format", "tags_json", "tag_issues_json")
+         "tag_format", "tags_json", "tag_issues_json", "content_id")
+
+
+def _moved_from(con, root: str, root_id: int, cid: str | None, f: _Found, claimed: set[int]) -> int | None:
+    """The known file this new path is, if its content is a known file's that is gone from its old
+    path (removed earlier, or not there any more). A copy whose original is still in place is a new
+    file: two locations, two rows."""
+    if not cid:
+        return None
+    best = None
+    for r in con.execute("SELECT id, fs_relpath, removed_at FROM file WHERE root_id=? AND content_id=?",
+                         (root_id, cid)).fetchall():
+        if r["id"] in claimed:
+            continue
+        if r["removed_at"] is None and os.path.lexists(os.path.join(root, r["fs_relpath"])):
+            continue
+        if best is None or os.path.basename(r["fs_relpath"]) == os.path.basename(f.fs_rel):
+            best = r["id"]
+    return best
 
 
 def resolve(con: sqlite3.Connection, path: str) -> tuple[str, str]:
@@ -133,7 +167,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
                           (root_id, t0, subkey)).lastrowid
     con.commit()
     c = dict(n_files=0, n_new=0, n_changed=0, n_unchanged=0, n_removed=0, n_vanished=0,
-             n_probe_errors=0, n_dir_errors=0)
+             n_probe_errors=0, n_dir_errors=0, n_moved=0)
 
     def abort(reason: str) -> ScanResult:
         con.rollback()
@@ -146,7 +180,8 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
         return not subkey or rel.startswith(subkey + "/")
 
     known = {r["relpath"]: r for r in con.execute(
-        "SELECT id, relpath, size, mtime_ns, removed_at, probe_status, tag_issues_json FROM file WHERE root_id=?", (root_id,))
+        "SELECT id, relpath, size, mtime_ns, removed_at, probe_status, tag_issues_json, kind, fs_relpath, "
+        "content_id FROM file WHERE root_id=?", (root_id,))
         if in_scope(r["relpath"])}
 
     # ---- 1. walk (listing only) ------------------------------------------
@@ -201,6 +236,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
     # ---- 2. classify: unchanged vs new/changed --------------------------
     seen: set[str] = set()
     todo: list[_Found] = []
+    backfill: list[tuple[int, str, str, bool]] = []    # known files without a content_id yet
     for f in found:
         k = known.get(f.rel)
         retry = reprobe_errors and k is not None and (
@@ -208,6 +244,8 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
         if k and not retry and k["removed_at"] is None and k["size"] == f.size and k["mtime_ns"] == f.mtime_ns:
             seen.add(f.rel)
             c["n_unchanged"] += 1
+            if k["content_id"] is None:
+                backfill.append((k["id"], f.fs_rel, k["kind"], k["probe_status"] == "ok"))
         else:
             todo.append(f)
     if seen:
@@ -216,8 +254,25 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
 
     # ---- 3. analyze new/changed files in parallel; write in this thread --
     done = 0
+    claimed: set[int] = set()          # rows taken over by a moved file in this scan
+    content_changed: list[int] = []    # file ids whose content differs from what was decided on
+    total = len(todo) + len(backfill)
     pool = ThreadPoolExecutor(max_workers=max(1, workers))
     try:
+        # identities for files recorded before identities existed (one-time, ADR 0002)
+        bfuts = {pool.submit(_content_id, os.path.join(root, fs), kind, ok): fid for fid, fs, kind, ok in backfill}
+        for fut in as_completed(bfuts):
+            done += 1
+            try:
+                con.execute("UPDATE file SET content_id=? WHERE id=?", (fut.result(), bfuts[fut]))
+            except FileNotFoundError:
+                if not _root_ok(root):
+                    pool.shutdown(cancel_futures=True)
+                    return abort("root disappeared while reading files")
+            if done % 200 == 0:
+                con.commit()
+                if progress:
+                    progress(done, total)
         futs = {pool.submit(_analyze, root, f): f for f in todo}
         for fut in as_completed(futs):
             f = futs[fut]
@@ -237,8 +292,20 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
             if vals["probe_status"] == "error":
                 c["n_probe_errors"] += 1
             k = known.get(f.rel)
-            if k:
+            moved = None if k else _moved_from(con, root, root_id, vals["content_id"], f, claimed)
+            if moved is not None:
+                # the same content, no longer at its old path: this file, moved or renamed. It keeps
+                # its row -- and so its albums, matches and decisions
+                c["n_moved"] += 1
+                claimed.add(moved)
+                con.execute(
+                    "UPDATE file SET relpath=?, fs_relpath=?, kind=?, ext=?, size=?, mtime_ns=?, last_scan=?, "
+                    "removed_at=NULL, " + ", ".join(f"{p}=?" for p in PROPS) + " WHERE id=?",
+                    (f.rel, f.fs_rel, f.kind, f.ext, f.size, f.mtime_ns, scan_id, *vals.values(), moved))
+            elif k:
                 c["n_changed"] += 1
+                if k["content_id"] != vals["content_id"] or not vals["content_id"]:
+                    content_changed.append(k["id"])
                 con.execute(
                     "UPDATE file SET fs_relpath=?, kind=?, ext=?, size=?, mtime_ns=?, last_scan=?, "
                     "removed_at=NULL, " + ", ".join(f"{p}=?" for p in PROPS) + ", "
@@ -257,7 +324,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
             if done % 200 == 0:
                 con.commit()
                 if progress:
-                    progress(done, len(todo))
+                    progress(done, total)
     except KeyboardInterrupt:
         # Ctrl-C: drop queued reads, keep what is already recorded, mark nothing removed.
         pool.shutdown(wait=False, cancel_futures=True)
@@ -268,7 +335,10 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
     if progress:
-        progress(done, len(todo))
+        progress(done, total)
+    if content_changed:
+        from .recognize.units import flag_changed
+        flag_changed(con, content_changed)
 
     # ---- 4. removals: only after a complete walk, never under failed dirs --
     if not _root_ok(root):
@@ -278,7 +348,7 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
         return any(fd == "" or rel.startswith(fd + "/") for fd in failed_dirs)
 
     gone = [k["id"] for rel, k in known.items()
-            if rel not in seen and k["removed_at"] is None and not under_failed(rel)]
+            if rel not in seen and k["removed_at"] is None and not under_failed(rel) and k["id"] not in claimed]
     now = time.time()
     con.executemany("UPDATE file SET removed_at=? WHERE id=?", [(now, i) for i in gone])
     c["n_removed"] = len(gone)
