@@ -89,10 +89,12 @@ def sampled_identity(path: str, ext: str, codec: str | None) -> str:
     h = hashlib.sha256(str(n).encode())
     with open(path, "rb") as fh:
         for f in FRACTIONS:
-            fh.seek(start + int(n * f))
-            h.update(fh.read(min(SLICE, n)))
-        fh.seek(max(start, end - SLICE))                # the last slice, ending where the audio ends
-        h.update(fh.read(min(SLICE, n)))
+            pos = start + int(n * f)
+            fh.seek(pos)
+            h.update(fh.read(min(SLICE, end - pos)))     # never past the audio into trailing tags
+        pos = max(start, end - SLICE)                   # the last slice, ending where the audio ends
+        fh.seek(pos)
+        h.update(fh.read(end - pos))
     return h.hexdigest()
 
 
