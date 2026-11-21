@@ -30,7 +30,12 @@ Collections built over 20+ years (CD rips, downloads, image + cue albums) sit on
 3. **Built for non-Western collections.** Legacy-encoding repair with CJK heuristics (tags, cue sheets, unreadable APE tags), GB18030/Big5 cue sheets read correctly and written as UTF-8 for any player, Simplified/Traditional keys, pinyin search, extra catalogues, own-info fallback.
 4. **Evidence over automation.** Nothing is accepted silently; bulk actions are limited to measured-safe classes; every decision is reversible until apply, and apply is reversible after.
 5. **Fast on a NAS.** Per-folder scan and hash; lookup + fingerprint cache (re-match ~1.5 s/album vs 10–15 s); rate limits respected (MusicBrainz 1/s, Deezer, Discogs).
-6. **Private and local.** Runs on your computer: an app process with the UI on 127.0.0.1 (one-time token, CSP, Host check), one short-lived worker process per album while recognizing, and FFmpeg/Chromaprint as external tools; keys only from the environment, never stored. What is sent online: [Configuration](CONFIGURATION.md#what-is-sent-to-online-services).
+6. **Plays in music servers (required).** The organized copy works in Subsonic-standard servers (Navidrome, and the
+   phone apps that speak the Subsonic protocol): every album once, all tracks in order, correct titles, artists,
+   years and durations — checked automatically against Navidrome on every pull request. Cue-sheet albums need the
+   setting "one file per track" for this (servers do not read cue sheets); any audio format works, since the server
+   converts what a phone cannot play (APE included).
+7. **Private and local.** Runs on your computer: an app process with the UI on 127.0.0.1 (one-time token, CSP, Host check), one short-lived worker process per album while recognizing, and FFmpeg/Chromaprint as external tools; keys only from the environment, never stored. What is sent online: [Configuration](CONFIGURATION.md#what-is-sent-to-online-services).
 
 ## Architecture in one line
 Python 3.12 engine (beets 2.14 in-process for matching, mutagen for tags, FFmpeg for probing/hashing/decoding/previews) + SQLite app database + plain HTML/JS UI, in a pywebview desktop window (`music-steward app`, [ADR 0001](adr/0001-desktop-shell-pywebview.md)) or a local browser tab.

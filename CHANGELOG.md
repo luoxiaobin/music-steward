@@ -7,6 +7,11 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 ## [Unreleased]
 
 ### Added
+- **Required: the organized copy works in Subsonic-standard music servers** (Navidrome, and phone apps that speak
+  the Subsonic protocol). A new test points a throwaway Navidrome at an organized copy and checks, through the
+  Subsonic API, that every album appears once with all its tracks in order and the planned titles, artists, years
+  and durations; CI runs it on macOS for every pull request. Tried by hand as well: four real albums split into
+  tracks, served by Navidrome and played on a phone.
 - **Setting: albums of one file with a cue sheet → one file per track.** For music servers and phone players that
   don't read cue sheets. Lossless: each track is cut from the image into FLAC at the cue sheet's exact positions
   (sample-exact, the source's bit depth kept), and checked: its decoded samples must equal the same samples of the

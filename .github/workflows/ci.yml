@@ -33,7 +33,8 @@ jobs:
           if [ "$RUNNER_OS" = "Linux" ]; then
             sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
           else
-            brew install ffmpeg
+            brew install ffmpeg navidrome   # navidrome: the Subsonic compatibility test (required feature)
+            navidrome --version
           fi
           ffmpeg -version | head -1
       - name: Install Music Steward
