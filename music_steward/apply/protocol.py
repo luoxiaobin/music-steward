@@ -193,7 +193,8 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
             rw = o["tags"]["cue_rewrite"]
             data, _enc = rewrite_bytes(temp.read_bytes(), rw.get("files"), rw.get("album"),
                                        {int(k): v for k, v in (rw.get("tracks") or {}).items()},
-                                       out_encoding=rw.get("encoding"))   # plans before 2026-11-19: original
+                                       out_encoding=rw.get("encoding"),   # plans before 2026-11-19: original
+                                       keep_file=rw.get("keep_file"))
             with open(temp, "wb") as fh:
                 fh.write(data)
                 fh.flush()

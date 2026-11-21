@@ -185,8 +185,9 @@ def from_cue(con: sqlite3.Connection, u) -> dict:
     cf = con.execute("SELECT f.fs_relpath, r.path AS root FROM file f JOIN root r ON r.id=f.root_id WHERE f.id=?",
                      (u["cue_file_id"],)).fetchone()
     sheet = cuemod.parse(os.path.join(cf["root"], cf["fs_relpath"]))
-    audio = con.execute("SELECT duration FROM file WHERE id=?", (json.loads(u["file_ids"])[0],)).fetchone()
-    f = cuemod.with_lengths(max(sheet.files, key=lambda x: len(x.tracks)), audio["duration"])
+    audio = con.execute("SELECT relpath, duration FROM file WHERE id=?", (json.loads(u["file_ids"])[0],)).fetchone()
+    f = cuemod.with_lengths(cuemod.file_for(sheet, audio["relpath"].rsplit("/", 1)[-1]), audio["duration"])
+    images = [x for x in sheet.files if len(x.tracks) >= 2]
     folder = parse_folder(album_folder(u["folder"]))
     s_title, s_perf = clean(sheet.title), clean(sheet.performer)
     album = s_title or folder["album"]
@@ -200,6 +201,8 @@ def from_cue(con: sqlite3.Connection, u) -> dict:
     if not disc:
         disc = _disc_of(u["folder"] + "/x", u["folder"])
         disc_from = "folder name" if disc else None
+    if not disc and len(images) > 1 and f in images:      # a 2-CD image cue: one FILE per disc
+        disc, disc_from = images.index(f) + 1, "cue sheet"
     tracks = [{"cue_track": t.number, "cue_title": t.title,
                "title": clean(t.title, t.number) or f"Track {t.number}", "artist": (artist if t.performer and t.performer == sheet.performer else clean(t.performer)) or artist, "medium": disc or 1, "medium_index": i + 1, "index": i + 1,
                "length": t.length} for i, t in enumerate(f.tracks)]
@@ -207,7 +210,7 @@ def from_cue(con: sqlite3.Connection, u) -> dict:
               "artist": "cue sheet" if s_perf else ("folder name" if folder["artist"] else None),
               "year": "cue sheet" if _year(sheet.date) else ("folder name" if folder["year"] else None),
               "titles": "cue sheet", "disc": disc_from}
-    return {"album": album, "artist": artist, "year": _year(sheet.date) or folder["year"], "mediums": disc or 1,
+    return {"album": album, "artist": artist, "year": _year(sheet.date) or folder["year"], "mediums": max(disc or 1, len(images)),
             "tracks": tracks, "origin": origin}
 
 
