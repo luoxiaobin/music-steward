@@ -45,8 +45,8 @@ is mounted under another name (`/Volumes/music` → `/Volumes/music-1`) or the N
 6. **Not connected.** A collection folder whose drive or share is not mounted is listed as *not connected*; the app
    still opens, scan / copy / retire / archive / delete are disabled for it, and a *Check again* button is offered.
    The app never removes it by itself.
-7. **Albums that are not found are never dropped.** An album whose files are not at the current location is marked
-   *not found* and keeps its decision, matches and edits; plans leave it out; it comes back by itself if its files
+7. **Albums that are not found are never dropped.** An album whose files are not at the current location raises the
+   *not found* exception (a warning, not a state) and keeps its decision, matches and edits; plans leave it out; it comes back by itself if its files
    return; it is discarded only if the owner says so. (Today "Recognize folder" drops the album *and* its decision.)
 
 ### Changing the path

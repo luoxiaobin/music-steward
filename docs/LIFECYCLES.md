@@ -72,7 +72,11 @@ stateDiagram-v2
 
 ## 3. Album
 
-States ✓ *Queued* → *Running* → *Done* | *Error*. ◇ *Not found*. ❓ *Retired*.
+States ✓ *Queued* → *Running* → *Done* | *Error*, and *Retired* ❓ once its originals are set aside.
+**Not found is not a state.** It is an *exception* (a warning) raised on an album or a collection folder when the files
+are not at the current location; it never changes the album's state or its decision, and it clears by itself when the
+files return. Likewise **No match** is a normal outcome of recognition (no online release): the album stays *Done* once
+the owner accepts its own information, or waits for a decision.
 
 ```mermaid
 stateDiagram-v2
@@ -83,17 +87,20 @@ stateDiagram-v2
   Error --> Queued: Recognize folder again
   Done --> Queued: search again · members changed · audio changed
   Done --> Done: renamed or moved (same record, new place)
-  Done --> NotFound: its files are not at the current location ◇
-  NotFound --> Done: its files return ◇
-  Done --> Retired: its originals were parked ❓
+  Done --> Retired: its originals were set aside ❓
   Retired --> Done: Restore ❓
-  Done --> Dropped: files gone, at "Recognize folder" ✓ TODAY (with its decision)
 ```
+
+| Exception | Raised when | Effect | Cleared |
+|---|---|---|---|
+| Not found ◇ | a complete scan finds none of the album's files at the location (and they are not parked) | shown as a warning; plans leave it out; nothing else changes | its files return, or the owner confirms *Remove…* (or leaves it for now) |
+| Audio changed ✓ | the audio or cue sheet differs from what was decided on | decision kept but flagged; left out of plans; queued again | the owner accepts again |
+| Not connected ◇ | the collection folder's drive or share is not available | writing actions disabled; nothing is marked | it is connected again |
 
 **Today** an album whose files are gone is *dropped together with its decision* the next time "Recognize folder" runs.
 Checked on 2026-11-21 on a scratch collection: **Retire → rescan → Recognize folder took 2 albums and 2 decisions to 0
-and 0.** [ADR 0004](adr/0004-collection-folders.md) rule 7 (*not found*, never dropped) fixes the general case; it
-does not say what an album whose originals were *deliberately* parked should be — see ❓ Q-L1.
+and 0.** [ADR 0004](adr/0004-collection-folders.md) rule 7 fixes this: the album is never dropped. Albums whose
+originals are parked are not *not found* at all: they are *Retired* (decided below).
 
 ## 4. Decision
 
@@ -161,21 +168,30 @@ Stopped → Complete* with some albums *kept* when their checks fail. Neither ch
 |---|---|
 | Scan: content changed | file *Changed* → album *Queued*, its decision *Flagged*, the plan leaves it out |
 | Scan: folder renamed or moved | file *Moved* → album re-keyed, decision kept |
-| Scan: files gone (complete scan) | file *Gone* → album *Not found*, decision kept ◇ (today: dropped at Recognize) |
+| Scan: files gone (complete scan) | file *Gone* → *not found* exception on the album, decision kept ◇ (today: dropped at Recognize) |
 | Drive not connected | collection folder *not connected* → writing actions disabled; nothing is marked gone |
 | Run undone | the organized copies go → the run's parked batches can no longer be archived or deleted |
-| Retire | files *Parked* → ❓ album state (see below); the next scan sees the files as gone |
+| Retire | files *Parked* → album *Retired*, decision kept; the next scan must not raise *not found* for parked files |
 | Restore | files return → album back to *Done*, decision intact |
+| Any of the above that changes originals, copies or a path | one line in the **history** (see below) |
 | Change path ◇ | blocked while a run is unfinished or originals are parked; otherwise decisions stay, Retire off |
+
+## Decided, to build
+
+* **Retired album.** An album whose originals are parked keeps its decision and is shown as "Organized · originals set
+  aside"; it is left out of Recognize and of new plans; Restore returns it to *Done*; after Delete it reads
+  "originals deleted" (final).
+* **History.** One readable list of events, each with time, kind and album: path changed, run applied / undone / resumed,
+  originals retired, restored, archived, deleted.
+* **Manual information.** An album with *No match* stays; its own information can be accepted and every field edited
+  (album, album artist, year, disc, track titles). **Gap:** a per-track artist (singer) cannot be edited yet; it is
+  needed for compilations and collections of singles.
+
+* **Removing a not-found album.** The warning is never resolved by the app. The owner chooses, per album or for all
+  not-found albums of a folder: **Leave for now** (the default; nothing changes, the warning stays, the decision is
+  kept) or **Remove…** (a confirmation names what goes: the album record, its decision, matches and edits; nothing on
+  disk is touched). Removal is recorded in the history. If the files return later, a scan finds them as a new album.
 
 ## Open questions
 
-* ❓ **Q-L1 — what is an album whose originals were parked?** *Not found* would be wrong (nothing is lost, it is
-  organized). Proposed: a distinct state **Retired** with its decision kept, shown as "Organized · originals set
-  aside", leaving it out of "Recognize" and "plans", and returning to *Done* on Restore. After Delete: *Retired —
-  originals deleted* (final).
-* ❓ **Q-L2 — a history of events.** Keep one list of lifecycle events (path changed, run applied or undone,
-  originals retired / restored / archived / deleted) that the owner can read, or only the per-object records that
-  exist now?
-* ❓ **Q-L3 — when does a *not found* album end?** Never by itself; the owner discards it. Is "discard" an action
-  on one album, on all not-found albums of a folder, or both?
+None at the moment.
