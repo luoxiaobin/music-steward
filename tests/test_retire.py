@@ -661,3 +661,42 @@ def test_resume_records_such_a_file_even_when_the_album_then_halts(applied, con,
     assert retire.batches(con, [run])[0]["moved"] == 2      # both parked files are known, Restore will offer them
     assert retire.restore(con, batch["id"])["restored"] == 2
     assert len(list((lib / ALBUM).iterdir())) == 4
+
+
+def test_a_link_at_the_original_place_is_never_mistaken_for_a_second_name(applied, con, monkeypatch):
+    """P0 (Codex, round 3): os.path.samefile followed a symlink pointing at the parked file, so Restore
+    deleted the parked original, left a dangling link and reported success."""
+    lib, dest, run = applied
+    res = retire.retire(con, run)
+    parked = next(p for p in (Path(res["folder"]) / ALBUM).iterdir() if p.suffix == ".mp3")
+    keep = parked.read_bytes()
+    orig = lib / ALBUM / parked.name
+    os.symlink(parked, orig)                                   # the original place is now a link to the parked file
+    out = retire.restore(con, res["batch"])
+    assert [b["relpath"] for b in out["blocked"]] == [f"{ALBUM}/{parked.name}"]
+    assert parked.read_bytes() == keep and os.path.islink(orig)           # nothing deleted, nothing replaced
+    assert out["restored"] == 3
+
+
+def test_recovery_after_a_crash_does_not_follow_a_link_either(applied, con, monkeypatch):
+    lib, dest, run = applied
+    batch = _crash_after_rename_before_record(con, run, monkeypatch)
+    folder = Path(batch["folder"])
+    parked = [p for p in (folder / ALBUM).iterdir() if p.suffix == ".mp3"]
+    victim = parked[-1]
+    keep = victim.read_bytes()
+    os.symlink(victim, lib / ALBUM / victim.name)              # a link where the original was, to the parked file
+    retire.resume(con, batch["id"])                            # settles in-flight moves, then re-checks
+    assert victim.read_bytes() == keep                         # the parked original is intact
+    out = retire.restore(con, batch["id"])
+    assert victim.read_bytes() == keep and out["blocked"]
+
+
+def test_two_names_of_one_regular_file_are_recognised_but_a_link_is_not(tmp_path):
+    a, b, c = tmp_path / "a", tmp_path / "b", tmp_path / "c"
+    a.write_bytes(b"x")
+    os.link(a, b)
+    os.symlink(a, c)
+    assert retire._same_inode(str(a), str(b)) is True
+    assert retire._same_inode(str(a), str(c)) is False and retire._same_inode(str(c), str(a)) is False
+    assert retire._same_inode(str(a), str(tmp_path / "missing")) is False

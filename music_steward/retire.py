@@ -413,6 +413,28 @@ def _rename_noreplace(src: str, dst: str, claimed=None) -> str:
     return "claim"
 
 
+def _same_inode(a: str, b: str) -> bool:
+    """Two names of ONE regular file (a hard link): both are regular files themselves -- a symlink is never
+    followed (os.path.samefile would, and a link at the original place pointing to the parked file made
+    recovery delete the parked original) -- on one device, one inode, with more than one name."""
+    try:
+        sa, sb = os.lstat(a), os.lstat(b)
+    except OSError:
+        return False
+    return (stat.S_ISREG(sa.st_mode) and stat.S_ISREG(sb.st_mode) and (sa.st_dev, sa.st_ino) == (sb.st_dev, sb.st_ino)
+            and sa.st_nlink > 1)
+
+
+def _is_ours(path: str, size: int, mtime_ns: int) -> bool:
+    """A regular file (never a link) with the size and modification time recorded for the file we are
+    moving -- a rename keeps both, so this tells our file from anything else that has the same name."""
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return False
+    return stat.S_ISREG(st.st_mode) and st.st_size == size and st.st_mtime_ns == mtime_ns
+
+
 def _is_placeholder(path: str, ino: int | None) -> bool:
     try:
         st = os.lstat(path)
@@ -544,15 +566,13 @@ def _reconcile(con: sqlite3.Connection, batch: sqlite3.Row, j: protocol.Journal)
     con.commit()
 
 
-def _is_parked(orig: str, parked: str, last_state: str | None) -> bool:
+def _is_parked(orig: str, parked: str, last_state: str | None, size: int, mtime_ns: int) -> bool:
     """Is this file already in the originals folder? The journal says so after the move; after a crash
     between the rename and its record, or between a link and the unlink, the disk is the truth."""
     if last_state == "moved":
         return True
-    o_there, p_there = os.path.lexists(orig), os.path.lexists(parked)
-    if p_there and not o_there:
-        return True
-    return bool(o_there and p_there and os.path.samefile(orig, parked))
+    p_ours, o_ours = _is_ours(parked, size, mtime_ns), _is_ours(orig, size, mtime_ns)
+    return bool(p_ours and (not o_ours or _same_inode(orig, parked)))
 
 
 def _row_of(o: dict) -> dict:
@@ -568,13 +588,13 @@ def _settle_inflight(con: sqlite3.Connection, batch: sqlite3.Row, j: protocol.Jo
     for op, o in j.ops().items():
         if not op.startswith("f") or "src" not in o or o["history"][-1] not in ("intent", "claimed"):
             continue
-        orig, parked = o["src"], o["dst"]
-        o_there, p_there = os.path.lexists(orig), os.path.lexists(parked)
-        if o_there and p_there and os.path.samefile(orig, parked):
+        orig, parked, size, mtime = o["src"], o["dst"], o["size"], o["mtime_ns"]
+        p_ours, o_ours = _is_ours(parked, size, mtime), _is_ours(orig, size, mtime)
+        if p_ours and o_ours and _same_inode(orig, parked):        # a link-method move that lost power before the unlink
             os.unlink(orig)
-            o_there = False
-        if p_there and not o_there:
-            _record(con, batch, j, op, _row_of(o), "moved", ino=os.stat(parked).st_ino)
+            o_ours = False
+        if p_ours and not o_ours:                                  # our file is parked; whatever is at the old name is not it
+            _record(con, batch, j, op, _row_of(o), "moved", ino=os.lstat(parked).st_ino)
 
 
 def _move_album(con, run: Run, batch: sqlite3.Row, j: protocol.Journal, album: dict) -> int:
@@ -617,7 +637,7 @@ def _finish_album(con, batch: sqlite3.Row, j: protocol.Journal, root: str, uid: 
             _upsert(con, batch, state="intent", **row)
         s_there, d_there = os.path.lexists(src), os.path.lexists(dst)
         if s_there and d_there:
-            if os.path.samefile(src, dst):                             # a link-method move that crashed before the unlink
+            if _same_inode(src, dst):                             # a link-method move that crashed before the unlink
                 os.unlink(src)
                 s_there = False
             elif hist and hist[-1] == "claimed" and _is_placeholder(dst, o.get("placeholder_ino")):
@@ -731,7 +751,7 @@ def resume(con: sqlite3.Connection, batch_id: int, progress=None, stop=None) -> 
         uid, files = int(op[1:]), o["files"]
         moved = {f["file_id"]: os.path.join(batch["folder"], f["relpath"]) for f in files
                  if _is_parked(f["path"], os.path.join(batch["folder"], f["relpath"]),
-                               ops.get(f"f{f['file_id']}", {}).get("history", [None])[-1])}
+                               ops.get(f"f{f['file_id']}", {}).get("history", [None])[-1], f["size"], f["mtime_ns"])}
         album = check_album(con, run, uid, moved) if uid in run.units else \
             {"eligible": False, "reason": "no longer part of the run"}
         if album["eligible"]:
@@ -768,12 +788,12 @@ def restore(con: sqlite3.Connection, batch_id: int, unit_ids: set[int] | None = 
         row = _row_of(o)
         if _has_link(root, parked) or not _inside(parked, batch["folder"]):
             raise RetireError("a path in the journal leads outside the originals folder (or through a link)")
-        if _has_link(root, os.path.dirname(orig)):
+        if _has_link(root, os.path.dirname(orig)) or os.path.islink(orig):
             blocked.append({"relpath": o["relpath"], "reason": "a link or an outside folder on the path of the original place"})
             continue
         o_there, p_there = os.path.lexists(orig), os.path.lexists(parked)
         if o_there and p_there:
-            if os.path.samefile(orig, parked):                         # a link-method restore that crashed before the unlink
+            if _same_inode(orig, parked):                         # a link-method restore that crashed before the unlink
                 os.unlink(parked)
                 p_there = False
             elif last == "restore_claimed" and _is_placeholder(orig, o.get("placeholder_ino")):
