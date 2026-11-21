@@ -298,3 +298,43 @@ def test_stop_between_files_then_resume_finishes(accepted, con, tmp_path):
     assert not list(dest.rglob(".*mlt-*"))
     r2 = runner.resume(con, r["run"])
     assert set(r2["states"]) == {"committed"}
+
+
+def test_crash_while_journalling_the_plan_then_resume_copies_every_file(accepted, con, tmp_path, monkeypatch):
+    """A run interrupted after journalling only part of its plan must not finish as 'complete'
+    with the rest silently missing: Resume journals the missing files and copies them."""
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    n_items = sum(1 for it in plan.load(con, pid)["items"] if it["status"] == "ok")
+    assert n_items == 4
+    real, calls = protocol.plan_op, []
+
+    def plan_op_then_crash(*a, **k):
+        calls.append(1)
+        if len(calls) == 3:
+            os._exit(137)                       # power loss after 2 of 4 intents
+        return real(*a, **k)
+    child = os.fork()
+    if child == 0:
+        try:
+            monkeypatch.setattr(protocol, "plan_op", plan_op_then_crash)
+            runner.apply(con, pid, journal_root=tmp_path / "j")
+        finally:
+            os._exit(0)
+    _, status = os.waitpid(child, 0)
+    assert os.WEXITSTATUS(status) == 137
+    run = con.execute("SELECT * FROM run").fetchone()
+    j = protocol.Journal(Path(run["journal"]))
+    assert len(j.ops()) == 2 and "planned" not in j.meta()
+    res = runner.resume(con, run["id"])
+    assert res["states"] == {"committed": 4} and res["complete_plan"] is True, res
+    assert len([x for x in dest.rglob("*") if x.is_file()]) == 4
+
+
+def test_a_torn_last_journal_line_does_not_swallow_the_next_record(tmp_path):
+    j = protocol.Journal(tmp_path / "j.jsonl")
+    j.write({"op": "a", "state": "intent"})
+    with open(j.path, "a") as fh:
+        fh.write('{"op": "b", "sta')              # crash mid-write: no newline
+    j.write({"op": "c", "state": "intent"})
+    assert set(j.ops()) == {"a", "c"}

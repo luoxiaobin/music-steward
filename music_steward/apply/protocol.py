@@ -92,8 +92,15 @@ class Journal:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def write(self, rec: dict):
-        with open(self.path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"ts": time.time(), **rec}, ensure_ascii=False) + "\n")
+        with open(self.path, "a+b") as fh:
+            # a crash can leave a torn last line without its newline; start on a fresh line so the
+            # torn one is the only record lost (it is skipped on read) and this one is kept
+            if fh.tell() > 0:
+                fh.seek(-1, os.SEEK_END)
+                torn = fh.read(1) != b"\n"
+            else:
+                torn = False
+            fh.write((("\n" if torn else "") + json.dumps({"ts": time.time(), **rec}, ensure_ascii=False) + "\n").encode("utf-8"))
             fh.flush()
             os.fsync(fh.fileno())
 
@@ -106,10 +113,27 @@ class Journal:
                 r = json.loads(line)
             except json.JSONDecodeError:  # torn last line after a crash
                 continue
+            if str(r.get("op", "")).startswith("_"):     # run-level records (see meta())
+                continue
             m = merged.setdefault(r["op"], {"history": []})
             m["history"].append(r["state"])
             m.update({k: v for k, v in r.items() if k != "ts"})
         return merged
+
+
+    def meta(self) -> dict:
+        """Run-level records (op "_run"), merged: {"planned": n} once every op of the plan is
+        journalled. A run without it was interrupted while being planned: Resume completes it."""
+        out: dict = {}
+        if self.path.exists():
+            for line in self.path.read_text(encoding="utf-8").splitlines():
+                try:
+                    r = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if r.get("op") == "_run":
+                    out.update({k: v for k, v in r.items() if k not in ("ts", "op", "state")})
+        return out
 
 
 def temp_path(final: Path, run: str, op: str) -> Path:
