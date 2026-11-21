@@ -5,7 +5,9 @@ is split into tracks, each track needs its own lyrics with times counted from th
 copying the album's file next to track 1 left the other tracks without lyrics (Codex review on #7).
 
 Lines are `[mm:ss.xx]text` (several time tags per line allowed); header tags like [ar:] [al:] [by:]
-[offset:] are kept in every part, [ti:] and [length:] are per track and replaced or dropped.
+are kept in every part, [ti:] and [length:] are per track and replaced or dropped. [offset:ms] is
+applied to every time before the lines are placed into tracks (a positive offset shows lyrics
+earlier), and not written again: the new times already include it (Codex review on #7).
 """
 from __future__ import annotations
 
@@ -47,11 +49,17 @@ def split(text: str, bounds: list[tuple[float, float | None]], titles: list[str 
     """One lyrics text per track ([start, end) in seconds into the image), times relative to the
     track's start; None for a track with no timed line. Lines without a time tag are not placed
     (untimed_lines() says whether there are any: the caller then keeps the original as well)."""
-    headers, timed = [], []
+    headers, timed, offset = [], [], 0.0
     for line in text.splitlines():
         h = HEADER.match(line.strip())
         if h and not TIME.match(line.strip()):
-            if h.group(1).lower() not in ("ti", "length"):
+            key = h.group(1).lower()
+            if key == "offset":
+                try:
+                    offset = int(h.group(2).strip()) / 1000
+                except ValueError:
+                    headers.append(line.strip())
+            elif key not in ("ti", "length"):
                 headers.append(line.strip())
             continue
         stamps = list(TIME.finditer(line))
@@ -60,6 +68,7 @@ def split(text: str, bounds: list[tuple[float, float | None]], titles: list[str 
         words = line[stamps[-1].end():] if stamps else line
         for m in stamps:
             timed.append((_seconds(m), words))
+    timed = [(max(0.0, t - offset), w) for t, w in timed]
     out: list[str | None] = []
     for (start, end), title in zip(bounds, titles):
         mine = sorted((t - start, w) for t, w in timed if t >= start and (end is None or t < end))

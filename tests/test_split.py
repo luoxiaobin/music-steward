@@ -289,3 +289,13 @@ def test_partly_timed_lyrics_are_split_and_also_kept_whole(split_album, con, tmp
     p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
     assert sorted(i["dest_rel"].rsplit("/", 1)[1] for i in p["items"] if i["kind"] == "lrc") == [
         "01 - 红星照我去战斗.lrc", "02 - 怀念战友.lrc", "HIFI年代 - 怀念战友.lrc"]
+
+
+def test_the_lyrics_offset_is_applied_before_lines_are_placed_into_tracks():
+    """Codex review on #7: [offset:] changes when a line shows; near a track boundary it decides the track."""
+    from music_steward import lrc
+    text = "[ar:A]\n[offset:+500]\n[00:02.30]boundary line\n[00:01.00]first\n"
+    parts = lrc.split(text, [(0.0, 2.0), (2.0, None)], ["One", "Two"])
+    assert parts[0] == "[ar:A]\n[ti:One]\n[00:00.50]first\n[00:01.80]boundary line\n"   # 2.30 - 0.50 = 1.80
+    assert parts[1] is None
+    assert "[offset" not in parts[0]
