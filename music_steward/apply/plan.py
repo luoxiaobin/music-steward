@@ -54,6 +54,10 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
                            "disc": f"{c['_disc']}/{c['mediums']}" if multi else None,
                            "mb_albumid": c["album_id"] if is_mb else None}})
     sheet = cuemod.parse(os.path.join(root_path, cf["fs_relpath"]))
+    own = cuemod.file_for(sheet, f["relpath"].rsplit("/", 1)[-1])
+    # a multi-image cue (one FILE per disc): this album's copy gets a cue of its own image only,
+    # tracks numbered from 1 -- not the whole sheet with every FILE pointing at this one image
+    keep = own.name if len([x for x in sheet.files if x.tracks]) > 1 else None
     tracks = {str(t["cue_track"]): {"title": (cue_titles or {}).get(str(t["cue_track"])) or t["title"],
                                     "performer": _script(c["artist"] if t["artist"] and t["artist"] == c.get("_artist_from")
                                                          else t["artist"], c.get("_script", "keep")) or c["artist"]}
@@ -62,7 +66,9 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None):
                   "src": os.path.join(root_path, cf["fs_relpath"]), "dest_rel": f"{adir}/{stem}.cue",
                   "codec": None, "size": cf["size"], "mtime": cf["mtime_ns"],
                   "tags": {"cue_rewrite": {"encoding": cue_encoding(con),
-                                           "files": {fl.name: image_name for fl in sheet.files},
+                                           "files": {own.name: image_name} if keep else
+                                                    {fl.name: image_name for fl in sheet.files},
+                                           "keep_file": keep,
                                            "album": {"title": c["album"], "performer": c["artist"]},
                                            "tracks": tracks}}})
     new_stem_of[f["relpath"].rsplit(".", 1)[0]] = f"{adir}/{stem}"

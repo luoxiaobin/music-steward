@@ -26,7 +26,8 @@ CHUNK = 1 << 20
 _libc = ctypes.CDLL(None, use_errno=True)
 RENAME_EXCL = 0x00000004
 TERMINAL = {"committed", "conflict", "already_existed", "aborted_source_changed",
-            "aborted_audio_changed", "ownership_uncertain", "undone", "undo_refused_modified", "failed"}
+            "aborted_audio_changed", "ownership_uncertain", "undone", "undo_refused_modified", "failed",
+            "aborted_unsafe_destination"}
 
 
 def rename_excl(src, dst):
@@ -92,8 +93,15 @@ class Journal:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
     def write(self, rec: dict):
-        with open(self.path, "a", encoding="utf-8") as fh:
-            fh.write(json.dumps({"ts": time.time(), **rec}, ensure_ascii=False) + "\n")
+        with open(self.path, "a+b") as fh:
+            # a crash can leave a torn last line without its newline; start on a fresh line so the
+            # torn one is the only record lost (it is skipped on read) and this one is kept
+            if fh.tell() > 0:
+                fh.seek(-1, os.SEEK_END)
+                torn = fh.read(1) != b"\n"
+            else:
+                torn = False
+            fh.write((("\n" if torn else "") + json.dumps({"ts": time.time(), **rec}, ensure_ascii=False) + "\n").encode("utf-8"))
             fh.flush()
             os.fsync(fh.fileno())
 
@@ -106,10 +114,27 @@ class Journal:
                 r = json.loads(line)
             except json.JSONDecodeError:  # torn last line after a crash
                 continue
+            if str(r.get("op", "")).startswith("_"):     # run-level records (see meta())
+                continue
             m = merged.setdefault(r["op"], {"history": []})
             m["history"].append(r["state"])
             m.update({k: v for k, v in r.items() if k != "ts"})
         return merged
+
+
+    def meta(self) -> dict:
+        """Run-level records (op "_run"), merged: {"planned": n} once every op of the plan is
+        journalled. A run without it was interrupted while being planned: Resume completes it."""
+        out: dict = {}
+        if self.path.exists():
+            for line in self.path.read_text(encoding="utf-8").splitlines():
+                try:
+                    r = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if r.get("op") == "_run":
+                    out.update({k: v for k, v in r.items() if k not in ("ts", "op", "state")})
+        return out
 
 
 def temp_path(final: Path, run: str, op: str) -> Path:
@@ -131,9 +156,13 @@ def _crash(point, crash_at):
         os._exit(137)
 
 
-def execute_op(j: Journal, o: dict, crash_at: str | None = None):
+def execute_op(j: Journal, o: dict, crash_at: str | None = None, guard=None):
+    """guard(final) -> None, or the reason this path must not be written (see runner._guard)."""
     src, final, temp = Path(o["src"]), Path(o["final"]), Path(o["temp"])
     op, state = o["op"], o["history"][-1]
+    if state == "intent" and guard is not None and (why := guard(final)):
+        j.write({"op": op, "state": "aborted_unsafe_destination", "ownership": "none", "reason": why})
+        return
     if state == "intent":
         generated = (o.get("tags") or {}).get("generated_text")   # a cue sheet written by the plan
         if "final_preexisting_sha" in o or final.exists():
@@ -150,6 +179,9 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
                      "reason": "source changed since the plan was made"})
             return
         final.parent.mkdir(parents=True, exist_ok=True)
+        if guard is not None and (why := guard(final)):      # the folders just made resolve somewhere else
+            j.write({"op": op, "state": "aborted_unsafe_destination", "ownership": "none", "reason": why})
+            return
         h = hashlib.sha256()
         fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
         try:
@@ -193,7 +225,8 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
             rw = o["tags"]["cue_rewrite"]
             data, _enc = rewrite_bytes(temp.read_bytes(), rw.get("files"), rw.get("album"),
                                        {int(k): v for k, v in (rw.get("tracks") or {}).items()},
-                                       out_encoding=rw.get("encoding"))   # plans before 2026-11-19: original
+                                       out_encoding=rw.get("encoding"),   # plans before 2026-11-19: original
+                                       keep_file=rw.get("keep_file"))
             with open(temp, "wb") as fh:
                 fh.write(data)
                 fh.flush()
@@ -244,6 +277,22 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None):
         j.write({"op": op, "state": "committed", "ownership": "created"})
 
 
+def retry_failed(j: Journal) -> int:
+    """Make the run's 'failed' files retryable (drive disconnected, disk full...): each goes back
+    to the state it was in when it failed, and recover() then decides from the files, as after a
+    crash -- so a copy that had in fact been published is recognised as ours, not re-copied.
+    Conflicts and changed sources stay as they are: retrying cannot fix them."""
+    n = 0
+    for op, o in j.ops().items():
+        h = o["history"]
+        if h[-1] != "failed":
+            continue
+        prev = next((s for s in reversed(h[:-1]) if s not in TERMINAL), "intent")
+        j.write({"op": op, "state": prev, "retry_of": "failed", "reason": None})
+        n += 1
+    return n
+
+
 def recover(j: Journal) -> list[dict]:
     """Bring every unfinished op to a resumable or terminal state, from the files."""
     out = []
@@ -288,14 +337,15 @@ def recover(j: Journal) -> list[dict]:
     return out
 
 
-def run_all(j: Journal, crash_at: str | None = None, crash_op: str | None = None, progress=None, stop=None):
+def run_all(j: Journal, crash_at: str | None = None, crash_op: str | None = None, progress=None, stop=None,
+            guard=None):
     """stop: a threading.Event -- checked between files; the rest stay 'intent' (Resume continues)."""
     ops = [(op, o) for op, o in j.ops().items() if o["history"][-1] not in TERMINAL]
     for i, (op, o) in enumerate(ops, 1):
         if stop is not None and stop.is_set():
             break
         try:
-            execute_op(j, o, crash_at if op == crash_op else None)
+            execute_op(j, o, crash_at if op == crash_op else None, guard)
         except Exception as e:  # one bad file must not stop the run; the journal says what happened
             Path(o["temp"]).unlink(missing_ok=True)
             j.write({"op": op, "state": "failed", "ownership": "none", "reason": f"{type(e).__name__}: {e}"[:300]})

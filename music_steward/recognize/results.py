@@ -144,9 +144,9 @@ def _cue_slices(con: sqlite3.Connection, u: dict) -> dict:
     try:
         c = con.execute("SELECT f.fs_relpath, r.path AS root FROM file f JOIN root r ON r.id=f.root_id WHERE f.id=?",
                         (u["cue_file_id"],)).fetchone()
-        audio = con.execute("SELECT duration FROM file WHERE id=?", (json.loads(u["file_ids"])[0],)).fetchone()
+        audio = con.execute("SELECT relpath, duration FROM file WHERE id=?", (json.loads(u["file_ids"])[0],)).fetchone()
         sheet = cuemod.parse(os.path.join(c["root"], c["fs_relpath"]))
-        f = cuemod.with_lengths(max(sheet.files, key=lambda x: len(x.tracks)), audio["duration"])
+        f = cuemod.with_lengths(cuemod.file_for(sheet, audio["relpath"].rsplit("/", 1)[-1]), audio["duration"])
         return {t.number: [t.start, t.length] for t in f.tracks}
     except (OSError, TypeError, ValueError):
         return {}

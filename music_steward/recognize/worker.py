@@ -21,8 +21,9 @@ def _match_cue(con, u, audio_path: str, key, search):
     c = con.execute("SELECT f.fs_relpath, r.path AS root FROM file f JOIN root r ON r.id=f.root_id WHERE f.id=?",
                     (u["cue_file_id"],)).fetchone()
     sheet = cuemod.parse(os.path.join(c["root"], c["fs_relpath"]))
-    audio = con.execute("SELECT duration, audio_offset FROM file WHERE id=?", (json.loads(u["file_ids"])[0],)).fetchone()
-    f = max(sheet.files, key=lambda x: len(x.tracks))
+    audio = con.execute("SELECT relpath, duration, audio_offset FROM file WHERE id=?",
+                        (json.loads(u["file_ids"])[0],)).fetchone()
+    f = cuemod.file_for(sheet, audio["relpath"].rsplit("/", 1)[-1])     # this image's own tracks
     cuemod.with_lengths(f, audio["duration"])
     tracks = [{"number": t.number, "title": t.title, "performer": t.performer, "start": t.start, "length": t.length}
               for t in f.tracks]

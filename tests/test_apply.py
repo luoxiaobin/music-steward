@@ -298,3 +298,116 @@ def test_stop_between_files_then_resume_finishes(accepted, con, tmp_path):
     assert not list(dest.rglob(".*mlt-*"))
     r2 = runner.resume(con, r["run"])
     assert set(r2["states"]) == {"committed"}
+
+
+def test_crash_while_journalling_the_plan_then_resume_copies_every_file(accepted, con, tmp_path, monkeypatch):
+    """A run interrupted after journalling only part of its plan must not finish as 'complete'
+    with the rest silently missing: Resume journals the missing files and copies them."""
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    n_items = sum(1 for it in plan.load(con, pid)["items"] if it["status"] == "ok")
+    assert n_items == 4
+    real, calls = protocol.plan_op, []
+
+    def plan_op_then_crash(*a, **k):
+        calls.append(1)
+        if len(calls) == 3:
+            os._exit(137)                       # power loss after 2 of 4 intents
+        return real(*a, **k)
+    child = os.fork()
+    if child == 0:
+        try:
+            monkeypatch.setattr(protocol, "plan_op", plan_op_then_crash)
+            runner.apply(con, pid, journal_root=tmp_path / "j")
+        finally:
+            os._exit(0)
+    _, status = os.waitpid(child, 0)
+    assert os.WEXITSTATUS(status) == 137
+    run = con.execute("SELECT * FROM run").fetchone()
+    j = protocol.Journal(Path(run["journal"]))
+    assert len(j.ops()) == 2 and "planned" not in j.meta()
+    res = runner.resume(con, run["id"])
+    assert res["states"] == {"committed": 4} and res["complete_plan"] is True, res
+    assert len([x for x in dest.rglob("*") if x.is_file()]) == 4
+
+
+def test_a_torn_last_journal_line_does_not_swallow_the_next_record(tmp_path):
+    j = protocol.Journal(tmp_path / "j.jsonl")
+    j.write({"op": "a", "state": "intent"})
+    with open(j.path, "a") as fh:
+        fh.write('{"op": "b", "sta')              # crash mid-write: no newline
+    j.write({"op": "c", "state": "intent"})
+    assert set(j.ops()) == {"a", "c"}
+
+
+def test_a_link_into_the_collection_made_after_planning_is_never_written_through(accepted, con, tmp_path):
+    """The plan checked the destination; then the album's folder at the destination became a link
+    into the collection. Apply must refuse those files, not write into the collection."""
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    before = snapshot(lib)
+    (dest / "周海晴").mkdir(parents=True)
+    os.symlink(lib / "Ò¹º½", dest / "周海晴/夜航 (2004)")
+    res = runner.apply(con, pid, journal_root=tmp_path / "j")
+    assert res["states"] == {"aborted_unsafe_destination": 4}, res
+    assert all("collection" in f["reason"] for f in res["failed"])
+    assert snapshot(lib) == before                     # nothing written into the collection
+
+
+def test_a_link_out_of_the_destination_is_refused(accepted, con, tmp_path):
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    dest.mkdir()
+    os.symlink(elsewhere, dest / "周海晴")
+    res = runner.apply(con, pid, journal_root=tmp_path / "j")
+    assert res["states"] == {"aborted_unsafe_destination": 4}, res
+    assert not list(elsewhere.rglob("*"))
+
+
+def test_a_collection_folder_added_after_planning_blocks_apply_and_resume(accepted, con, tmp_path):
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    dest.mkdir()
+    con.execute("INSERT INTO root(path, added_at) VALUES(?, 0)", (str(dest),))
+    con.commit()
+    res = runner.apply(con, pid, journal_root=tmp_path / "j")
+    assert "overlaps" in res["error"] and not con.execute("SELECT 1 FROM run").fetchone()
+    assert not list(dest.rglob("*"))
+
+
+def test_retry_failed_copies_files_that_failed_and_resume_alone_does_not(accepted, con, tmp_path, monkeypatch):
+    """A file that hit an error (drive gone, disk full) is final for Resume; Retry failed tries it again."""
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    real = protocol.write_tags
+
+    def flaky(path, tags, codec):
+        if "夜航" in tags.get("title", ""):
+            raise OSError(5, "Input/output error")            # e.g. the share dropped
+        return real(path, tags, codec)
+    monkeypatch.setattr(protocol, "write_tags", flaky)
+    res = runner.apply(con, pid, journal_root=tmp_path / "j")
+    assert res["states"] == {"committed": 3, "failed": 1}, res
+    assert "Input/output error" in res["failed"][0]["reason"]
+    assert not list(dest.rglob(".*mlt-*"))                      # no temp file left behind
+    monkeypatch.setattr(protocol, "write_tags", real)          # reconnected
+    assert runner.resume(con, res["run"])["states"] == {"committed": 3, "failed": 1}
+    again = runner.resume(con, res["run"], retry_failed=True)
+    assert again["retried"] == 1 and again["states"] == {"committed": 4} and again["failed"] == [], again
+    assert (dest / "周海晴/夜航 (2004)/02 - 夜航.mp3").exists()
+    assert runner.undo(con, res["run"])["actions"] == {"removed": 4}   # one run, undo removes everything
+
+
+def test_retry_failed_recognises_a_copy_that_was_in_fact_published(accepted, con, tmp_path):
+    """A failure after the rename (the journal write failed): retry must see the copy as ours."""
+    lib, dest = accepted
+    pid = plan.build(con, str(dest), 1)
+    res = runner.apply(con, pid, journal_root=tmp_path / "j")
+    j = protocol.Journal(Path(res["journal"]))
+    op, o = next((k, v) for k, v in j.ops().items() if v["kind"] == "audio")
+    j.write({"op": op, "state": "failed", "ownership": "none", "reason": "OSError: journal write failed"})
+    again = runner.resume(con, res["run"], retry_failed=True)
+    assert again["states"] == {"committed": 4}, again
+    assert runner.undo(con, res["run"])["actions"] == {"removed": 4}

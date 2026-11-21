@@ -113,6 +113,27 @@ def parse(path: str) -> Cue:
         return parse_bytes(fh.read())
 
 
+def file_for(sheet: Cue, audio_name: str) -> CueFile:
+    """The FILE entry of `sheet` that describes the audio file `audio_name` (a base name).
+
+    A 2-CD image cue has one FILE per disc image; each image is its own album unit, so every
+    consumer must take that image's own tracks -- not the FILE with the most tracks, which gave
+    disc 2 the track list of disc 1. Same matching as the unit grouping: exact name, then the
+    same stem (cues often say .wav for an .ape), then -- one image only -- that one."""
+    import os
+    import unicodedata
+    want = unicodedata.normalize("NFC", audio_name).casefold()
+    stem = os.path.splitext(want)[0]
+    names = [(unicodedata.normalize("NFC", f.name).casefold(), f) for f in sheet.files]
+    for n, f in names:
+        if os.path.basename(n.replace("\\", "/")) == want:
+            return f
+    for n, f in names:
+        if os.path.splitext(os.path.basename(n.replace("\\", "/")))[0] == stem:
+            return f
+    return max(sheet.files, key=lambda x: len(x.tracks))
+
+
 def with_lengths(f: CueFile, total: float | None) -> CueFile:
     """Track lengths from consecutive INDEX 01 starts; the last runs to the file's end."""
     for i, t in enumerate(f.tracks):
@@ -122,14 +143,20 @@ def with_lengths(f: CueFile, total: float | None) -> CueFile:
 
 
 def rewrite_bytes(raw: bytes, file_renames: dict[str, str] | None = None, album: dict | None = None,
-                  tracks: dict[int, dict] | None = None, out_encoding: str | None = None) -> tuple[bytes, str]:
+                  tracks: dict[int, dict] | None = None, out_encoding: str | None = None,
+                  keep_file: str | None = None) -> tuple[bytes, str]:
     """Return the cue with FILE references renamed and (optionally) album/track TITLE and
     PERFORMER replaced. Everything else is kept. Written in `out_encoding` (e.g. "utf-8-sig":
     UTF-8 with a BOM, which macOS players need -- foobar2000 for Mac showed GB18030 cues as
-    mojibake), or in the cue's ORIGINAL encoding when None."""
+    mojibake), or in the cue's ORIGINAL encoding when None.
+
+    keep_file: the FILE name (as written in the cue) to keep; the other FILE sections are dropped
+    and the kept tracks numbered from 1 -- one disc of a multi-image cue becomes a standalone cue
+    for that disc's image. `tracks` stays keyed by the ORIGINAL track numbers."""
     enc = detect_encoding(raw)
     file_renames, album, tracks = file_renames or {}, album or {}, tracks or {}
     out, cur_track = [], None
+    skipping, renumber = False, 0
     seen_album = {"TITLE": False, "PERFORMER": False}
     lines = raw.decode(enc).splitlines(keepends=True)
     for line in lines:
@@ -143,10 +170,19 @@ def rewrite_bytes(raw: bytes, file_renames: dict[str, str] | None = None, album:
             m = re.match(r'\s*(?:"([^"]*)"|(\S+))(.*)$', rest)
             if m:
                 name = m.group(1) if m.group(1) is not None else m.group(2)
+                skipping = keep_file is not None and name != keep_file
                 line = f'{indent}FILE "{file_renames.get(name, name)}"{m.group(3)}{eol}'
+            cur_track = None
+        elif skipping:
+            continue
         elif cmd == "TRACK":
             n = re.match(r"\d+", rest)
             cur_track = int(n.group(0)) if n else None
+            if keep_file is not None and n:
+                renumber += 1
+                line = f"{indent}TRACK {renumber:02d}{rest[n.end():]}{eol}"
+        if skipping:
+            continue
         elif cmd in ("TITLE", "PERFORMER"):
             key = cmd.lower()
             if cur_track is None and album.get(key):

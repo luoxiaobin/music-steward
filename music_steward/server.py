@@ -183,19 +183,19 @@ class App:
 
     def start_job(self, kind: str, root: str, path: str = "") -> dict:
         """Background scan or hash of a root or one of its sub-folders. One job at a time."""
-        if kind in ("apply", "undo", "resume", "recognize_unit"):
+        if kind in ("apply", "undo", "resume", "retry", "recognize_unit"):
             root = root or self.roots[0]
             if not str(path).isdigit():
                 return {"error": "bad id"}
         root = os.path.abspath(root)
         if root not in self.roots:
             return {"error": "not a configured root"}
-        if kind in ("apply", "undo", "resume", "recognize_unit"):
+        if kind in ("apply", "undo", "resume", "retry", "recognize_unit"):
             pass
         elif path and (".." in path.split("/") or path.startswith("/")):
             return {"error": "bad path"}
         target = os.path.join(root, str(path)) if path else root
-        if kind not in ("apply", "undo", "resume", "recognize_unit") and not os.path.realpath(target).startswith(os.path.realpath(root)):
+        if kind not in ("apply", "undo", "resume", "retry", "recognize_unit") and not os.path.realpath(target).startswith(os.path.realpath(root)):
             return {"error": "bad path"}
         with self._lock:
             if self.scan_state.get("running"):
@@ -213,13 +213,14 @@ class App:
                 if kind == "scan":
                     r = scan(con, target, progress=prog)
                     res = {"status": r.status, **r.counts, "abort_reason": r.abort_reason}
-                elif kind in ("apply", "undo", "resume"):
+                elif kind in ("apply", "undo", "resume", "retry"):
                     from .apply import runner
                     n = int(path)
                     res = {"status": "complete", **(runner.apply(con, n, progress=prog, stop=self._stop) if kind == "apply"
                                                     else runner.undo(con, n) if kind == "undo"
-                                                    else runner.resume(con, n, progress=prog, stop=self._stop))}
-                    if kind in ("apply", "resume") and self._stop.is_set():
+                                                    else runner.resume(con, n, progress=prog, stop=self._stop,
+                                                                       retry_failed=kind == "retry"))}
+                    if kind in ("apply", "resume", "retry") and self._stop.is_set():
                         left = (res.get("states") or {}).get("intent", 0)
                         res.update(status="stopped", abort_reason=f"stopped by you; {left} files not copied yet "
                                                                  "(Resume continues the run)")
@@ -275,7 +276,7 @@ class App:
         return self.settings_view(con)
 
     def stop_job(self) -> dict:
-        if not self.scan_state.get("running") or self.scan_state.get("kind") not in ("recognize", "apply", "resume"):
+        if not self.scan_state.get("running") or self.scan_state.get("kind") not in ("recognize", "apply", "resume", "retry"):
             return {"error": "only a running recognition or apply can be stopped"}
         self._stop.set()
         return {"stopping": True}
@@ -664,7 +665,7 @@ def make_handler(app: App, port_ref: dict):
                     return self._json(app.make_plan(con, body))
                 finally:
                     con.close()
-            if u.path in ("/api/apply", "/api/undo", "/api/resume"):
+            if u.path in ("/api/apply", "/api/undo", "/api/resume", "/api/retry"):
                 kind = u.path.rsplit("/", 1)[1]
                 return self._json(app.start_job(kind, "", str(body.get("id", ""))))
             if u.path in ("/api/bulk_accept", "/api/bulk"):

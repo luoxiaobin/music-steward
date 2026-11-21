@@ -11,7 +11,20 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   [Recovery and safety](docs/RECOVERY.md), [Configuration](docs/CONFIGURATION.md) (naming defaults with examples,
   credentials, data locations, what is sent online) and [Architecture](docs/ARCHITECTURE.md). (Codex review)
 
+- **Retry failed** on the plan screen (and `resume(..., retry_failed=True)`): files that failed in a run (drive
+  disconnected, disk full) are tried again in the same run, so Undo still covers everything. A **Not copied** list
+  shows each file that was not copied and why.
+
 ### Fixed
+- **Apply could write into the collection through a link.** The destination was only checked when the plan was
+  built; a destination folder replaced afterwards by a link into the collection made Apply write copies there. Apply
+  and Resume now re-check the destination, and every file's real path is checked before it is written.
+- **An interrupted run could finish with files silently missing.** A crash while a run was being prepared left a
+  journal with only part of the plan; Resume finished those and reported success. A run is now marked ready only
+  when every file is journalled, and Resume adds any that are missing.
+- A torn last line in an apply journal (crash mid-write) no longer swallows the next record.
+- **Cue sheets with one FILE per disc image** gave every disc the track list of the first: the matcher, track
+  mapping, previews and own info now use each image's own tracks, and each disc's copy gets its own cue sheet.
 - Documentation accuracy: what the app reads and writes, NAS publishing marked experimental with its residual
   limitation, beets' license (MIT), the process model, milestone status.
 

@@ -185,3 +185,95 @@ def test_identical_album_in_two_folders_is_copied_once(tmp_path, con):
         st.setdefault(i["src"].split("/lib/")[1].split("/")[0], set()).add(i["status"])
     assert st["B"] == {"duplicate_source"} and p["summary"]["duplicate_albums_skipped"] == 1
     assert st["A"] == {"conflict_duplicate"} and st["C"] == {"conflict_duplicate"}   # A vs C: really different
+
+
+TWO_IMAGES = '''PERFORMER "群星"
+TITLE "经典老歌"
+FILE "CD1.wav" WAVE
+  TRACK 01 AUDIO
+    TITLE "一号"
+    INDEX 01 00:00:00
+  TRACK 02 AUDIO
+    TITLE "二号"
+    INDEX 01 00:01:00
+  TRACK 03 AUDIO
+    TITLE "三号"
+    INDEX 01 00:03:00
+  TRACK 04 AUDIO
+    TITLE "四号"
+    INDEX 01 00:04:00
+FILE "CD2.wav" WAVE
+  TRACK 05 AUDIO
+    TITLE "五号"
+    INDEX 01 00:00:00
+  TRACK 06 AUDIO
+    TITLE "六号"
+    INDEX 01 00:01:00
+  TRACK 07 AUDIO
+    TITLE "七号"
+    INDEX 01 00:02:00
+  TRACK 08 AUDIO
+    TITLE "八号"
+    INDEX 01 00:03:00
+'''
+
+
+@pytest.fixture
+def two_image_cue(tmp_path, con):
+    """One cue sheet, one FILE per disc image (a 2-CD image set in one folder)."""
+    lib = tmp_path / "lib"
+    a = lib / "经典老歌"
+    tone(a / "CD1.flac", ["-c:a", "flac"], secs=6, freq=300)
+    tone(a / "CD2.flac", ["-c:a", "flac"], secs=5, freq=600)
+    (a / "album.cue").write_bytes(TWO_IMAGES.encode("gbk"))
+    scan(con, lib)
+    us = [u for u in units.plan_units(con, 1) if u["kind"] == "cue"]
+    units.enqueue(con, 1, us)
+    con.execute("UPDATE unit SET status='done'")
+    con.commit()
+    by_image = {}
+    for r in con.execute("SELECT u.id, f.relpath FROM unit u JOIN file f ON f.id = json_extract(u.file_ids, '$[0]')"):
+        by_image[r["relpath"].rsplit("/", 1)[-1]] = r["id"]
+    return lib, by_image
+
+
+def test_file_for_picks_the_images_own_entry():
+    sheet = cue.parse_bytes(TWO_IMAGES.encode("gbk"))
+    assert [t.number for t in cue.file_for(sheet, "CD2.ape").tracks] == [5, 6, 7, 8]   # same stem, other extension
+    assert [t.number for t in cue.file_for(sheet, "cd1.WAV").tracks] == [1, 2, 3, 4]   # case-insensitive
+
+
+def test_each_image_of_a_two_file_cue_gets_its_own_tracks(two_image_cue, con, tmp_path, monkeypatch):
+    """Before: every consumer took the FILE with the most tracks, so disc 2 got disc 1's tracks."""
+    from music_steward.recognize import beets_adapter, local, results, worker
+    lib, uid = two_image_cue
+    assert set(uid) == {"CD1.flac", "CD2.flac"}
+    d2 = con.execute("SELECT * FROM unit WHERE id=?", (uid["CD2.flac"],)).fetchone()
+    # the matcher is given disc 2's tracks
+    seen = {}
+    monkeypatch.setattr(beets_adapter, "match_cue", lambda path, album, tracks, *a, **k: seen.setdefault("t", tracks))
+    worker._match_cue(con, d2, str(lib / "经典老歌/CD2.flac"), None, None)
+    assert [t["title"] for t in seen["t"]] == ["五号", "六号", "七号", "八号"]
+    assert seen["t"][3]["length"] == pytest.approx(2.0, abs=0.1)        # to the end of CD2 (5 s), not CD1
+    # preview slices and own info
+    assert sorted(results._cue_slices(con, dict(d2))) == [5, 6, 7, 8]
+    info = local.from_cue(con, d2)
+    assert [t["title"] for t in info["tracks"]] == ["五号", "六号", "七号", "八号"]
+    assert (info["tracks"][0]["medium"], info["mediums"], info["origin"]["disc"]) == (2, 2, "cue sheet")
+    # plan + apply: each disc gets a standalone cue for its own image
+    for u in uid.values():
+        cid = local.add(con, u)
+        con.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
+                    "VALUES(?, 'accept', ?, 0, 'local')", (u, cid))
+    con.commit()
+    dest = tmp_path / "out"
+    p = plan.load(con, plan.build(con, str(dest), 1))
+    assert all(i["status"] == "ok" for i in p["items"]), [(i["dest_rel"], i["note"]) for i in p["items"]]
+    res = runner.apply(con, p["id"], journal_root=tmp_path / "j")
+    assert set(res["states"]) == {"committed"}, res
+    adir = dest / "群星/经典老歌"
+    c2 = cue.parse(str(adir / "经典老歌 (CD 2).cue"))
+    assert [f.name for f in c2.files] == ["经典老歌 (CD 2).flac"]
+    assert [(t.number, t.title) for t in c2.tracks] == [(1, "五号"), (2, "六号"), (3, "七号"), (4, "八号")]
+    c1 = cue.parse(str(adir / "经典老歌 (CD 1).cue"))
+    assert [f.name for f in c1.files] == ["经典老歌 (CD 1).flac"] and [t.title for t in c1.tracks] == ["一号", "二号", "三号", "四号"]
