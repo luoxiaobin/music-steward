@@ -302,9 +302,15 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
                 # its row -- and so its albums, matches and decisions
                 c["n_moved"] += 1
                 claimed.add(moved)
+                old = con.execute("SELECT size, mtime_ns FROM file WHERE id=?", (moved,)).fetchone()
+                # a pure rename keeps the bytes, so the saved hashes stay valid (hashing a NAS is slow);
+                # moved AND retagged: the whole-file hashes are stale (Codex review on #6)
+                same = (old["size"], old["mtime_ns"]) == (f.size, f.mtime_ns)
                 con.execute(
                     "UPDATE file SET relpath=?, fs_relpath=?, kind=?, ext=?, size=?, mtime_ns=?, last_scan=?, "
-                    "removed_at=NULL, " + ", ".join(f"{p}=?" for p in PROPS) + " WHERE id=?",
+                    "removed_at=NULL, " + ", ".join(f"{p}=?" for p in PROPS) +
+                    ("" if same else ", file_sha256=NULL, audio_hash=NULL, audio_hash_method=NULL, hash_error=NULL, "
+                                     "hashed_size=NULL, hashed_mtime_ns=NULL") + " WHERE id=?",
                     (f.rel, f.fs_rel, f.kind, f.ext, f.size, f.mtime_ns, scan_id, *vals.values(), moved))
             elif k:
                 c["n_changed"] += 1

@@ -212,3 +212,24 @@ def test_a_restored_file_and_a_new_copy_of_it_are_two_files(accepted, con, monke
     assert sorted((x["relpath"], x["fs_relpath"], x["removed_at"]) for x in rows) == [
         ("Copy/01 - x.mp3", "Copy/01 - x.mp3", None), ("Ò¹º½/01 - x.mp3", "Ò¹º½/01 - x.mp3", None)]
     assert r.counts["n_moved"] == 0
+
+
+def test_a_file_moved_and_retagged_loses_its_stale_hashes_but_a_rename_keeps_them(accepted, con):  # noqa: F811
+    """Codex review on #6: the exact-duplicate audit used the old whole-file hash of a moved and
+    retagged file."""
+    from mutagen.id3 import ID3, TIT2
+    from music_steward.hashpass import run as hash_run
+    lib, _ = accepted
+    hash_run(con, 1)
+    q = "SELECT file_sha256, relpath FROM file WHERE relpath LIKE '%0{n} - x.mp3'"
+    assert con.execute(q.format(n=1)).fetchone()[0] and con.execute(q.format(n=2)).fetchone()[0]
+    (lib / "Moved").mkdir()
+    os.rename(lib / "Ò¹º½/01 - x.mp3", lib / "Moved/01 - x.mp3")          # moved only
+    os.rename(lib / "Ò¹º½/02 - x.mp3", lib / "Moved/02 - x.mp3")          # moved and retagged
+    t = ID3(lib / "Moved/02 - x.mp3")
+    t.add(TIT2(encoding=3, text="新的标题"))
+    t.save()
+    assert scan(con, lib).counts["n_moved"] == 2
+    one, two = con.execute(q.format(n=1)).fetchone(), con.execute(q.format(n=2)).fetchone()
+    assert one["relpath"].startswith("Moved/") and one["file_sha256"]          # same bytes: hash kept
+    assert two["relpath"].startswith("Moved/") and two["file_sha256"] is None  # new bytes: hash cleared
