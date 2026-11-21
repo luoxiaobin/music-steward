@@ -123,7 +123,11 @@ def _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, 
                        "date": c["year"], "mb_trackid": ct.get("recording_id") if is_mb else None,
                        "mb_albumid": c["album_id"] if is_mb else None,
                        "split": {"start": start, "end": nxt, "src_ext": f["ext"], "src_codec": f["codec"],
-                                 "rate": f["sample_rate"], "bits": f["bits_per_sample"]}}}
+                                 "rate": f["sample_rate"], "bits": f["bits_per_sample"],
+                                 # the positions come from this cue sheet: checked unchanged at plan
+                                 # and apply time, like the image (Codex review on #7)
+                                 "cue": {"path": os.path.join(root_path, cf["fs_relpath"]),
+                                         "size": cf["size"], "mtime_ns": cf["mtime_ns"]}}}}
         items.append(it)
         mine.append(it)
     new_stem_of[f["relpath"].rsplit(".", 1)[0]] = f"{adir}/{mine[0]['dest_rel'].rsplit('/', 1)[-1].rsplit('.', 1)[0]}" \
@@ -366,8 +370,12 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
             it["status"], it["note"] = "duplicate_source", f"identical to {dup_units[it['unit_id']]}: copied once"
             continue
         st = os.stat(it["src"]) if os.path.exists(it["src"]) else None
+        cue = ((it.get("tags") or {}).get("split") or {}).get("cue")
+        cst = os.stat(cue["path"]) if cue and os.path.exists(cue["path"]) else None
         if st is None or st.st_size != it["size"] or st.st_mtime_ns != it["mtime"]:
             it["status"], it["note"] = "source_changed", "source changed or missing since the scan; re-scan"
+        elif cue and (cst is None or (cst.st_size, cst.st_mtime_ns) != (cue["size"], cue["mtime_ns"])):
+            it["status"], it["note"] = "source_changed", "cue sheet changed or missing since the scan; re-scan"
         elif (dest / it["dest_rel"]).exists():
             it["status"], it["note"] = "conflict_existing", "a file already exists at the destination"
         elif len(seen[collision_key(it["dest_rel"])]) > 1:

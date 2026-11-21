@@ -74,6 +74,16 @@ def choose_method(dest_root: Path) -> str:
         shutil.rmtree(d, ignore_errors=True)
 
 
+def fsync_file(p: Path):
+    """Force a finished file onto the disk before it is published: after a power cut a file under its
+    final name must be complete (the journal then says committed and recovery leaves it alone)."""
+    fd = os.open(p, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
 def fsync_dir(d: Path):
     try:
         fd = os.open(d, os.O_RDONLY)
@@ -161,8 +171,20 @@ def _cut(j: Journal, o: dict, src: Path, temp: Path, sp: dict, crash_at: str | N
     that the track's samples equal the image's, journal 'copied'. False: aborted (journalled)."""
     from .split import extract, verify
     op = o["op"]
+    cue = sp.get("cue")
+    if cue:      # the track positions come from the cue sheet: it must be the one the plan was made from
+        try:
+            st = os.stat(cue["path"])
+            same = (st.st_size, st.st_mtime_ns) == (cue["size"], cue["mtime_ns"])
+        except FileNotFoundError:
+            same = False
+        if not same:
+            j.write({"op": op, "state": "aborted_source_changed", "ownership": "none",
+                     "reason": "the cue sheet changed since the plan was made"})
+            return False
     os.close(os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644))
     extract(str(src), str(temp), sp["start"], sp["end"], sp["rate"], sp.get("bits"), sp["src_ext"])
+    fsync_file(temp)
     _crash("mid_copy", crash_at)
     st2 = src.stat()
     if st2.st_size != o["src_size"] or st2.st_mtime_ns != o["src_mtime_ns"]:
@@ -279,6 +301,9 @@ def execute_op(j: Journal, o: dict, crash_at: str | None = None, guard=None):
                 j.write({"op": op, "state": "aborted_audio_changed", "ownership": "none",
                          "reason": "audio of the copy differs from the source after tagging"})
                 return
+        # tagging (and cutting a track) rewrites the temp file after the copy's own fsync: flush it again
+        # before it is published (Codex review on #7)
+        fsync_file(temp)
         st = temp.stat()
         j.write({"op": op, "state": "tagged", "tagged_sha": file_sha256(str(temp)), "temp_ino": st.st_ino})
         o.update(tagged_sha=file_sha256(str(temp)), temp_ino=st.st_ino)

@@ -1,5 +1,6 @@
 """Setting "Albums of one file with a cue sheet: one file per track": lossless, sample-exact split."""
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -214,3 +215,34 @@ def test_identical_images_cut_differently_are_not_duplicates(tmp_path, con, monk
     assert p["summary"]["duplicate_albums_skipped"] == 0
     assert "duplicate_source" not in {i["status"] for i in p["items"]}
     assert "conflict_duplicate" in {i["status"] for i in p["items"]}      # a visible conflict instead
+
+
+def test_a_cue_sheet_changed_after_the_scan_blocks_the_split(split_album, con, tmp_path):
+    """Codex review on #7: the split read the current cue sheet while keeping the titles accepted for
+    the old one -- titles on the wrong stretches of audio."""
+    lib, _ = split_album
+    sheet = lib / "HIFI/image.cue"
+    p1 = plan.build(con, str(tmp_path / "out"), 1)                # planned with the scanned cue
+    sheet.write_bytes(sheet.read_bytes().replace(b"00:04:00", b"00:03:00"))
+    os.utime(sheet, ns=(0, sheet.stat().st_mtime_ns + 10**9))
+    p2 = plan.load(con, plan.build(con, str(tmp_path / "out2"), 1))
+    assert {i["status"] for i in p2["items"] if i["kind"] == "split"} == {"source_changed"}
+    res = runner.apply(con, p1, journal_root=tmp_path / "j")       # the earlier plan, applied now
+    assert res["states"] == {"aborted_source_changed": 3}, res
+    assert all("cue sheet changed" in f["reason"] for f in res["failed"])
+    assert not list((tmp_path / "out").rglob("*.flac"))
+
+
+def test_finished_files_are_flushed_to_disk_before_they_are_published(split_album, con, tmp_path, monkeypatch):
+    """Codex review on #7: a cut (or tagged) file must be on the disk before it gets its final name."""
+    flushed, published = [], []
+    real_fsync, real_rename = protocol.fsync_file, protocol.rename_excl
+    monkeypatch.setattr(protocol, "fsync_file", lambda p: (flushed.append(str(p)), real_fsync(p))[1])
+    monkeypatch.setattr(protocol, "rename_excl", lambda a, b: (published.append((str(a), set(flushed))),
+                                                                 real_rename(a, b))[1])
+    res = runner.apply(con, plan.build(con, str(tmp_path / "out"), 1), journal_root=tmp_path / "j")
+    assert res["states"] == {"committed": 3}
+    published = [(t, seen) for t, seen in published if ".mlt-probe" not in t]   # not the destination probe
+    if not published:
+        pytest.skip("this destination does not publish with rename_excl")
+    assert len(published) == 3 and all(temp in seen for temp, seen in published)
