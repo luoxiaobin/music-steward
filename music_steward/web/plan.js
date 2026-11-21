@@ -94,7 +94,8 @@ async function renderPlan(id) {
     doneForYou(s, dups),
     (s.left_out || []).length ? h("div", { class: "card block" }, h("h2", { class: "h2" }, "Left out · audio changed since you decided ",
         h("span", { class: "badge b-conflict" }, s.left_out.length)),
-      rows(s.left_out, [["Album", x => h("td", {}, x.label)], ["Folder", x => h("td", { class: "mono" }, (x.folder || ".") + "/")]]),
+      rows(s.left_out, [["Album", x => h("td", { "data-no-translate": "" }, x.label)],
+                        ["Folder", x => h("td", { class: "mono", "data-no-translate": "" }, (x.folder || ".") + "/")]]),
       h("p", { class: "muted small" }, "Decide these albums again in review, then build a new plan.")) : null,
     previewTree(ok.concat(items.filter(i => i.kind === "cue_new" && i.status === "ok" && !ok.includes(i)))),
     h("div", { class: "cards" },
@@ -121,10 +122,16 @@ async function renderPlan(id) {
                         await post("/api/undo", { id: r.id }); pollPlan(id); } }, "Undo run"), " ",
                       h("button", { type: "button", class: "btn", disabled: busy, onclick: async () => {
                         await post("/api/resume", { id: r.id }); pollPlan(id); } }, "Resume"),
+                      ...(retirable(r) ? [" ", h("button", { type: "button", class: "btn", disabled: busy || !p.retire_allowed,
+                        title: p.retire_allowed ? "Set the originals of the albums that were copied aside (nothing is deleted)"
+                                                : "Allow it first: Settings → Originals",
+                        onclick: () => retireDialog(r.id, id) }, "Retire originals…")] : []),
                       ...((r.summary.states || {}).failed ? [" ", h("button", { type: "button", class: "btn primary", disabled: busy,
                         title: "Try the failed files again, e.g. after reconnecting the drive", onclick: async () => {
                           await post("/api/retry", { id: r.id }); pollPlan(id); } }, `Retry failed (${r.summary.states.failed})`)] : [])])]])) : null,
     failedList(p.runs, rows),
+    originalsCard(p, id, busy, rows),
+    retireResult(job, busy),
     h("div", { class: "card" }, h("h2", { class: "h2" }, "Tag changes ",
         h("span", { class: "muted small", style: "font-weight:400" }, `${diffs.length} changes in ${audio.length} files · written to the copies only`)),
       h("div", { style: "overflow-x:auto" }, rows(diffs.slice(0, 200), [
@@ -162,6 +169,96 @@ function failedList(runs, rows) {
     h("p", { class: "muted small" }, "Failed files can be tried again with Retry failed. Conflicts and changed sources need a new plan."));
 }
 
+// ---- originals (ADR 0003): set aside after the copy is verified; Restore; what to do with them
+const retirable = r => !r.undone_at && r.finished_at && ((r.summary.states || {}).committed || (r.summary.states || {}).already_existed);
+
+async function retireDialog(runId, planId) {
+  const dlg = h("dialog", { class: "appdialog settings" }, h("h2", { class: "h2" }, "Retire originals"),
+    h("p", { class: "muted" }, "Checking the organized copies…"));
+  document.body.append(dlg);
+  dlg.showModal();
+  const close = () => { dlg.close(); dlg.remove(); };
+  let d;
+  try { d = await api(`/api/retire_plan?run=${runId}`); } catch (e) { d = { error: String(e) }; }
+  if (d.error) {
+    dlg.replaceChildren(h("h2", { class: "h2" }, "Retire originals"), h("p", { class: "err" }, d.error),
+      h("div", { class: "btnrow" }, h("button", { type: "button", class: "btn btn-primary", onclick: close }, "OK")));
+    return;
+  }
+  const cant = d.albums.filter(a => !a.eligible), flagged = d.albums.filter(a => a.eligible && a.flags.length);
+  const tick = h("input", { type: "checkbox", id: "retireAck" });
+  const go = h("button", { type: "button", class: "btn btn-primary", disabled: true, onclick: async () => {
+    const r = await post("/api/retire", { id: runId, ack: true });
+    close();
+    if (r.error) return tell(r.error);
+    pollPlan(planId);
+  } }, `Set aside albums: ${d.albums_ok} (${fmtSize(d.bytes_ok)})`);
+  tick.addEventListener("change", () => { go.disabled = !tick.checked || !d.albums_ok; });
+  dlg.replaceChildren(...[
+    h("h2", { class: "h2" }, "Retire originals"),
+    h("p", {}, h("strong", {}, `Albums ${d.albums_ok} · files ${d.files_ok} · ${fmtSize(d.bytes_ok)}`),
+      " can be set aside: their organized copies exist and their audio is identical to the originals."),
+    h("p", { class: "small" }, "The original files are moved (not copied, not deleted) into a folder named ",
+      h("code", {}, "_ORIGINALS"), " inside your collection folder, on the same drive. It takes seconds. " +
+      "The folder has a README explaining what it is. You can restore them from here at any time."),
+    cant.length ? h("details", {}, h("summary", {}, h("strong", {}, "Albums that stay where they are "),
+      h("span", { class: "badge b-conflict" }, cant.length)),
+      h("ul", { class: "small" }, cant.slice(0, 100).map(a => reasonLi(a.label, a.reason)),
+        cant.length > 100 ? h("li", { class: "muted" }, `+ ${cant.length - 100} more`) : null)) : null,
+    flagged.length ? h("details", {}, h("summary", {}, h("strong", {}, "Worth a look "), h("span", { class: "badge b-unid" }, flagged.length)),
+      h("ul", { class: "small" }, flagged.slice(0, 100).map(a => reasonLi(a.label, ...a.flags)))) : null,
+    h("div", { class: "banner" }, h("strong", {}, "One thing to know. "),
+      "Afterwards the organized copy is the only finished copy; the originals are only set aside. " +
+      "Music Steward does not make backups. Keep your own backup of the organized copy."),
+    h("label", { class: "small" }, tick, " I know this, and I have (or will make) a backup of the organized copy."),
+    h("div", { class: "btnrow" }, h("button", { type: "button", class: "btn", onclick: close }, "Cancel"), go)
+  ].filter(Boolean));            // a null child would be written into the page as the word "null"
+  dlg.querySelector("#retireAck").focus();
+}
+
+// one list item: the album, then each reason in its own element (a fixed sentence the page can translate)
+const reasonLi = (label, ...reasons) => h("li", {}, h("strong", { "data-no-translate": "" }, label), " — ",
+  ...reasons.flatMap((x, i) => [i ? "; " : null, h("span", {}, x)].filter(Boolean)));
+
+function originalsCard(p, id, busy, rows) {
+  if (!(p.originals || []).length) return null;
+  const state = b => b.restored_at ? "Restored to the collection" : b.status === "running" ? "Interrupted — Finish setting aside to continue"
+    : b.status === "stopped" ? "Stopped — Finish setting aside to continue" : "Set aside (can be restored)";
+  return h("div", { class: "card" }, h("h2", { class: "h2" }, "Originals set aside"),
+    h("p", { class: "muted small" }, "These original files were set aside, unchanged, in the folder shown; each folder has a README. " +
+      "What you can do with them: restore them here; archive them (copy the folder to a backup drive); or delete them to save space " +
+      "— only after you have played the organized copies and have a backup of them. Deleting cannot be undone."),
+    rows(p.originals, [["Set aside on", b => h("td", {}, new Date(b.created_at * 1000).toLocaleString())],
+      ["Albums", b => h("td", {}, String((b.summary || {}).albums ?? 0))],
+      ["Files · size", b => h("td", {}, `${b.moved} · ${fmtSize((b.summary || {}).bytes || 0)}`)],
+      ["Originals folder", b => h("td", { class: "mono", style: "word-break:break-all", "data-no-translate": "" }, b.folder)],
+      ["Status", b => h("td", {}, state(b))],
+      ["", b => h("td", {}, [
+        ["running", "stopped"].includes(b.status) && !b.restored_at ? h("button", { type: "button", class: "btn", disabled: busy,
+          onclick: async () => { await post("/api/retire_resume", { id: b.id }); pollPlan(id); } }, "Finish setting aside") : null, " ",
+        b.moved && !b.restored_at ? h("button", { type: "button", class: "btn", disabled: busy, onclick: async () => {
+          if (!await ask(`Move ${b.moved} files back to where they were? Anything that has appeared at an original place since is left alone and reported.`, "Restore originals")) return;
+          await post("/api/restore", { id: b.id }); pollPlan(id); } }, "Restore originals") : null])]]));
+}
+
+function retireResult(job, busy) {
+  const r = job.result;
+  if (busy || !r || !["retire", "retire_resume", "restore"].includes(job.kind)) return null;
+  if (r.status === "error") return h("div", { class: "card banner" }, h("strong", {}, "Not done. "), r.abort_reason);
+  if (job.kind === "restore") {
+    return h("div", { class: "card banner" }, h("strong", {}, `Restored files: ${r.restored}. `),
+      (r.blocked || []).length ? h("div", {}, "Left where they are (something is at the original place now): ",
+        h("span", { class: "mono", "data-no-translate": "" }, r.blocked.slice(0, 5).map(x => x.relpath).join(", "))) : null,
+      (r.missing || []).length ? h("div", {}, `No longer in the originals folder: ${r.missing.length}`) : null);
+  }
+  const sk = r.skipped || [];
+  return h("div", { class: "card banner" }, h("strong", {}, r.status === "stopped" ? "Stopped. " : "Done. "),
+    r.batch ? [`Albums set aside: ${r.albums} (${fmtSize(r.bytes)}) in `, h("span", { class: "mono", "data-no-translate": "" }, r.folder)] : "Nothing was set aside.",
+    sk.length ? h("details", {}, h("summary", {}, h("strong", {}, "Albums that stay where they are "),
+      h("span", { class: "badge b-conflict" }, sk.length)),
+      h("ul", { class: "small" }, sk.slice(0, 50).map(a => reasonLi(a.label, a.reason)))) : null);
+}
+
 function progressCard(job, ok) {
   const doneN = job.done || 0, total = job.total || ok.length;
   const bytes = ok.reduce((a, i) => a + (i.src_size || 0), 0);
@@ -172,11 +269,12 @@ function progressCard(job, ok) {
   const mins = x => x < 90 ? `${Math.round(x)} s` : `${Math.round(x / 60)} min`;
   return h("div", { class: "card" },
     h("div", { style: "display:flex;gap:12px;align-items:center;flex-wrap:wrap" },
-      h("strong", {}, job.kind === "apply" ? "Copying" : job.kind === "resume" ? "Resuming" : job.kind === "retry" ? "Retrying" : "Undoing"),
-      h("span", { class: "muted small" }, `${doneN} / ${total} files` +
+      h("strong", {}, {apply: "Copying", resume: "Resuming", retry: "Retrying", retire: "Setting originals aside",
+                       retire_resume: "Finishing setting originals aside", restore: "Restoring originals"}[job.kind] || "Undoing"),
+      h("span", { class: "muted small" }, `${doneN} / ${total} ${["retire", "retire_resume"].includes(job.kind) ? "albums" : "files"}` +
         (job.kind === "apply" && bytes ? ` · ${fmtSize(doneB)} of ${fmtSize(bytes)}` : "") +
         (el > 3 && doneB ? ` · ${fmtSize(doneB / el)}/s` : "") + (eta != null ? ` · about ${mins(eta)} left` : "")),
-      ["apply", "resume", "retry"].includes(job.kind) ? h("button", { type: "button", class: "btn", style: "margin-left:auto",
+      ["apply", "resume", "retry", "retire", "retire_resume"].includes(job.kind) ? h("button", { type: "button", class: "btn", style: "margin-left:auto",
         onclick: async e => { e.target.disabled = true; e.target.textContent = "Stopping after this file…";
                               const r = await post("/api/stop", {}); if (r.error) tell(r.error); } }, "Stop") : null),
     h("div", { class: "pbar" }, h("div", { style: `width:${Math.round(frac * 100)}%` })),

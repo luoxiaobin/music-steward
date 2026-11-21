@@ -21,6 +21,7 @@
 | `recognize/httpcache.py` | Cache of web answers and fingerprints; per-service throttling. |
 | `apply/plan.py`, `naming.py` | Frozen plan: destination paths, naming rules, tag values, conflicts, duplicate albums, generated cue sheets. |
 | `apply/protocol.py`, `tagwrite.py`, `runner.py` | Journal-first apply: copy → tag the copy → verify → publish (no overwrite); resume; undo. |
+| `retire.py` | Retire originals: re-checks each album (copy intact, original unchanged, no links), then moves its files into `_ORIGINALS` with a README and manifest; resume; restore. The only module that renames under a collection folder. |
 | `apply/split.py` | "One file per track": cuts a track out of a lossless cue-sheet image into FLAC at exact sample positions and checks its samples against the image. Read-only on the image. |
 | `identity.py` | File identities from the audio (length + first/last 64 KiB, tags excluded), so renamed or moved files keep their records and decisions ([ADR 0002](adr/0002-album-identity-independent-of-paths.md)). Read-only. |
 | `cue.py`, `chinese.py`, `search.py`, `preview.py`, `settings.py`, `i18n.py` | Cue sheets (encodings, rewrite), Simplified/Traditional, search index with pinyin, audio previews, settings, interface languages. |
@@ -30,7 +31,9 @@
 ## Safety boundaries
 
 * **Read-only sources.** Only `apply/protocol.py` writes music files, and only under the plan's destination root;
-  `plan.check_destination` refuses a destination that overlaps a collection root.
+  `plan.check_destination` refuses a destination that overlaps a collection root. The one exception is
+  `retire.py` ([ADR 0003](adr/0003-retire-originals.md)): a per-folder opt-in, journalled *rename* of verified
+  albums' files into `<root>/_ORIGINALS/<batch>/`, restorable, never a deletion.
 * **Journal first.** Every apply step is recorded on the local disk before it happens; temporary files carry the run
   and step in their name; recovery decides from the journal and the files, never from guesses.
 * **Publish without overwrite.** Probed per destination: `renamex_np(RENAME_EXCL)` → `link()+unlink()` →

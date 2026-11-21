@@ -7,6 +7,17 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 ## [Unreleased]
 
 ### Added
+- **Retire originals** ([ADR 0003](docs/adr/0003-retire-originals.md)): after a copy is verified, set the originals
+  aside so you end up with one organized library — optional, off until you allow it per collection folder
+  (Settings → Retiring originals). On the plan screen, **Retire originals…** re-checks every album (all files copied;
+  the organized copy still there with identical audio, also if you retagged it; the original unchanged; no links),
+  shows what can and cannot be set aside and why, and asks for a confirmation that includes the backup warning.
+  The originals are **moved, never deleted**, into `_ORIGINALS/run…/` in the same collection folder (same drive,
+  instant), with a plain-language `README - ORIGINALS.txt` in your interface language and a `MANIFEST.csv`
+  (each original with its organized copy). **Restore originals** puts every file back and never overwrites;
+  **Finish setting aside** settles a stop or crash. Duplicate albums copied once and albums split into tracks are
+  handled. Archive and Delete buttons are planned; the README and the User guide say how to archive or delete by hand.
+- The scanner ignores `_ORIGINALS`; a file restored with the same size and time keeps its saved hashes.
 - **Required: the organized copy works in Subsonic-standard music servers** (Navidrome, and phone apps that speak
   the Subsonic protocol). A new test points a throwaway Navidrome at an organized copy and checks, through the
   Subsonic API, that every album appears once with all its tracks in order and the planned titles, artists, years

@@ -9,7 +9,8 @@ AUDIO_EXTS = {".mp3", ".flac", ".ape", ".m4a", ".mp4", ".aac", ".wav", ".wma",
 SIDE_EXTS = {".cue": "cue", ".lrc": "lrc"}
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
 # never interesting, never reported
-JUNK_NAMES = {".DS_Store", "Thumbs.db", "desktop.ini", "@eaDir", "#recycle", ".AppleDouble"}
+JUNK_NAMES = {".DS_Store", "Thumbs.db", "desktop.ini", "@eaDir", "#recycle", ".AppleDouble",
+              "_ORIGINALS"}      # where retired originals are parked (retire.py): never scanned as music
 
 
 def nfc(s: str) -> str:

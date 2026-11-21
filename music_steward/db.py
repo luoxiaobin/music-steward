@@ -144,6 +144,20 @@ CREATE TABLE IF NOT EXISTS run(
     undone_at REAL
 );
 
+-- originals set aside by retire.py (ADR 0003); the journal on disk is the truth for crash recovery
+CREATE TABLE IF NOT EXISTS retire_batch(
+    id INTEGER PRIMARY KEY, root_id INTEGER NOT NULL, run_id INTEGER NOT NULL, key TEXT NOT NULL UNIQUE,
+    folder TEXT NOT NULL, journal TEXT NOT NULL, created_at REAL, finished_at REAL,
+    status TEXT,                        -- running | complete | stopped
+    summary_json TEXT, restored_at REAL
+);
+CREATE TABLE IF NOT EXISTS retired_file(
+    batch_id INTEGER NOT NULL REFERENCES retire_batch(id), file_id INTEGER, unit_id INTEGER, album TEXT,
+    relpath TEXT NOT NULL, size INTEGER, mtime_ns INTEGER, content_id TEXT, kind TEXT,
+    state TEXT,                         -- intent | moved | restored
+    PRIMARY KEY(batch_id, relpath)
+);
+
 CREATE TABLE IF NOT EXISTS dir_note(
     root_id INTEGER NOT NULL, relpath TEXT NOT NULL, note TEXT NOT NULL, detail TEXT,
     last_scan INTEGER,
@@ -160,7 +174,9 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
                  ("candidate", "origin_json", "TEXT"), ("candidate", "original_year", "INTEGER"),
                  # ADR 0002: identity follows the content; a decision made on different audio is flagged
                  ("file", "content_id", "TEXT"), ("decision", "stale_reason", "TEXT"),
-                 ("scan", "n_moved", "INTEGER")]
+                 ("scan", "n_moved", "INTEGER"),
+                 # where the collection folder really was when originals were set aside (retire.py)
+                 ("retire_batch", "root_real", "TEXT")]
 
 
 _READY: set[str] = set()   # databases already set up by this process

@@ -183,19 +183,19 @@ class App:
 
     def start_job(self, kind: str, root: str, path: str = "") -> dict:
         """Background scan or hash of a root or one of its sub-folders. One job at a time."""
-        if kind in ("apply", "undo", "resume", "retry", "recognize_unit"):
+        if kind in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "recognize_unit"):
             root = root or self.roots[0]
             if not str(path).isdigit():
                 return {"error": "bad id"}
         root = os.path.abspath(root)
         if root not in self.roots:
             return {"error": "not a configured root"}
-        if kind in ("apply", "undo", "resume", "retry", "recognize_unit"):
+        if kind in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "recognize_unit"):
             pass
         elif path and (".." in path.split("/") or path.startswith("/")):
             return {"error": "bad path"}
         target = os.path.join(root, str(path)) if path else root
-        if kind not in ("apply", "undo", "resume", "retry", "recognize_unit") and not os.path.realpath(target).startswith(os.path.realpath(root)):
+        if kind not in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "recognize_unit") and not os.path.realpath(target).startswith(os.path.realpath(root)):
             return {"error": "bad path"}
         with self._lock:
             if self.scan_state.get("running"):
@@ -226,6 +226,18 @@ class App:
                                                                  "(Resume continues the run)")
                     if res.get("error"):
                         res["status"], res["abort_reason"] = "error", res["error"]
+                elif kind in ("retire", "retire_resume", "restore"):
+                    from . import retire
+                    n = int(path)
+                    try:
+                        r = (retire.retire(con, n, progress=prog, stop=self._stop) if kind == "retire"
+                             else retire.resume(con, n, progress=prog, stop=self._stop) if kind == "retire_resume"
+                             else retire.restore(con, n))
+                        res = {"status": "complete", **r}
+                        if self._stop.is_set() and kind != "restore":
+                            res.update(status="stopped", abort_reason="stopped by you (Resume continues it)")
+                    except retire.RetireError as e:
+                        res = {"status": "error", "abort_reason": str(e)}
                 elif kind == "recognize_unit":
                     from .recognize import queue
                     res = {"status": "complete", **queue.run(self.db_path, [int(path)], progress=prog)}
@@ -258,6 +270,8 @@ class App:
         from . import settings
         from . import __version__
         return {"version": __version__, "settings": settings.all_values(con),
+                "retire_roots": [{"id": r["id"], "path": r["path"], "allowed": settings.retire_allowed(con, r["id"])}
+                                 for r in con.execute("SELECT id, path FROM root ORDER BY id")],
                 "status": {"acoustid": bool(os.environ.get("ACOUSTID_API_KEY")),
                            "discogs": bool(os.environ.get("DISCOGS_TOKEN"))}}
 
@@ -265,7 +279,11 @@ class App:
         from . import settings
         try:
             settings.save(con, body.get("settings") or {})
-        except settings.SettingsError as e:
+            for rid, allowed in (body.get("retire_roots") or {}).items():       # per collection folder (ADR 0003)
+                if not con.execute("SELECT 1 FROM root WHERE id=?", (int(rid),)).fetchone():
+                    raise settings.SettingsError(f"unknown collection folder {rid}")
+                settings.set_retire_allowed(con, int(rid), bool(allowed))
+        except (settings.SettingsError, ValueError) as e:
             return {"error": str(e)}
         if (body.get("settings") or {}).get("dest"):
             from .apply.plan import PlanError, check_destination
@@ -276,7 +294,7 @@ class App:
         return self.settings_view(con)
 
     def stop_job(self) -> dict:
-        if not self.scan_state.get("running") or self.scan_state.get("kind") not in ("recognize", "apply", "resume", "retry"):
+        if not self.scan_state.get("running") or self.scan_state.get("kind") not in ("recognize", "apply", "resume", "retry", "retire", "retire_resume"):
             return {"error": "only a running recognition or apply can be stopped"}
         self._stop.set()
         return {"stopping": True}
@@ -316,6 +334,9 @@ class App:
             p["dest_free"] = None
         for r in p["runs"]:
             r["summary"] = json.loads(r.pop("summary_json") or "{}")
+        from . import retire, settings as _st
+        p["retire_allowed"] = _st.retire_allowed(con, p["root_id"])
+        p["originals"] = retire.batches(con, [r["id"] for r in p["runs"]])
         return p
 
     def search_again(self, con, body) -> dict:
@@ -586,6 +607,12 @@ def make_handler(app: App, port_ref: dict):
                                        "scan": app.scan_state})
                 if u.path == "/api/settings":
                     return self._json(app.settings_view(con))
+                if u.path == "/api/retire_plan":          # the dry run: changes nothing
+                    from . import retire
+                    try:
+                        return self._json(retire.dry_run(con, _int(q.get("run"))))
+                    except retire.RetireError as e:
+                        return self._json({"error": str(e)})
                 m = re.fullmatch(r"/api/i18n/([A-Za-z-]{2,10})", u.path)
                 if m:
                     from . import i18n
@@ -667,6 +694,11 @@ def make_handler(app: App, port_ref: dict):
                     con.close()
             if u.path in ("/api/apply", "/api/undo", "/api/resume", "/api/retry"):
                 kind = u.path.rsplit("/", 1)[1]
+                return self._json(app.start_job(kind, "", str(body.get("id", ""))))
+            if u.path in ("/api/retire", "/api/retire_resume", "/api/restore"):
+                kind = u.path.rsplit("/", 1)[1]
+                if kind == "retire" and body.get("ack") is not True:
+                    return self._json({"error": "retiring needs the confirmation (the tick) from the dialog"})
                 return self._json(app.start_job(kind, "", str(body.get("id", ""))))
             if u.path in ("/api/bulk_accept", "/api/bulk"):
                 con = app.con()

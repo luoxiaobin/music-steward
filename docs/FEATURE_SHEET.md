@@ -25,7 +25,7 @@ Collections built over 20+ years (CD rips, downloads, image + cue albums) sit on
 | **Settings & languages** | Naming rules, year, cue encoding, album cues, catalogues, default destination; interface in English, 简体中文, 繁體中文, Français (Canada), Español (EE. UU.). |
 
 ## Key design highlights
-1. **Sources are never modified.** All changes go to organized copies; the destination may never overlap a source; every trial checked that all sources were unchanged afterwards.
+1. **Sources are never modified — unless you ask.** All changes go to organized copies; the destination may never overlap a source; every trial checked that all sources were unchanged afterwards. The one exception is the optional, confirmed *Retire originals* (off by default): after a copy is verified it **moves** (never deletes) the originals into a labelled `_ORIGINALS` folder, restorable at any time.
 2. **Crash-safe by construction.** Journal-first apply; no-overwrite publish probed per destination (atomic on a local disk; on SMB shares claim-then-rename, which has a documented residual window — writing the copy to a NAS is experimental, see [Recovery](RECOVERY.md#writing-the-organized-copy-to-a-nas)); scans abort, not "mark removed", when a share drops; matching resumable unit by unit (each in its own process).
 3. **Built for non-Western collections.** Legacy-encoding repair with CJK heuristics (tags, cue sheets, unreadable APE tags), GB18030/Big5 cue sheets read correctly and written as UTF-8 for any player, Simplified/Traditional keys, pinyin search, extra catalogues, own-info fallback.
 4. **Evidence over automation.** Nothing is accepted silently; bulk actions are limited to measured-safe classes; every decision is reversible until apply, and apply is reversible after.

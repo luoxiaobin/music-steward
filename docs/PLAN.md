@@ -150,8 +150,9 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
    checked on real NAS APE images). Tried 2026-11-21: 4 real albums (3 APE, 1 FLAC; 51 tracks) split and served by
    Navidrome 0.64.2 — all tracks imported, Chinese titles, order, durations, year and covers right; played by the
    owner on a phone over the home network: works.
-4. **Retire the originals**: ✅ design accepted ([ADR 0003](adr/0003-retire-originals.md)); build order: retire + restore +
-   labelling, then Archive, then Delete.
+4. **Retire the originals** ([ADR 0003](adr/0003-retire-originals.md), accepted): ✅ retire + restore + labelling
+   (README, manifest, opt-in per folder, Originals card); next: **Archive** (verified copy), then **Delete** (typed word,
+   repeated checks) after real use.
 5. Read-only **collection health report**; a signed, notarized `.app`; ✅ icon for the chosen concept (vector
    master, every size generated from one geometry, checked at 16–1024 px; Dock, favicon, iPhone home screen, macOS
    `.icns`, iOS app icon). A subtle variant for a future player app, if one is made.
