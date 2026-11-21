@@ -12,6 +12,10 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   Subsonic API, that every album appears once with all its tracks in order and the planned titles, artists, years
   and durations; CI runs it on macOS for every pull request. Tried by hand as well: four real albums split into
   tracks, served by Navidrome and played on a phone.
+- **App icon**: the chosen concept, an ivory folder with a music note in negative space on teal, redrawn as a
+  vector master (`assets/icon/*.svg`) by `tools/make_icons.py`, which also makes every size from the same shapes.
+  Shown in the Dock for the desktop window, as the page's favicon and as the iPhone home-screen icon; a macOS
+  `.icns` and an iOS 1024 px app icon are ready in `assets/icon/` for a packaged app later.
 - **Setting: albums of one file with a cue sheet → one file per track.** For music servers and phone players that
   don't read cue sheets. Lossless: each track is cut from the image into FLAC at the cue sheet's exact positions
   (sample-exact, the source's bit depth kept), and checked: its decoded samples must equal the same samples of the
