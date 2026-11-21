@@ -788,7 +788,7 @@ async function openSettings() {
       h("div", { class: "muted xsmall" }, "After an organized copy has been verified, Music Steward can set the original files aside " +
         "(moved into a folder called _ORIGINALS in the same collection folder, never deleted) so you can restore them, archive them or delete them yourself. " +
         "Off unless you allow it for a collection folder."),
-      ...(d.retire_roots || []).map(r => chk("setRetire" + r.id, ["Allow for ", h("span", { class: "mono" }, r.path)], r.allowed, false))),
+      ...(d.retire_roots || []).map(r => chk("setRetire" + r.id, ["Allow for ", h("span", { class: "mono", "data-no-translate": "" }, r.path)], r.allowed, false))),
     h("section", {}, h("h3", {}, "Online catalogues"),
       chk("srcMb", "MusicBrainz", true, true, "always"),
       chk("srcDeezer", "Deezer", srcs.includes("deezer"), env("sources")),

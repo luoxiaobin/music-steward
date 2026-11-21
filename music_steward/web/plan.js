@@ -94,7 +94,8 @@ async function renderPlan(id) {
     doneForYou(s, dups),
     (s.left_out || []).length ? h("div", { class: "card block" }, h("h2", { class: "h2" }, "Left out · audio changed since you decided ",
         h("span", { class: "badge b-conflict" }, s.left_out.length)),
-      rows(s.left_out, [["Album", x => h("td", {}, x.label)], ["Folder", x => h("td", { class: "mono" }, (x.folder || ".") + "/")]]),
+      rows(s.left_out, [["Album", x => h("td", { "data-no-translate": "" }, x.label)],
+                        ["Folder", x => h("td", { class: "mono", "data-no-translate": "" }, (x.folder || ".") + "/")]]),
       h("p", { class: "muted small" }, "Decide these albums again in review, then build a new plan.")) : null,
     previewTree(ok.concat(items.filter(i => i.kind === "cue_new" && i.status === "ok" && !ok.includes(i)))),
     h("div", { class: "cards" },
@@ -216,7 +217,7 @@ async function retireDialog(runId, planId) {
 }
 
 // one list item: the album, then each reason in its own element (a fixed sentence the page can translate)
-const reasonLi = (label, ...reasons) => h("li", {}, h("strong", {}, label), " — ",
+const reasonLi = (label, ...reasons) => h("li", {}, h("strong", { "data-no-translate": "" }, label), " — ",
   ...reasons.flatMap((x, i) => [i ? "; " : null, h("span", {}, x)].filter(Boolean)));
 
 function originalsCard(p, id, busy, rows) {
@@ -230,7 +231,7 @@ function originalsCard(p, id, busy, rows) {
     rows(p.originals, [["Set aside on", b => h("td", {}, new Date(b.created_at * 1000).toLocaleString())],
       ["Albums", b => h("td", {}, String((b.summary || {}).albums ?? 0))],
       ["Files · size", b => h("td", {}, `${b.moved} · ${fmtSize((b.summary || {}).bytes || 0)}`)],
-      ["Originals folder", b => h("td", { class: "mono", style: "word-break:break-all" }, b.folder)],
+      ["Originals folder", b => h("td", { class: "mono", style: "word-break:break-all", "data-no-translate": "" }, b.folder)],
       ["Status", b => h("td", {}, state(b))],
       ["", b => h("td", {}, [
         ["running", "stopped"].includes(b.status) && !b.restored_at ? h("button", { type: "button", class: "btn", disabled: busy,
@@ -247,12 +248,12 @@ function retireResult(job, busy) {
   if (job.kind === "restore") {
     return h("div", { class: "card banner" }, h("strong", {}, `Restored files: ${r.restored}. `),
       (r.blocked || []).length ? h("div", {}, "Left where they are (something is at the original place now): ",
-        h("span", { class: "mono" }, r.blocked.slice(0, 5).map(x => x.relpath).join(", "))) : null,
+        h("span", { class: "mono", "data-no-translate": "" }, r.blocked.slice(0, 5).map(x => x.relpath).join(", "))) : null,
       (r.missing || []).length ? h("div", {}, `No longer in the originals folder: ${r.missing.length}`) : null);
   }
   const sk = r.skipped || [];
   return h("div", { class: "card banner" }, h("strong", {}, r.status === "stopped" ? "Stopped. " : "Done. "),
-    r.batch ? [`Albums set aside: ${r.albums} (${fmtSize(r.bytes)}) in `, h("span", { class: "mono" }, r.folder)] : "Nothing was set aside.",
+    r.batch ? [`Albums set aside: ${r.albums} (${fmtSize(r.bytes)}) in `, h("span", { class: "mono", "data-no-translate": "" }, r.folder)] : "Nothing was set aside.",
     sk.length ? h("details", {}, h("summary", {}, h("strong", {}, "Albums that stay where they are "),
       h("span", { class: "badge b-conflict" }, sk.length)),
       h("ul", { class: "small" }, sk.slice(0, 50).map(a => reasonLi(a.label, a.reason)))) : null);

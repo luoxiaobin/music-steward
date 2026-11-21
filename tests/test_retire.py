@@ -803,3 +803,46 @@ def test_a_collection_reached_through_a_stable_link_still_works(tmp_path):
     retire._check_batch_paths(str(alias), str(folder), os.path.realpath(alias))        # accepted
     with pytest.raises(retire.RetireError, match="collection folder"):
         retire._check_batch_paths(str(alias), str(folder), str(tmp_path / "somewhere_else"))
+
+
+@pytest.mark.parametrize("method", ["natural", "link", "claim"])
+def test_directory_changes_reach_the_disk_in_a_safe_order(tmp_path, monkeypatch, method):
+    """P0 (Codex, round 6): the original's name was removed before the new name's directory entry was
+    durable, and 'moved' could be journalled before either directory was synced."""
+    events = []
+    real_unlink = os.unlink
+    monkeypatch.setattr(retire.protocol, "fsync_dir", lambda d: events.append(("fsync", str(d))))
+    monkeypatch.setattr(os, "unlink", lambda p, *a, **k: (events.append(("unlink", str(p))), real_unlink(p, *a, **k))[1])
+    if method in ("link", "claim"):
+        monkeypatch.setattr(retire.protocol, "rename_excl", _unsupported)
+        monkeypatch.setattr(retire, "_renameat2_excl", _unsupported)
+    if method == "claim":
+        monkeypatch.setattr(os, "link", _unsupported)
+    (tmp_path / "from").mkdir()
+    (tmp_path / "to").mkdir()
+    src, dst = tmp_path / "from" / "a.bin", tmp_path / "to" / "b.bin"
+    src.write_bytes(b"x")
+    retire._rename_noreplace(str(src), str(dst))
+    assert dst.read_bytes() == b"x" and not src.exists()
+    synced = [d for kind, d in events if kind == "fsync"]
+    assert str(dst.parent) in synced and str(src.parent) in synced                  # both directories, before returning
+    if method == "link":
+        i_new = events.index(("fsync", str(dst.parent)))
+        i_drop = events.index(("unlink", str(src)))
+        i_old = events.index(("fsync", str(src.parent)))
+        assert i_new < i_drop < i_old                                               # new name durable, then drop, then durable
+
+
+def test_dropping_the_second_name_in_recovery_syncs_in_the_same_order(tmp_path, monkeypatch):
+    events = []
+    real_unlink = os.unlink
+    monkeypatch.setattr(retire.protocol, "fsync_dir", lambda d: events.append(("fsync", str(d))))
+    monkeypatch.setattr(os, "unlink", lambda p, *a, **k: (events.append(("unlink", str(p))), real_unlink(p, *a, **k))[1])
+    (tmp_path / "k").mkdir()
+    (tmp_path / "d").mkdir()
+    keep, drop = tmp_path / "k" / "keep", tmp_path / "d" / "drop"
+    keep.write_bytes(b"x")
+    os.link(keep, drop)
+    retire._unlink_other_name(str(keep), str(drop))
+    assert events == [("fsync", str(keep.parent)), ("unlink", str(drop)), ("fsync", str(drop.parent))]
+    assert keep.read_bytes() == b"x" and not drop.exists()

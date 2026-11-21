@@ -371,6 +371,19 @@ def _renameat2_excl(src: str, dst: str) -> None:
         raise OSError(e, os.strerror(e), dst)
 
 
+def _sync_dir_of(path: str) -> None:
+    protocol.fsync_dir(Path(os.path.dirname(path)))
+
+
+def _unlink_other_name(keep: str, drop: str) -> None:
+    """Remove the second name of one file (a hard link): the name we keep must be on the disk first, and
+    the removal itself is made durable -- otherwise a power cut can lose the new directory entry after the
+    old one is gone, and a journalled 'moved' would describe a move that did not survive."""
+    _sync_dir_of(keep)
+    os.unlink(drop)
+    _sync_dir_of(drop)
+
+
 def _after_claim() -> None:
     """Hook between claiming a name and renaming onto it (tests inject the race here)."""
 
@@ -389,6 +402,8 @@ def _rename_noreplace(src: str, dst: str, claimed=None) -> str:
     for primitive in (protocol.rename_excl, _renameat2_excl):
         try:
             primitive(src, dst)
+            _sync_dir_of(dst)                                # both directory changes reach the disk before the
+            _sync_dir_of(src)                                # caller journals 'moved'
             return "exclusive-rename"
         except FileExistsError:
             raise
@@ -403,7 +418,7 @@ def _rename_noreplace(src: str, dst: str, claimed=None) -> str:
         if e.errno not in _NO_PRIMITIVE + (errno.EPERM,):
             raise
     else:
-        os.unlink(src)                                      # a crash before this leaves one inode, two names
+        _unlink_other_name(dst, src)                        # a crash before this leaves one inode, two names
         return "link"
     fd = os.open(dst, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
     ino = os.fstat(fd).st_ino
@@ -421,6 +436,8 @@ def _rename_noreplace(src: str, dst: str, claimed=None) -> str:
     except BaseException:
         _drop_placeholder(dst, ino)
         raise
+    _sync_dir_of(dst)
+    _sync_dir_of(src)
     return "claim"
 
 
@@ -618,7 +635,7 @@ def _settle_inflight(con: sqlite3.Connection, batch: sqlite3.Row, j: protocol.Jo
         p_ours = _is_ours(parked, size, mtime)
         o_ours = orig_clean and _is_ours(orig, size, mtime)
         if p_ours and o_ours and _same_inode(orig, parked):      # a link-method move that lost power before the unlink
-            os.unlink(orig)
+            _unlink_other_name(parked, orig)
             o_ours = False
         if p_ours and not o_ours:                                # our file is parked; whatever is at the old name is not it
             _record(con, batch, j, op, _row_of(o), "moved", ino=os.lstat(parked).st_ino)
@@ -665,7 +682,7 @@ def _finish_album(con, batch: sqlite3.Row, j: protocol.Journal, root: str, uid: 
         s_there, d_there = os.path.lexists(src), os.path.lexists(dst)
         if s_there and d_there:
             if not _has_link(root, src) and not _has_link(root, dst) and _same_inode(src, dst):
-                os.unlink(src)                                         # a link-method move that crashed before the unlink
+                _unlink_other_name(dst, src)                           # a link-method move that crashed before the unlink
                 s_there = False
             elif hist and hist[-1] == "claimed" and _is_placeholder(dst, o.get("placeholder_ino")):
                 os.unlink(dst)                                         # our own empty placeholder from a crashed move
@@ -821,7 +838,7 @@ def restore(con: sqlite3.Connection, batch_id: int, unit_ids: set[int] | None = 
         o_there, p_there = os.path.lexists(orig), os.path.lexists(parked)
         if o_there and p_there:
             if _same_inode(orig, parked):                         # a link-method restore that crashed before the unlink
-                os.unlink(parked)
+                _unlink_other_name(orig, parked)
                 p_there = False
             elif last == "restore_claimed" and _is_placeholder(orig, o.get("placeholder_ino")):
                 os.unlink(orig)                                        # our own empty placeholder from a crashed restore
