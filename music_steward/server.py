@@ -312,6 +312,7 @@ class App:
         chk = folders.check_folder(con, dest, "destination")
         if chk["level"] == "error" and chk["code"] != "overlaps":      # an overlap keeps the plan's own message
             return {"error": folders.explain(chk)}
+        dest = chk.get("resolved") or dest
         row = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()
         try:
             pid = plan.build(con, os.path.expanduser(dest), row["id"], nfc(body.get("path", "")))

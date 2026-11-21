@@ -131,3 +131,11 @@ def test_the_server_answers_the_live_check_and_the_plan_refuses_a_network_addres
     r = json.loads(req(port, "/api/plan", cookie=ck, method="POST", headers={"X-MLT": "1"},
                        body=json.dumps({"root": str(library), "path": "", "dest": "//192.0.2.10/music/out"}))[2])
     assert "network address" in r["error"]
+
+
+@pytest.mark.parametrize("wrap", ["file://{}", '"{}"', "  {}  "])
+def test_what_is_saved_is_the_path_that_was_checked(con, tmp_path, wrap):
+    out = tmp_path / "out"
+    out.mkdir()
+    saved = settings.save(con, {"dest": wrap.format(out)})["dest"]["value"]
+    assert saved == str(out)                                                # not "<cwd>/file:/..." or a quoted path

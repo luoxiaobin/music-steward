@@ -86,7 +86,7 @@ def save(con: sqlite3.Connection, values: dict) -> dict:
             r = folders.check_folder(con, v, "destination")
             if r["level"] == "error":
                 raise SettingsError(folders.explain(r))
-            v = os.path.abspath(os.path.expanduser(v))
+            v = r.get("resolved") or os.path.abspath(os.path.expanduser(v))
         con.execute("INSERT OR REPLACE INTO meta VALUES(?, ?)", (f"setting:{n}", v.lower() if allowed else v))
     con.commit()
     return all_values(con)
