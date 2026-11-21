@@ -7,6 +7,11 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 ## [Unreleased]
 
 ### Added
+- **Required: the organized copy works in Subsonic-standard music servers** (Navidrome, and phone apps that speak
+  the Subsonic protocol). A new test points a throwaway Navidrome at an organized copy and checks, through the
+  Subsonic API, that every album appears once with all its tracks in order and the planned titles, artists, years
+  and durations; CI runs it on macOS for every pull request. Tried by hand as well: four real albums split into
+  tracks, served by Navidrome and played on a phone.
 - **App icon**: the chosen concept, an ivory folder with a music note in negative space on teal, redrawn as a
   vector master (`assets/icon/*.svg`) by `tools/make_icons.py`, which also makes every size from the same shapes.
   Shown in the Dock for the desktop window, as the page's favicon and as the iPhone home-screen icon; a macOS
