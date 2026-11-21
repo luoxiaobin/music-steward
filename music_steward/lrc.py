@@ -33,9 +33,20 @@ def _stamp(t: float) -> str:
     return f"[{cs // 6000:02d}:{cs // 100 % 60:02d}.{cs % 100:02d}]"
 
 
+def untimed_lines(text: str) -> int:
+    """Lines with words but no time tag (and not a header): they cannot be placed into a track."""
+    n = 0
+    for line in text.splitlines():
+        s = line.strip()
+        if s and not TIME.search(s) and not HEADER.match(s):
+            n += 1
+    return n
+
+
 def split(text: str, bounds: list[tuple[float, float | None]], titles: list[str | None]) -> list[str | None]:
     """One lyrics text per track ([start, end) in seconds into the image), times relative to the
-    track's start; None for a track with no timed line."""
+    track's start; None for a track with no timed line. Lines without a time tag are not placed
+    (untimed_lines() says whether there are any: the caller then keeps the original as well)."""
     headers, timed = [], []
     for line in text.splitlines():
         h = HEADER.match(line.strip())

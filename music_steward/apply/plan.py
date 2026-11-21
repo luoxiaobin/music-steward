@@ -139,11 +139,19 @@ def _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, 
                                   (f["root_id"], image_stem + ".", image_stem + ".\uffff")).fetchall()
            if x["relpath"].rsplit(".", 1)[0] == image_stem]
     if lrc and mine:
-        from ..lrc import decode, split as split_lrc
+        from ..lrc import decode, split as split_lrc, untimed_lines
         src_lrc = os.path.join(root_path, lrc[0]["fs_relpath"])
         with open(src_lrc, "rb") as fh:
-            parts = split_lrc(decode(fh.read()), [(it["tags"]["split"]["start"], it["tags"]["split"]["end"]) for it in mine],
-                              [it["tags"]["title"] for it in mine])
+            text = decode(fh.read())
+        parts = split_lrc(text, [(it["tags"]["split"]["start"], it["tags"]["split"]["end"]) for it in mine],
+                          [it["tags"]["title"] for it in mine])
+        if untimed_lines(text) or not any(parts):
+            # lines that cannot be placed into a track (untimed lyrics): keep the original as well, as
+            # an album-level file, rather than silently losing them (Codex review on #7)
+            stem = safe_component(f"{c['album']} (CD {c['_disc']})" if multi else c["album"], "Album")
+            items.append({"unit_id": u["id"], "file_id": lrc[0]["id"], "kind": "lrc", "src": src_lrc,
+                          "dest_rel": f"{adir}/{stem}.lrc", "codec": None, "tags": {},
+                          "size": lrc[0]["size"], "mtime": lrc[0]["mtime_ns"]})
         for it, text in zip(mine, parts):
             if text is not None:
                 items.append({"unit_id": u["id"], "file_id": lrc[0]["id"], "kind": "lrc",

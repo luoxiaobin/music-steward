@@ -267,3 +267,25 @@ def test_the_images_lyrics_are_split_along_its_tracks(split_album, con, tmp_path
     assert read("02 - 怀念战友.lrc") == ["[ar:柏菲]", "[ti:怀念战友]", "[00:00.50]第二首 一", "[00:01.20]副歌"]
     assert read("03 - 大海啊故乡.lrc") == ["[ar:柏菲]", "[ti:大海啊故乡]", "[00:01.10]副歌"]
     assert (lib / "HIFI/image.lrc").read_bytes().startswith("[ar:柏菲]".encode("gbk"))   # source untouched
+
+
+def test_untimed_lyrics_are_kept_as_an_album_file(split_album, con, tmp_path):
+    """Codex review on #7: lyrics without time tags could not be split, and were then lost."""
+    lib, _ = split_album
+    raw = "[ar:柏菲]\n红星照我去战斗\n怀念战友\n".encode("gbk")
+    (lib / "HIFI/image.lrc").write_bytes(raw)
+    scan(con, lib)
+    dest = tmp_path / "out"
+    p = plan.load(con, plan.build(con, str(dest), 1))
+    assert [i["dest_rel"] for i in p["items"] if i["kind"] == "lrc"] == ["柏菲/HIFI年代 - 怀念战友/HIFI年代 - 怀念战友.lrc"]
+    assert set(runner.apply(con, p["id"], journal_root=tmp_path / "j")["states"]) == {"committed"}
+    assert (dest / "柏菲/HIFI年代 - 怀念战友/HIFI年代 - 怀念战友.lrc").read_bytes() == raw      # the original, unchanged
+
+
+def test_partly_timed_lyrics_are_split_and_also_kept_whole(split_album, con, tmp_path):
+    lib, _ = split_album
+    (lib / "HIFI/image.lrc").write_bytes("[00:00.50]第一首\n(间奏)\n[00:02.50]第二首\n".encode("gbk"))
+    scan(con, lib)
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1))
+    assert sorted(i["dest_rel"].rsplit("/", 1)[1] for i in p["items"] if i["kind"] == "lrc") == [
+        "01 - 红星照我去战斗.lrc", "02 - 怀念战友.lrc", "HIFI年代 - 怀念战友.lrc"]
