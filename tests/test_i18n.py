@@ -36,3 +36,13 @@ def test_the_retire_screens_mark_album_names_and_paths_as_data():
         assert lines and all("data-no-translate" in ln for ln in lines), needle
     assert "data-no-translate" in next(ln for ln in (web / "app.js").read_text(encoding="utf-8").splitlines()
                                        if '"Allow for "' in ln)
+
+
+def test_the_folder_check_shows_paths_as_data():
+    """What the user typed (and the path offered back) must never be run through the interface translator."""
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "music_steward/web/app.js").read_text(encoding="utf-8")
+    start = js.index("function folderCheck(")
+    body = js[start:js.index("function chooseButton(")]
+    for needle in ("r.detail", "r.suggestion"):
+        assert all("data-no-translate" in ln for ln in body.splitlines() if needle in ln and "h(" in ln), needle
