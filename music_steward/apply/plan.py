@@ -277,7 +277,12 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
         args += (scope, scope + "/", scope + "/￿")
     root_path = con.execute("SELECT path FROM root WHERE id=?", (root_id,)).fetchone()["path"]
     items, prepared, notes, left_out = [], [], [], []
+    from ..recognize.units import gone_units
+    gone, not_here = gone_units(con, root_id), 0
     for u in con.execute(q, args).fetchall():
+        if u["id"] in gone:        # originals set aside, or not found: nothing to copy from, and not copied again
+            not_here += 1
+            continue
         if u["stale_reason"]:            # decided on audio that has changed since (ADR 0002)
             left_out.append({"unit_id": u["id"], "label": u["label"], "folder": u["folder"], "reason": u["stale_reason"]})
             continue
@@ -417,7 +422,7 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
                "changes": {t: sum(n["type"] == t for n in notes)
                            for t in ("artist_merged", "script", "original_year", "kept_image")},
                "split_tracks": sum(i["kind"] == "split" and i["status"] == "ok" for i in items),
-               "notes": notes[:1000], "left_out": left_out[:1000]}
+               "notes": notes[:1000], "left_out": left_out[:1000], "not_here": not_here}
     pid = con.execute("INSERT INTO plan(created_at, dest_root, root_id, scope, summary_json) VALUES(?,?,?,?,?)",
                       (time.time(), str(dest), root_id, scope, json.dumps(summary))).lastrowid
     con.executemany("INSERT INTO plan_item VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",

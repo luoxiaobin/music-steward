@@ -212,6 +212,8 @@ const CONF = {
   queued: ["b-rel", "Queued"], running: ["b-rel", "Recognizing…"], error: ["b-conflict", "Error"],
 };
 function unitBadge(u) {
+  if (u.presence === "retired") return h("span", { class: "badge b-ready" }, "Originals set aside");
+  if (u.presence === "not_found") return h("span", { class: "badge b-conflict" }, "Not found");
   if (u.decision) return u.decision.action === "accept"
     ? h("span", { class: "badge b-ready" }, u.decision.release_key === "local" ? "Accepted · own info" : "Accepted")
                                                           : h("span", { class: "badge b-unid" }, "Skipped");

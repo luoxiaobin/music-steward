@@ -119,6 +119,23 @@ def plan_units(con: sqlite3.Connection, root_id: int, subpath: str = "") -> list
     return units
 
 
+def gone_units(con: sqlite3.Connection, root_id: int) -> dict[int, str]:
+    """{unit id: "retired" | "not_found"} for albums none of whose files is in the collection folder any more.
+    *Retired*: their originals were set aside by Retire (or deleted after that) -- the normal end of an album.
+    *Not found*: the files are simply not there (a share mounted elsewhere, a folder moved away): an exception
+    to tell the owner about. Either way the album keeps its matches and its decision (docs/LIFECYCLES.md)."""
+    live = {r[0] for r in con.execute("SELECT id FROM file WHERE root_id=? AND removed_at IS NULL", (root_id,))}
+    parked = {r[0] for r in con.execute(
+        "SELECT rf.file_id FROM retired_file rf JOIN retire_batch b ON b.id=rf.batch_id "
+        "WHERE b.root_id=? AND rf.state IN ('moved','deleted')", (root_id,))}
+    out = {}
+    for uid, ids in con.execute("SELECT id, file_ids FROM unit WHERE root_id=?", (root_id,)):
+        ids = json.loads(ids)
+        if ids and not any(i in live for i in ids):
+            out[uid] = "retired" if any(i in parked for i in ids) else "not_found"
+    return out
+
+
 CHANGED = "its audio or cue sheet changed since you decided; review this album again"
 CUE_REPLACED = "its cue sheet was replaced since you decided; review this album again"
 
@@ -181,9 +198,10 @@ def enqueue(con: sqlite3.Connection, root_id: int, units: list[dict], requeue: b
         c["moved"] += 1
     if scope is not None:
         keep = {u["key"] for u in units}
+        gone = gone_units(con, root_id)          # an album whose files are gone is never "stale": it keeps its decision
         for row in con.execute("SELECT id, key, folder FROM unit WHERE root_id=?", (root_id,)).fetchall():
             in_scope = not scope or row["folder"] == scope or row["folder"].startswith(scope + "/")
-            if in_scope and row["key"] not in keep:
+            if in_scope and row["key"] not in keep and row["id"] not in gone:
                 con.execute("DELETE FROM decision WHERE unit_id=?", (row["id"],))
                 con.execute("DELETE FROM unit WHERE id=?", (row["id"],))
                 c["removed_stale"] += 1

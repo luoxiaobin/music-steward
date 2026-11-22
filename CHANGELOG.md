@@ -6,6 +6,13 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 
 ## [Unreleased]
 
+### Fixed
+- **Setting originals aside no longer loses your decisions.** After *Retire originals*, a rescan followed by
+  *Recognize folder* used to drop the retired albums **and** your decisions for them. Now an album whose files are
+  gone keeps its matches and its decision: it shows **Originals set aside** (after Retire) or **Not found** (the
+  files are simply not there), and a new plan does not try to copy it again ("Albums whose originals are no longer in
+  the collection folder: N"). Restoring the originals brings it back as normal.
+
 ### Added
 - **Folder check**: wherever you type a folder (Settings → Default destination folder, the plan's Destination) the
   app now tells you, as you type, whether it is written correctly, whether it exists, and whether it can be used —
