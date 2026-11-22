@@ -47,3 +47,12 @@ def test_the_folder_check_shows_paths_as_data():
     body = js[start:js.index("function chooseButton(")]
     for needle in ("r.detail", "r.suggestion"):
         assert all("data-no-translate" in ln for ln in body.splitlines() if needle in ln and "h(" in ln), needle
+
+
+def test_album_names_in_the_list_the_detail_and_the_search_are_data():
+    """P1 (Codex, #16): an album called "Not found" was shown translated once that became a status word."""
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "music_steward/web/app.js").read_text(encoding="utf-8")
+    for needle in ("u.label)", "d.label)", "r.label)"):
+        lines = [ln for ln in js.splitlines() if needle in ln and "h(" in ln and "aria-label" not in ln]
+        assert lines and all("data-no-translate" in ln for ln in lines), needle

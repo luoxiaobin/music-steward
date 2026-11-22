@@ -116,8 +116,11 @@ def units(con: sqlite3.Connection, root_id: int, folder: str = "") -> list[dict]
         q += " AND (folder=? OR (folder >= ? AND folder < ?))"
         args += (folder, folder + "/", folder + "/￿")
     out = []
+    from .units import gone_units
+    gone = gone_units(con, root_id)
     for r in con.execute(q + " ORDER BY folder, label", args):
         u = dict(r)
+        u["presence"] = gone.get(u["id"], "here")          # here | retired | not_found
         u["n_files"] = len(json.loads(u["file_ids"]))
         c = con.execute("SELECT * FROM candidate WHERE unit_id=? AND COALESCE(source,'')<>'Local' "
                         "ORDER BY rank LIMIT 1", (u["id"],)).fetchone()

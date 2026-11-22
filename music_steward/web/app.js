@@ -212,6 +212,8 @@ const CONF = {
   queued: ["b-rel", "Queued"], running: ["b-rel", "Recognizing…"], error: ["b-conflict", "Error"],
 };
 function unitBadge(u) {
+  if (u.presence === "retired") return h("span", { class: "badge b-ready" }, "Originals set aside");
+  if (u.presence === "not_found") return h("span", { class: "badge b-conflict" }, "Not found");
   if (u.decision) return u.decision.action === "accept"
     ? h("span", { class: "badge b-ready" }, u.decision.release_key === "local" ? "Accepted · own info" : "Accepted")
                                                           : h("span", { class: "badge b-unid" }, "Skipped");
@@ -334,7 +336,7 @@ async function renderUnits(where) {
     const tr = h("tr", { tabindex: "0", "data-unit": u.id, "aria-selected": String(S.selectedUnit === u.id),
                          onclick: () => selectUnit(u.id, tr), onkeydown: e => { if (e.key === "Enter") selectUnit(u.id, tr); } },
       h("td", { class: "selcol", onclick: e => e.stopPropagation() }, box),
-      h("td", {}, h("div", { class: "strong" }, u.label), h("div", { class: "sub mono" }, (u.folder || ".") + "/"),
+      h("td", {}, h("div", { class: "strong", "data-no-translate": "" }, u.label), h("div", { class: "sub mono" }, (u.folder || ".") + "/"),
         u.decision && u.decision.stale_reason ? h("div", { class: "warn small strong" }, "Audio changed · decide again") : null),
       h("td", {}, u.kind === "track" ? "track" : u.kind === "cue" ? `${u.n_tracks || "?"} (cue)` : u.n_files),
       h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${yearText(t)}${t.country ? " · " + t.country : ""}`,
@@ -439,7 +441,7 @@ function renderUnitDetail(d) {
           ` · ${c.source}`))));
   }
   const parts = [
-    h("div", {}, h("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" }, h("h2", {}, d.label), unitBadge(d)),
+    h("div", {}, h("div", { style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" }, h("h2", { "data-no-translate": "" }, d.label), unitBadge(d)),
       h("div", { class: "mono muted", style: "margin-top:6px" }, d.kind === "cue"
         ? `${d.folder || "."}/ · one image file with ${d.n_tracks || "?"} tracks (cue sheet)`
         : `${d.folder || "."}/ · ${d.n_files} file${d.n_files > 1 ? "s" : ""} · ${d.kind}`),
@@ -983,7 +985,7 @@ function drawSearch(res) {
         return h("button", { type: "button", class: "sitem", "data-i": i, onclick: () => openResult(r),
                               onmouseenter: () => { SR.idx = i; markSearch(); } },
           h("span", { class: "sicon" }, icon),
-          h("span", { class: "stext" }, h("span", { class: "strong" }, r.label),
+          h("span", { class: "stext" }, h("span", { class: "strong", "data-no-translate": "" }, r.label),
             h("span", { class: "muted small" }, r.kind === "folder" ? `  ${r.n} tracks · ${r.folder}` : (r.sub ? `  ${r.sub}` : ""),
               r.kind !== "folder" ? h("span", { class: "mono xsmall" }, `  ${r.folder}/`) : null))); }));
   };

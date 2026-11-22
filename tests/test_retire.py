@@ -846,3 +846,57 @@ def test_dropping_the_second_name_in_recovery_syncs_in_the_same_order(tmp_path, 
     retire._unlink_other_name(str(keep), str(drop))
     assert events == [("fsync", str(keep.parent)), ("unlink", str(drop)), ("fsync", str(drop.parent))]
     assert keep.read_bytes() == b"x" and not drop.exists()
+
+
+# ---- an album whose originals were set aside keeps its decision (docs/LIFECYCLES.md) -------------------------
+def _recognize_folder(con):
+    """What the *Recognize folder* button does to the album list."""
+    from music_steward.recognize import units
+    return units.enqueue(con, 1, units.plan_units(con, 1), scope="")
+
+
+def test_retire_then_rescan_then_recognize_keeps_the_album_and_its_decision(applied, con):
+    """Found 2026-11-21: after Retire, a rescan and 'Recognize folder' deleted the retired albums AND their decisions."""
+    from music_steward.recognize import results
+    lib, dest, run = applied
+    before = con.execute("SELECT count(*) FROM unit").fetchone()[0], con.execute("SELECT count(*) FROM decision").fetchone()[0]
+    assert before[1] >= 1
+    retire.retire(con, run)
+    scan(con, lib)
+    out = _recognize_folder(con)
+    assert out["removed_stale"] == 0
+    assert (con.execute("SELECT count(*) FROM unit").fetchone()[0],
+            con.execute("SELECT count(*) FROM decision").fetchone()[0]) == before
+    listed = results.units(con, 1)
+    assert [u["presence"] for u in listed] == ["retired"] and listed[0]["decision"]["action"] == "accept"
+
+
+def test_a_plan_does_not_copy_an_album_whose_originals_are_set_aside(applied, con, tmp_path):
+    lib, dest, run = applied
+    retire.retire(con, run)
+    scan(con, lib)
+    _recognize_folder(con)
+    p = plan.load(con, plan.build(con, str(tmp_path / "second"), 1))
+    assert p["summary"]["items"] == 0 and p["summary"]["not_here"] == 1
+
+
+def test_restore_brings_the_album_back_as_here(applied, con):
+    from music_steward.recognize import results
+    lib, dest, run = applied
+    retire.retire(con, run)
+    scan(con, lib)
+    batch = con.execute("SELECT id FROM retire_batch").fetchone()[0]
+    retire.restore(con, batch)
+    scan(con, lib)
+    _recognize_folder(con)
+    assert [u["presence"] for u in results.units(con, 1)] == ["here"]
+
+
+def test_an_album_whose_files_are_simply_missing_is_not_found_and_keeps_its_decision(accepted, con):
+    from music_steward.recognize import results
+    lib, dest = accepted
+    shutil.move(str(lib / ALBUM), str(lib.parent / "elsewhere"))        # the folder went away; nothing was retired
+    scan(con, lib)
+    _recognize_folder(con)
+    u = results.units(con, 1)
+    assert [x["presence"] for x in u] == ["not_found"] and u[0]["decision"]["action"] == "accept"

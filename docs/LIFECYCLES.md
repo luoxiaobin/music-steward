@@ -97,9 +97,10 @@ stateDiagram-v2
 | Audio changed ✓ | the audio or cue sheet differs from what was decided on | decision kept but flagged; left out of plans; queued again | the owner accepts again |
 | Not connected ◇ | the collection folder's drive or share is not available | writing actions disabled; nothing is marked | it is connected again |
 
-**Today** an album whose files are gone is *dropped together with its decision* the next time "Recognize folder" runs.
-Checked on 2026-11-21 on a scratch collection: **Retire → rescan → Recognize folder took 2 albums and 2 decisions to 0
-and 0.** [ADR 0004](adr/0004-collection-folders.md) rule 7 fixes this: the album is never dropped. Albums whose
+**Fixed (this PR's predecessor of the full feature):** an album whose files are gone is no longer dropped with its decision
+at "Recognize folder". It shows *Originals set aside* (Retire) or *Not found*, and plans skip it. Before the fix, on 2026-11-21,
+**Retire → rescan → Recognize folder took 2 albums and 2 decisions to 0 and 0.** Still to build: *Leave for now / Remove…*
+for not-found albums and the history. [ADR 0004](adr/0004-collection-folders.md) rule 7 fixes this: the album is never dropped. Albums whose
 originals are parked are not *not found* at all: they are *Retired* (decided below).
 
 ## 4. Decision

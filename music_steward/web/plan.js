@@ -99,6 +99,7 @@ async function renderPlan(id) {
       rows(s.left_out, [["Album", x => h("td", { "data-no-translate": "" }, x.label)],
                         ["Folder", x => h("td", { class: "mono", "data-no-translate": "" }, (x.folder || ".") + "/")]]),
       h("p", { class: "muted small" }, "Decide these albums again in review, then build a new plan.")) : null,
+    s.not_here ? h("p", { class: "muted small" }, `Albums whose originals are no longer in the collection folder: ${s.not_here}. They are not copied again.`) : null,
     previewTree(ok.concat(items.filter(i => i.kind === "cue_new" && i.status === "ok" && !ok.includes(i)))),
     h("div", { class: "cards" },
       h("div", { class: "card" }, h("div", { class: "lbl" }, "Source root"), h("div", { class: "mono", style: "margin-top:6px" }, S.root.path),
