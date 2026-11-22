@@ -25,7 +25,16 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   instant), with a plain-language `README - ORIGINALS.txt` in your interface language and a `MANIFEST.csv`
   (each original with its organized copy). **Restore originals** puts every file back and never overwrites;
   **Finish setting aside** settles a stop or crash. Duplicate albums copied once and albums split into tracks are
-  handled. Archive and Delete buttons are planned; the README and the User guide say how to archive or delete by hand.
+  handled.
+- **Archive** (verified backup copy) and **Delete** (free the space) of parked originals, on the Originals card.
+  *Archive…* copies the parked originals, with the README and manifest, to a folder you choose (not inside a
+  collection folder), every file checked by SHA-256 and never overwriting; it can be stopped and continued, and the
+  card says whether the archive is verified and still complete. *Delete…* is permanent and cannot be undone: it
+  repeats every check (the organized copy's audio, and that each parked file is exactly the one set aside), lists
+  what the organized copy does not carry (original tag values, lyrics), and needs the word **DELETE** typed, a tick
+  that there is no backup when no verified archive exists, and a tick that you played the copies while the batch is
+  younger than the cooling-off period (Settings → Retiring originals, default 7 days). Albums that fail a
+  check are kept; a stopped or interrupted delete resumes; a record of the batch is kept in `~/.music-steward/deleted/`.
 - The scanner ignores `_ORIGINALS`; a file restored with the same size and time keeps its saved hashes.
 - **Required: the organized copy works in Subsonic-standard music servers** (Navidrome, and phone apps that speak
   the Subsonic protocol). A new test points a throwaway Navidrome at an organized copy and checks, through the

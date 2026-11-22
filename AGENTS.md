@@ -27,10 +27,14 @@ originals.* Treat these as **P0** (block the PR):
   collection folder the user switched it on for, never replacing a file (the same no-replace ladder as apply:
   exclusive rename / link / claim-then-rename; it may remove only its own empty placeholder, identified by inode),
   never across a symlink or a device, always journal-first (Resume re-checks the album in flight and settles a
-  crash; Restore moves back and refuses to work through a link). Nothing may be **deleted** under a root until the
-  confirmed *Delete* of ADR 0003 exists (then only inside `_ORIGINALS/<run>/`, after its checks and typed
-  confirmation); removing empty folders inside `_ORIGINALS` is fine. Every other write, rename or deletion under a
-  root is still P0, and so is weakening any check or the opt-in.
+  crash; Restore moves back and refuses to work through a link). The only **deletion** under a root is the confirmed
+  *Delete* of ADR 0003 (`retire.delete`): only a file parked inside `_ORIGINALS/<run>/`, only after its album is
+  checked again strictly (organized copy's audio fingerprint; the parked file's size, time and content identity), only
+  after the typed word, the *no backup* tick when there is no verified archive and the *I played them* tick inside the
+  cooling-off period; never through a link or out of the batch folder; journal-first, resumable; it may also remove
+  its own placeholder and empty folders inside `_ORIGINALS`. *Archive* only reads the parked files and writes to its
+  own target (never inside a collection folder). Every other write, rename or deletion under a root is still P0, and
+  so is weakening any check, tick or the opt-in.
 - **No overwrite at the destination.** Publishing must stay no-overwrite (`apply/protocol.py`: RENAME_EXCL / link /
   claim-then-rename); conflicts are reported, never resolved by replacing a file.
 - **Crash safety.** Apply is journal-first; an interrupted scan, recognition or apply must leave nothing half-written

@@ -136,6 +136,9 @@ audio{width:100%}
 .tree ul{margin:2px 0 6px 38px;padding:0;list-style:none}
 
 .appdialog.settings{max-width:620px;width:92vw}
+.callout{margin-top:10px;padding:10px 12px;border-radius:8px;font-size:13px;line-height:19px}
+.callout-red{background:var(--conflict-bg);border:1px solid var(--conflict);color:var(--conflict)}
+.callout-green{background:var(--ready-bg);border:1px solid var(--ready);color:var(--ready)}
 .settings section{border-top:1px solid var(--line2);padding:10px 0}
 .settings h3{font-size:14px;margin:0 0 6px}
 .settings .radios label,.settings section>label{display:block;margin:4px 0}

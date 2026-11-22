@@ -176,7 +176,9 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
                  ("file", "content_id", "TEXT"), ("decision", "stale_reason", "TEXT"),
                  ("scan", "n_moved", "INTEGER"),
                  # where the collection folder really was when originals were set aside (retire.py)
-                 ("retire_batch", "root_real", "TEXT")]
+                 ("retire_batch", "root_real", "TEXT"),
+                 # Archive and Delete of the parked originals (ADR 0003): JSON records
+                 ("retire_batch", "archive_json", "TEXT"), ("retire_batch", "delete_json", "TEXT")]
 
 
 _READY: set[str] = set()   # databases already set up by this process

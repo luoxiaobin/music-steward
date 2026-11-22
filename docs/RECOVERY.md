@@ -96,7 +96,7 @@ Residual limitations ([evidence report §6.7](../m0/EVIDENCE_REPORT.md)):
 ## Retiring originals: interruptions and undo
 
 Retiring **moves** the files of verified albums into `<collection folder>/_ORIGINALS/run…/` (same drive, same relative
-paths), after re-checking each album; nothing is deleted. Every step is journalled first.
+paths), after re-checking each album; retiring deletes nothing. Every step is journalled first.
 
 | What happened | What is left | What to do |
 |---|---|---|
@@ -116,6 +116,17 @@ costs you the Restore button.
 An album is **not** set aside — and nothing of it moves — if any of its files was not copied or blocked, the organized
 copy is missing or its audio differs from the journal, the original changed since it was copied, or a path on the way
 is a link. The reason is shown in the dialog. See [User guide, step 11](USER_GUIDE.md#11-your-originals-optional).
+
+
+## Archive and Delete of parked originals: interruptions
+
+| What happened | What is left | What to do |
+|---|---|---|
+| **Archive** was stopped, the app quit, or the backup drive dropped | Files already copied are complete and checked; a file being copied is only under a temporary name | Press **Archive…** again with the same folder: it continues, recognises identical files and never overwrites |
+| A file in the archive was changed or removed later | The card shows the archive as *not complete* | Archive again to the same folder: only what is missing is copied |
+| **Delete** was stopped or interrupted | Albums already deleted are gone (they cannot come back); the rest are still parked | Press **Delete…** again: it repeats the checks and continues; a file already deleted counts as done |
+| A check failed for an album at Delete | That album's parked files are **kept** and the reason is listed | Fix the cause (for example Restore, or run the copy again), then Delete again |
+| Afterwards, what proves what was deleted | `~/.music-steward/deleted/` keeps the batch's manifest | Nothing to do; it is a record, not a way to undo |
 
 ## Backing up the app's own data
 

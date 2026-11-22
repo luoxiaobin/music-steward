@@ -789,7 +789,10 @@ async function openSettings() {
       h("div", { class: "muted xsmall" }, "After an organized copy has been verified, Music Steward can set the original files aside " +
         "(moved into a folder called _ORIGINALS in the same collection folder, never deleted) so you can restore them, archive them or delete them yourself. " +
         "Off unless you allow it for a collection folder."),
-      ...(d.retire_roots || []).map(r => chk("setRetire" + r.id, ["Allow for ", h("span", { class: "mono", "data-no-translate": "" }, r.path)], r.allowed, false))),
+      ...(d.retire_roots || []).map(r => chk("setRetire" + r.id, ["Allow for ", h("span", { class: "mono", "data-no-translate": "" }, r.path)], r.allowed, false)),
+      h("div", { style: "margin-top:8px" }, h("label", { for: "setCooloff", class: "small" }, "Days after setting originals aside before deleting them needs an extra confirmation "),
+        h("select", { id: "setCooloff", "data-no-translate": "" }, ["0", "1", "3", "7", "14", "30"].map(n =>
+          h("option", { value: n, selected: v("retire_cooloff_days") === n ? true : null }, n))))),
     h("section", {}, h("h3", {}, "Online catalogues"),
       chk("srcMb", "MusicBrainz", true, true, "always"),
       chk("srcDeezer", "Deezer", srcs.includes("deezer"), env("sources")),
@@ -814,7 +817,8 @@ async function openSettings() {
           album_cue: dlg.querySelector("#setAlbumCue").checked ? "on" : "off",
           sources: ["musicbrainz", dlg.querySelector("#srcDeezer").checked && "deezer",
                     dlg.querySelector("#srcDiscogs").checked && "discogs"].filter(Boolean).join(","),
-          dest: dest.value, language: dlg.querySelector("#setLang").value };
+          dest: dest.value, language: dlg.querySelector("#setLang").value,
+          retire_cooloff_days: dlg.querySelector("#setCooloff").value };
         const retire_roots = Object.fromEntries((d.retire_roots || []).map(r => [r.id, dlg.querySelector("#setRetire" + r.id).checked]));
         for (const n of Object.keys(body)) if (env(n === "sources" ? "sources" : n)) delete body[n];
         const r = await post2("/api/settings", { settings: body, retire_roots });
