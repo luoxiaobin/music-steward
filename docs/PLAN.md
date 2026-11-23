@@ -161,7 +161,12 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
 7. **Lifecycle fixes** ([docs/LIFECYCLES.md](LIFECYCLES.md)): a *Retired* album state and the *not found* exception, so
    Retire → rescan → Recognize folder no longer drops decisions (bug confirmed 2026-11-21); one readable history of
    events; per-track artist in *Edit fields*.
-8. Outside trial users when the above is solid.
+8. **Listen on your phone** ([ADR 0005](adr/0005-streaming-server.md), proposed; [PHONE_APP.md](PHONE_APP.md)): a managed
+   Navidrome as streaming server for the organized copies. Order: ✅ analysis; the phone trial
+   ([PHONE_TRIAL.md](PHONE_TRIAL.md): Amperfy on the iPhone, Wi-Fi then away from home); a *Listen* screen (status, QR code,
+   account, start/stop, rescan after each Apply); login item and `serve`; remote-listening guide (Tailscale); Windows.
+   An own Subsonic server or player only if the trial proves a gap.
+9. Outside trial users when the above is solid.
 
 ## M2 backlog (original order)
 
