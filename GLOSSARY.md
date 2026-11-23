@@ -66,3 +66,17 @@ _Avoid_: not found, unknown, failed
 **Share identity**:
 The host and share name behind a collection folder on the network, kept on this Mac only and never with a password, so a new mount point of the same share can be suggested.
 _Avoid_: NAS address, server, credentials
+
+### Listening
+
+**Streaming server**:
+The program that serves the organized copies to phone players over the Subsonic protocol. It reads the organized library only, keeps its own accounts, and is separate from the review screen.
+_Avoid_: NAS, cloud, hosting
+
+**Listen**:
+The screen that switches the streaming server on and off and shows how a phone connects to it.
+_Avoid_: player, share
+
+**Remote listening**:
+Streaming to a phone that is not on the home network, through a private network such as Tailscale, never through an open port.
+_Avoid_: public access, cloud access

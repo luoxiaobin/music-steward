@@ -1,6 +1,8 @@
 # Phone app — competitive analysis and prototype proposal
 
-* **Status:** Proposal for review (2026-11-22). Nothing here is decided or built.
+* **Status:** Proposal (2026-11-22). **Decided since** (owner, 2026-11-22; see [ADR 0005](adr/0005-streaming-server.md)):
+  use **Navidrome** as the streaming server instead of writing one; **iPhone first**; **try existing apps first**
+  ([PHONE_TRIAL.md](PHONE_TRIAL.md)) before any own player. §6 below is partly answered by this.
 * **Question:** Can we get a phone player quickly, as a browser-based app, that speaks the Subsonic API and plays the
   library Music Steward has scanned, cleaned and organized — and what should it do to be worth using?
 

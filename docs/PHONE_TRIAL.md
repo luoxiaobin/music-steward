@@ -100,6 +100,27 @@ but annoying · ❌ broken, and write one line on what you saw.
 | 23 | Were any words confusing (server, Subsonic, transcoding)? |
 | 24 | If you had to explain it to a family member, which step would lose them? |
 
+## Part 4 — Away from home (mobile data)
+
+Navidrome's home address does not work on mobile data. The safe way is a private network, not a forwarded port:
+
+1. Install the free **Tailscale** app on the Mac and on the iPhone and sign in to the same account on both.
+2. In Tailscale note the Mac's name (for example `kevins-mac-mini`) or its `100.x.x.x` address.
+3. In Amperfy add a second server (or change the address) to `http://<that name or address>:4533`.
+4. Turn **Wi-Fi off** on the phone and repeat checks 11, 16 and 17.
+5. In Amperfy's settings look for separate streaming formats for Wi-Fi and cellular; for cellular choose MP3 or Opus
+   at 128–192 kbps. Then note: how long a track takes to start, and what the cellular data counter shows after one album.
+
+| # | Check |
+|---|---|
+| 25 | Play and seek over mobile data with the lock screen on |
+| 26 | Seconds to start a FLAC track on cellular, with and without conversion |
+| 27 | Mobile data used by one album (Settings → Cellular) |
+| 28 | The Mac sleeps or Navidrome stops: what does the phone show? |
+| 29 | Download an album on Wi-Fi, then play it on cellular without using data |
+
+Keep the Mac awake (`caffeinate` is in the start command) and never forward a port on your router for this.
+
 ## What to send back
 
 A copy of this checklist with ✅ / ⚠️ / ❌ and one line each, plus: the **three things you liked most**, the **three
