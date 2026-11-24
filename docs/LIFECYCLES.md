@@ -35,7 +35,7 @@ stateDiagram-v2
   [*] --> Listed: named with --root
   Listed --> Scanned: first complete scan
   Scanned --> Scanned: scan (complete, aborted or interrupted)
-  Scanned --> Scanned: change path ◇
+  Scanned --> Scanned: change path ✓
   Scanned --> Hidden: hide ◇
   Hidden --> Scanned: show, or add the same path ◇
 ```
@@ -44,9 +44,9 @@ stateDiagram-v2
 |---|---|---|
 | Listed ✓ / Added ◇ | owner | registered only; nothing read, nothing scanned; Retire off |
 | Scanned ✓ | owner | inventory refreshed; an *aborted* or *interrupted* scan marks nothing removed |
-| Disconnected / reconnected ✓ (observed) | the drive | ◇ shown as *not connected*, writing actions disabled, nothing removed |
+| Disconnected / reconnected ✓ (observed) | the drive | shown as *not connected* (with the share's new mount point, if it has one), every action that reads it disabled, nothing removed |
 | Retire allowed / not allowed ✓ | owner | per folder, off by default |
-| Path changed ◇ | owner | same collection, new path: decisions kept, Retire back to off, history entry |
+| Path changed ✓ | owner | same collection, new path: decisions kept, Retire back to off, history entry; plans made before it are not applied |
 | Hidden / shown ◇ | owner | stop / resume showing and scanning; everything kept |
 
 **Never:** the app writes to it (except the fenced *Retire*); removes it by itself; lets two collection folders overlap ◇.

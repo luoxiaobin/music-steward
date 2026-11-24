@@ -33,12 +33,28 @@ def _guard(con: sqlite3.Connection, dest: Path):
     return guard
 
 
+MOVED = ("this plan was made before its collection folder's path changed; make a new plan "
+         "(your decisions are kept)")
+
+
+def sources_moved(con: sqlite3.Connection, p: dict) -> bool:
+    """A plan holds its sources' full paths. After *Change path* (ADR 0004) they point at the old place,
+    which may by then be another share or another disk: such a plan is never applied, resumed or retried."""
+    row = con.execute("SELECT path FROM root WHERE id=?", (p["root_id"],)).fetchone()
+    if row is None:
+        return True
+    top = row["path"].rstrip("/") + "/"
+    return any(not it["src"].startswith(top) for it in p["items"] if it["status"] == "ok")
+
+
 def journal_dir() -> Path:
     return Path(dbmod.DEFAULT_DB).parent / "journal"
 
 
 def apply(con: sqlite3.Connection, plan_id: int, progress=None, journal_root: Path | None = None, stop=None) -> dict:
     p = load(con, plan_id)
+    if sources_moved(con, p):
+        return {"error": MOVED}
     dest = Path(p["dest_root"])
     try:
         check_destination(con, dest)          # again: links and collection folders may have changed
@@ -104,6 +120,8 @@ def finish(con, run_id) -> dict:
 def resume(con, run_id, progress=None, stop=None, retry_failed: bool = False) -> dict:
     """Finish an interrupted run. retry_failed: also try again the files that failed (Retry failed)."""
     r = con.execute("SELECT * FROM run WHERE id=?", (run_id,)).fetchone()
+    if sources_moved(con, load(con, r["plan_id"])):
+        return {"error": MOVED}
     j = protocol.Journal(Path(r["journal"]))
     if "planned" not in j.meta():           # interrupted while being planned: journal the rest first
         p = load(con, r["plan_id"])

@@ -6,6 +6,28 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 
 ## [Unreleased]
 
+### Added
+- **Change path of a collection folder** ([ADR 0004](docs/adr/0004-collection-folders.md)): when the same collection
+  is now at another path — the share mounted as `/Volumes/music-1` instead of `/Volumes/music`, a new NAS address —
+  **Settings → Collection folders → Change path…** moves it there and keeps every album, decision and edit. The app
+  first compares up to 200 known files with the new folder (same relative path, same size; nothing is opened or
+  written there) and refuses a folder where fewer than 90% match ("this does not look like the same collection"),
+  a folder that is already a collection folder, or one inside or around another. It waits while a job runs, while a
+  copy is unfinished, and while originals are still set aside. Afterwards *Retire originals* is off again for that
+  folder, a history entry records the change, and the app offers **Scan now**. Command line:
+  `music-steward collection list` and `music-steward collection set-path OLD NEW`.
+- **Not connected**: a collection folder whose drive or share is not mounted is shown as such, with **Check again**
+  and **Change path…**; when the same network share is mounted elsewhere, the app suggests that path (it remembers
+  the share's host and name on this Mac, never a user name or password). Scan, recognition, copy, retire, restore,
+  archive and delete are refused for it; *Undo run* still works (it only touches the destination).
+
+### Changed
+- **`--root` adds a collection folder; it no longer hides the others.** `music-steward app` and `serve` show every
+  collection folder the app knows, plus any named with `--root`; `serve` no longer requires `--root` once one is known.
+- A plan made before its collection folder's path changed is no longer applied, resumed or retried (its source paths
+  point at the old place, which may by then be another share): make a new plan.
+- The header says *Collection folder* instead of *Root*.
+
 ### Fixed
 - **Setting originals aside no longer loses your decisions.** After *Retire originals*, a rescan followed by
   *Recognize folder* used to drop the retired albums **and** your decisions for them. Now an album whose files are

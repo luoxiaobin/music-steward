@@ -37,7 +37,12 @@ class App:
     def __init__(self, db_path: str, roots: list[str], dest: str | None = None):
         self.dest = os.path.abspath(os.path.expanduser(dest)) if dest else None
         self.db_path = db_path
-        self.roots = [os.path.abspath(r) for r in roots]
+        # every collection folder the database knows, plus the ones given: --root adds, it never hides one (ADR 0004 §5)
+        given = [nfc(os.path.abspath(os.path.expanduser(r))) for r in roots]
+        con = db.connect(db_path)
+        known = [r[0] for r in con.execute("SELECT path FROM root ORDER BY id")]
+        con.close()
+        self.roots = known + [r for r in given if r not in known]
         self.token = secrets.token_urlsafe(24)
         self.session = secrets.token_urlsafe(32)
         self.scan_state = {"running": False}
@@ -52,6 +57,7 @@ class App:
 
     # ---- data -------------------------------------------------------------
     def roots_info(self, con):
+        from . import collection
         out = []
         for r in self.roots:
             row = con.execute("SELECT id FROM root WHERE path=?", (nfc(r),)).fetchone()
@@ -60,9 +66,46 @@ class App:
                 s = con.execute("SELECT * FROM scan WHERE root_id=? ORDER BY id DESC LIMIT 1",
                                 (row["id"],)).fetchone()
                 last = dict(s) if s else None
+            ok = collection.connected(r)
             out.append({"path": r, "root_id": row["id"] if row else None,
-                        "available": os.path.isdir(r), "last_scan": last})
+                        "available": ok, "last_scan": last,
+                        "suggestion": collection.suggestion(con, row["id"]) if row and not ok else None})
         return out
+
+    # ---- collection folders (ADR 0004) -------------------------------------------------------------------
+    def collections(self, con) -> list[dict]:
+        from . import collection
+        return [collection.describe(con, r["id"]) for r in con.execute("SELECT id FROM root ORDER BY id")]
+
+    def change_path(self, con, body) -> dict:
+        """Change path: under the job lock, so no scan, copy or retire can start while it happens."""
+        from . import collection
+        rid = _int(body.get("root_id"))
+        with self._lock:
+            try:
+                old = con.execute("SELECT path FROM root WHERE id=?", (rid,)).fetchone()
+                r = collection.set_path(con, rid, str(body.get("path", "")), self.scan_state)
+            except collection.CollectionError as e:
+                return {"error": str(e)}
+            self.roots = [r["path"] if p == old["path"] else p for p in self.roots]
+            self._summary_cache = {}
+        return r
+
+    def _job_root(self, con, kind: str, n: int) -> str | None:
+        """The collection folder a job by id works on (a plan, a copy run, a batch of parked originals)."""
+        if kind == "apply":
+            q, arg = "SELECT r.path FROM plan p JOIN root r ON r.id=p.root_id WHERE p.id=?", n
+        elif kind in ("resume", "retry", "retire", "retire_resume"):
+            q, arg = ("SELECT r.path FROM run JOIN plan p ON p.id=run.plan_id JOIN root r ON r.id=p.root_id "
+                      "WHERE run.id=?"), n
+        elif kind in ("restore", "archive", "delete"):
+            q, arg = "SELECT r.path FROM retire_batch b JOIN root r ON r.id=b.root_id WHERE b.id=?", n
+        elif kind == "recognize_unit":
+            q, arg = "SELECT r.path FROM unit u JOIN root r ON r.id=u.root_id WHERE u.id=?", n
+        else:
+            return None
+        row = con.execute(q, (arg,)).fetchone()
+        return row["path"] if row else None
 
     def summary(self, con, root_id):
         key = (root_id, con.execute("SELECT max(id) FROM scan").fetchone()[0],
@@ -187,7 +230,7 @@ class App:
             root = root or self.roots[0]
             if not str(path).isdigit():
                 return {"error": "bad id"}
-        root = os.path.abspath(root)
+        root = nfc(os.path.abspath(root))
         if root not in self.roots:
             return {"error": "not a configured root"}
         if kind in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "archive", "delete", "recognize_unit"):
@@ -197,6 +240,16 @@ class App:
         target = os.path.join(root, str(path)) if path else root
         if kind not in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "archive", "delete", "recognize_unit") and not os.path.realpath(target).startswith(os.path.realpath(root)):
             return {"error": "bad path"}
+        if kind != "undo":          # undo only touches the destination; everything else reads the collection folder
+            from . import collection
+            con = self.con()
+            try:
+                where = self._job_root(con, kind, int(path)) if str(path).isdigit() and kind not in (
+                    "scan", "hash", "recognize") else root
+            finally:
+                con.close()
+            if where and not collection.connected(where):
+                return {"error": collection.MESSAGES["not_connected"], "not_connected": where}
         with self._lock:
             if self.scan_state.get("running"):
                 return {"error": f"a {self.scan_state.get('kind')} is already running"}
@@ -272,7 +325,7 @@ class App:
     def settings_view(self, con) -> dict:
         from . import settings
         from . import __version__
-        return {"version": __version__, "settings": settings.all_values(con),
+        return {"version": __version__, "settings": settings.all_values(con), "collections": self.collections(con),
                 "retire_roots": [{"id": r["id"], "path": r["path"], "allowed": settings.retire_allowed(con, r["id"])}
                                  for r in con.execute("SELECT id, path FROM root ORDER BY id")],
                 "status": {"acoustid": bool(os.environ.get("ACOUSTID_API_KEY")),
@@ -623,6 +676,12 @@ def make_handler(app: App, port_ref: dict):
                                           if u.path == "/api/archive_plan" else retire.delete_preview(con, _int(q.get("batch"))))
                     except retire.RetireError as e:
                         return self._json({"error": str(e)})
+                if u.path == "/api/collection_check":                       # Change path, the dry run: changes nothing
+                    from . import collection
+                    try:
+                        return self._json(collection.check(con, _int(q.get("root_id")), q.get("path", ""), app.scan_state))
+                    except collection.CollectionError as e:
+                        return self._json({"error": str(e)})
                 if u.path == "/api/check_folder":                           # changes nothing
                     from . import folders
                     return self._json(folders.check_folder(con, q.get("path", ""), q.get("purpose", "destination")))
@@ -750,6 +809,12 @@ def make_handler(app: App, port_ref: dict):
                 con = app.con()
                 try:
                     return self._json(app.save_settings(con, body))
+                finally:
+                    con.close()
+            if u.path == "/api/collection_path":
+                con = app.con()
+                try:
+                    return self._json(app.change_path(con, body))
                 finally:
                     con.close()
             if u.path == "/api/stop":

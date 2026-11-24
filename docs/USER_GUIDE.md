@@ -177,3 +177,20 @@ listing every file with its original path and its organized copy, so you can res
 
 Interrupted (the app quit, the drive dropped)? **Finish setting aside** on the same card settles what was
 half-done: every file is either at its old place or in `_ORIGINALS`, never lost.
+
+## 12. When your collection folder moves
+
+Music Steward remembers every collection folder; starting it with `--root` adds one, it never hides the others.
+
+**Not connected.** If the drive or share is not mounted, the folder panel says *This collection folder is not
+connected*. Nothing is lost, and nothing that reads the folder can start. Connect it (Finder → Go → Connect to Server)
+and press **Check again**. If the same share is already mounted under another name (macOS sometimes mounts
+`/Volumes/music` as `/Volumes/music-1`), the notice shows that path and offers **Change path…**.
+
+**Change path…** (also in **Settings → Collection folders**) is for *the same collection at a new path*. Choose the
+new folder; the app compares up to 200 files it knows with the new folder (same place, same size — nothing is read
+or written there) and accepts it only if at least 90% match. Your albums, decisions and edits stay; the next scan
+reads only what differs. Afterwards *Retire originals* is off again for that folder, and plans made before the change
+cannot be applied any more: make a new plan. The change waits while a job is running, while a copy is unfinished
+(finish it with Resume or undo it), and while originals are still set aside in `_ORIGINALS` (restore or delete them
+first). From the command line: `music-steward collection list` and `music-steward collection set-path OLD NEW`.

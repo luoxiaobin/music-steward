@@ -60,7 +60,8 @@ async function loadState() {
   const root = st.roots.find(r => r.root_id === S.rootId) || st.roots[0];
   S.root = root;
   document.getElementById("rootChip").textContent =
-    root ? `Root: ${root.path}${root.available ? "" : " (not available)"} · sources read-only` : "No root configured";
+    root ? `Collection folder: ${root.path}${root.available ? "" : " (not connected)"} · sources read-only` : "No collection folder yet";
+  renderConn(root);
   renderInventory(st);
   renderFilters();
   renderScan(st.scan);
@@ -751,6 +752,87 @@ document.getElementById("recognizeBtn").addEventListener("click", async () => {
 })().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });
 
 
+// ---------------------------------------------------------------- collection folders (ADR 0004)
+// A collection folder whose drive or share is not mounted: say so, offer the share's new place when the
+// same share is mounted elsewhere, Change path…, and Check again. Nothing about the folder is lost.
+function renderConn(root) {
+  const box = document.getElementById("connNote");
+  if (!root || root.available || !root.root_id) { box.hidden = true; box.replaceChildren(); return; }
+  box.hidden = false;
+  box.replaceChildren(...[
+    h("p", { class: "small" }, "This collection folder is not connected. If the share is mounted somewhere else now, choose " +
+      "Change path…. Otherwise connect it (Finder → Go → Connect to Server) and press Check again."),
+    h("p", { class: "mono small", "data-no-translate": "" }, root.path),
+    root.suggestion ? h("p", { class: "small" }, "The same share is now at this path. Change path to it?", " ",
+      h("span", { class: "mono", "data-no-translate": "" }, root.suggestion)) : null,
+    h("div", { class: "btnrow" },
+      h("button", { type: "button", class: "btn", onclick: () => refreshAll() }, "Check again"),
+      h("button", { type: "button", class: "btn" + (root.suggestion ? " btn-primary" : ""),
+        onclick: () => changePathDialog(root.root_id, root.path, root.suggestion) }, "Change path…"))].filter(Boolean));
+}
+
+async function changePathDialog(rootId, oldPath, suggested) {
+  const input = h("input", { type: "text", id: "cpPath", value: suggested || "", placeholder: "/Volumes/music" });
+  const out = h("div", { class: "small", style: "margin-top:8px;min-height:18px" });
+  const msg = h("p", { class: "err" });
+  let checked = null, seq = 0;
+  const go = h("button", { type: "button", class: "btn btn-primary", disabled: true, onclick: async () => {
+    go.disabled = true;
+    const r = await post2("/api/collection_path", { root_id: rootId, path: input.value });
+    if (r.error) { msg.textContent = r.error; return; }
+    close();
+    S.rootId = rootId;
+    await refreshAll();
+    if (await ask(r.done.message, "Scan now")) startScan();
+  } }, "Change path");
+  const fchk = folderCheck(input, "any", () => {});
+  const check = async () => {
+    const mine = ++seq;
+    checked = null; go.disabled = true; msg.textContent = "";
+    if (!input.value.trim()) { out.replaceChildren(); return; }
+    out.replaceChildren(h("span", { class: "muted" }, "Comparing files…"));
+    let r;
+    try { r = await api(`/api/collection_check?root_id=${rootId}&path=${encodeURIComponent(input.value)}`); }
+    catch (e) { r = { error: String(e) }; }
+    if (mine !== seq) return;
+    if (r.error) { out.replaceChildren(h("span", { class: "err" }, r.error)); return; }
+    checked = r;
+    const res = r.result;
+    out.replaceChildren(...[
+      res ? h("div", {}, h("span", { class: res.code.startsWith("accepted") ? "ok" : "err", style: "font-weight:600" }, res.code.startsWith("accepted") ? "✓ " : "✗ "),
+              h("span", {}, res.message),
+              res.detail ? h("span", { class: "mono", "data-no-translate": "" }, " " + res.detail) : null) : null,
+      ...r.blockers.map(b => h("div", { class: "err" }, "✗ ", h("span", {}, b.message),
+        b.detail ? h("span", { class: "mono", "data-no-translate": "" }, " " + b.detail) : null))].filter(Boolean));
+    go.disabled = !r.ok;
+  };
+  let timer = null;
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(check, 500); });
+  const dlg = h("dialog", { class: "appdialog settings" },
+    h("h2", { class: "h2" }, "Change path…"),
+    h("p", { class: "small" }, "Use this when the same collection is now at another path, for example a share mounted under a new name. " +
+      "Music Steward compares up to 200 known files with the new folder; nothing is read or written there."),
+    h("div", { class: "small" }, "Current path: ", h("span", { class: "mono", "data-no-translate": "" }, oldPath)),
+    h("h3", {}, h("label", { for: "cpPath" }, "New path")),
+    h("div", { style: "display:flex;gap:8px" }, input, chooseButton(input)),
+    fchk.el, out, msg,
+    h("div", { class: "btnrow" },
+      h("button", { type: "button", class: "btn", onclick: () => close() }, "Cancel"), go));
+  const close = () => { dlg.close(); dlg.remove(); };
+  dlg.addEventListener("cancel", e => { e.preventDefault(); close(); });
+  document.body.append(dlg);
+  dlg.showModal();
+  if (input.value) check();
+}
+
+function collectionList(d, onChange) {
+  return h("div", { class: "collist" }, (d.collections || []).map(c => h("div", { class: "colrow" },
+    h("span", { class: "mono small", "data-no-translate": "" }, c.path),
+    h("span", { class: "small " + (c.connected ? "ok" : "warn") }, c.connected ? "Connected" : "Not connected"),
+    h("button", { type: "button", class: "btn", onclick: () => { onChange(); changePathDialog(c.id, c.path, c.suggestion); } },
+      "Change path…"))));
+}
+
 // ---------------------------------------------------------------- settings
 async function openSettings() {
   const d = await api("/api/settings");
@@ -773,6 +855,10 @@ async function openSettings() {
          ["fr-ca", "Français (Canada)"], ["es-us", "Español (EE. UU.)"]].map(([val, label]) =>
           h("option", { value: val, selected: v("language") === val ? true : null }, val === "auto" ? tr(label) : label))),
       envNote("language")),
+    h("section", {}, h("h3", {}, "Collection folders"),
+      h("div", { class: "muted xsmall" }, "The folders Music Steward scans. They are only read. If one is now at another path, " +
+        "for example a share mounted under a new name, choose Change path…: your albums and decisions stay."),
+      collectionList(d, () => { dlg.close(); dlg.remove(); })),
     h("section", {}, h("h3", {}, "Names in the organized copies"),
       radios("script", [["simplified", "Simplified Chinese", "one folder per artist (鄧麗君 → 邓丽君)"],
                         ["traditional", "Traditional Chinese"], ["keep", "As each release has it"]]), envNote("script")),

@@ -419,4 +419,6 @@ def scan(con: sqlite3.Connection, root_path: str, workers: int = 8, progress=Non
                 ", ".join(f"{k}=?" for k in c) + " WHERE id=?",
                 (time.time(), *c.values(), scan_id))
     con.commit()
+    from .collection import remember_share     # which network share this is, for the not-connected message
+    remember_share(con, root_id, root)
     return ScanResult(scan_id, root_id, "complete", c, None, time.time() - t0)

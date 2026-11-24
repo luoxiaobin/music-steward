@@ -179,3 +179,12 @@ body.resizing{cursor:col-resize;user-select:none}
 
 .listfilter{font:13px var(--font);min-height:32px;padding:0 10px;border:1px solid var(--btn-line);border-radius:8px;width:180px;background:var(--panel)}
 .listfilter:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+
+/* a collection folder that is not connected (ADR 0004) */
+.connnote{border:1px solid var(--btn-line);border-left:3px solid var(--review);border-radius:6px;padding:8px 10px;margin:0 0 8px}
+.connnote p{margin:0 0 6px}
+.connnote .mono{overflow-wrap:anywhere}
+.connnote .btnrow{display:flex;flex-wrap:wrap;gap:6px}
+.collist{display:grid;gap:8px}
+.collist .colrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.collist .colrow .mono{overflow-wrap:anywhere;flex:1 1 220px}

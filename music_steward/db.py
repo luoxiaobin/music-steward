@@ -158,6 +158,13 @@ CREATE TABLE IF NOT EXISTS retired_file(
     PRIMARY KEY(batch_id, relpath)
 );
 
+-- collection folders (ADR 0004): what happened to a folder itself, e.g. its path changed
+CREATE TABLE IF NOT EXISTS root_history(
+    id INTEGER PRIMARY KEY, root_id INTEGER NOT NULL REFERENCES root(id), at REAL NOT NULL,
+    event TEXT NOT NULL,                -- path_changed
+    old_path TEXT, new_path TEXT, detail_json TEXT
+);
+
 CREATE TABLE IF NOT EXISTS dir_note(
     root_id INTEGER NOT NULL, relpath TEXT NOT NULL, note TEXT NOT NULL, detail TEXT,
     last_scan INTEGER,
@@ -178,7 +185,10 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
                  # where the collection folder really was when originals were set aside (retire.py)
                  ("retire_batch", "root_real", "TEXT"),
                  # Archive and Delete of the parked originals (ADR 0003): JSON records
-                 ("retire_batch", "archive_json", "TEXT"), ("retire_batch", "delete_json", "TEXT")]
+                 ("retire_batch", "archive_json", "TEXT"), ("retire_batch", "delete_json", "TEXT"),
+                 # the network share behind a collection folder, to suggest its new mount point (ADR 0004 §12);
+                 # host and share name only, never a user name or password
+                 ("root", "share_host", "TEXT"), ("root", "share_name", "TEXT"), ("root", "share_sub", "TEXT")]
 
 
 _READY: set[str] = set()   # databases already set up by this process

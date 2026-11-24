@@ -769,6 +769,93 @@ TABLE: list[tuple[str, str, str, str]] = [
     ("a file already exists at the destination", "目标位置已有文件", "un fichier existe déjà à la destination", "ya existe un archivo en el destino"),
     ("source changed or missing since the scan; re-scan", "扫描后源文件已改变或缺失；请重新扫描", "source modifiée ou absente depuis l'analyse; réanalysez",
      "el original cambió o falta desde el escaneo; vuelva a escanear"),
+    # ---- collection folders: not connected, Change path (ADR 0004)
+    ("Collection folder: {path} · sources read-only", "收藏文件夹：{path} · 源文件只读",
+     "Dossier de la collection : {path} · sources en lecture seule", "Carpeta de la colección: {path} · originales de solo lectura"),
+    ("Collection folder: {path} (not connected) · sources read-only", "收藏文件夹：{path}（未连接）· 源文件只读",
+     "Dossier de la collection : {path} (non connecté) · sources en lecture seule",
+     "Carpeta de la colección: {path} (no conectada) · originales de solo lectura"),
+    ("No collection folder yet", "尚无收藏文件夹", "Aucun dossier de collection pour l'instant", "Todavía no hay carpeta de la colección"),
+    ("Collection folders", "收藏文件夹", "Dossiers de la collection", "Carpetas de la colección"),
+    ("The folders Music Steward scans. They are only read. If one is now at another path, for example a share mounted "
+     "under a new name, choose Change path…: your albums and decisions stay.",
+     "Music Steward 扫描的文件夹，只读不写。如果某个文件夹现在位于另一个路径（例如共享以新名称挂载），请选择“更改路径…”：你的专辑和决定都会保留。",
+     "Les dossiers que Music Steward analyse. Ils sont seulement lus. Si l'un d'eux se trouve maintenant à un autre "
+     "chemin, par exemple un partage monté sous un nouveau nom, choisissez Changer le chemin… : vos albums et vos décisions sont conservés.",
+     "Las carpetas que Music Steward escanea. Solo se leen. Si una está ahora en otra ruta, por ejemplo un recurso "
+     "compartido montado con otro nombre, elija Cambiar ruta…: sus álbumes y decisiones se conservan."),
+    ("Connected", "已连接", "Connecté", "Conectada"),
+    ("Not connected", "未连接", "Non connecté", "No conectada"),
+    ("Check again", "再次检查", "Vérifier de nouveau", "Comprobar de nuevo"),
+    ("Change path…", "更改路径…", "Changer le chemin…", "Cambiar ruta…"),
+    ("Change path", "更改路径", "Changer le chemin", "Cambiar ruta"),
+    ("Scan now", "立即扫描", "Analyser maintenant", "Escanear ahora"),
+    ("Current path:", "当前路径：", "Chemin actuel :", "Ruta actual:"),
+    ("New path", "新路径", "Nouveau chemin", "Ruta nueva"),
+    ("Comparing files…", "正在比对文件…", "Comparaison des fichiers…", "Comparando archivos…"),
+    ("Use this when the same collection is now at another path, for example a share mounted under a new name. "
+     "Music Steward compares up to 200 known files with the new folder; nothing is read or written there.",
+     "当同一个收藏现在位于另一个路径时使用（例如共享以新名称挂载）。Music Steward 会将最多 200 个已知文件与新文件夹比对；不会在那里读取或写入任何内容。",
+     "Utilisez ceci lorsque la même collection se trouve maintenant à un autre chemin, par exemple un partage monté "
+     "sous un nouveau nom. Music Steward compare jusqu'à 200 fichiers connus avec le nouveau dossier; rien n'y est lu ni écrit.",
+     "Use esto cuando la misma colección está ahora en otra ruta, por ejemplo un recurso compartido montado con otro "
+     "nombre. Music Steward compara hasta 200 archivos conocidos con la carpeta nueva; allí no se lee ni se escribe nada."),
+    ("This collection folder is not connected. If the share is mounted somewhere else now, choose Change path…. "
+     "Otherwise connect it (Finder → Go → Connect to Server) and press Check again.",
+     "此收藏文件夹未连接。如果共享现在挂载在别处，请选择“更改路径…”。否则请先连接它（访达 → 前往 → 连接服务器），再按“再次检查”。",
+     "Ce dossier de la collection n'est pas connecté. Si le partage est maintenant monté ailleurs, choisissez Changer "
+     "le chemin…. Sinon, connectez-le (Finder → Aller → Se connecter au serveur) et appuyez sur Vérifier de nouveau.",
+     "Esta carpeta de la colección no está conectada. Si el recurso compartido está montado ahora en otro lugar, elija "
+     "Cambiar ruta…. Si no, conéctelo (Finder → Ir → Conectarse al servidor) y pulse Comprobar de nuevo."),
+    ("The same share is now at this path. Change path to it?", "同一个共享现在位于此路径。要将路径更改为它吗？",
+     "Le même partage se trouve maintenant à ce chemin. Changer le chemin pour celui-ci?",
+     "El mismo recurso compartido está ahora en esta ruta. ¿Cambiar la ruta a esta?"),
+    ("Checked {a} files: {b} are at the new path with the same size. Your albums and decisions stay. The next scan "
+     "updates the inventory.", "已检查 {a} 个文件：其中 {b} 个在新路径中且大小相同。你的专辑和决定都会保留。下次扫描会更新清单。",
+     "{a} fichiers vérifiés : {b} se trouvent au nouveau chemin avec la même taille. Vos albums et vos décisions sont "
+     "conservés. La prochaine analyse met l'inventaire à jour.",
+     "Se comprobaron {a} archivos: {b} están en la ruta nueva con el mismo tamaño. Sus álbumes y decisiones se conservan. "
+     "El próximo escaneo actualiza el inventario."),
+    ("No files of this collection folder are known yet, so there was nothing to compare. The next scan reads the new path.",
+     "此收藏文件夹尚无已知文件，因此没有可比对的内容。下次扫描会读取新路径。",
+     "Aucun fichier de ce dossier de la collection n'est encore connu, il n'y avait donc rien à comparer. La prochaine "
+     "analyse lit le nouveau chemin.",
+     "Todavía no se conoce ningún archivo de esta carpeta de la colección, así que no había nada que comparar. El "
+     "próximo escaneo lee la ruta nueva."),
+    ("Only {b} of {a} files were found at that path, so this does not look like the same collection. To use it as "
+     "another collection folder, add it instead.", "在该路径中只找到 {a} 个文件中的 {b} 个，因此看起来不是同一个收藏。如要将其用作另一个收藏文件夹，请改为添加它。",
+     "Seulement {b} fichiers sur {a} ont été trouvés à ce chemin : ce ne semble pas être la même collection. Pour "
+     "l'utiliser comme un autre dossier de collection, ajoutez-le plutôt.",
+     "Solo se encontraron {b} de {a} archivos en esa ruta, así que no parece la misma colección. Para usarla como otra "
+     "carpeta de la colección, agréguela en su lugar."),
+    ("That folder is already a collection folder of its own, with its own albums and decisions.",
+     "该文件夹本身已是一个收藏文件夹，有自己的专辑和决定。",
+     "Ce dossier est déjà un dossier de collection à part entière, avec ses propres albums et décisions.",
+     "Esa carpeta ya es una carpeta de la colección propia, con sus propios álbumes y decisiones."),
+    ("That folder is inside, or contains, another collection folder:", "该文件夹位于另一个收藏文件夹之内，或包含另一个收藏文件夹：",
+     "Ce dossier se trouve dans un autre dossier de collection, ou le contient :",
+     "Esa carpeta está dentro de otra carpeta de la colección, o la contiene:"),
+    ("That is already the path of this collection folder.", "这已经是此收藏文件夹的路径。",
+     "C'est déjà le chemin de ce dossier de la collection.", "Esa ya es la ruta de esta carpeta de la colección."),
+    ("That folder does not exist.", "该文件夹不存在。", "Ce dossier n'existe pas.", "Esa carpeta no existe."),
+    ("Wait until the running job has finished:", "请等待正在进行的任务完成：", "Attendez la fin de la tâche en cours :",
+     "Espere a que termine la tarea en curso:"),
+    ("A copy is unfinished. Finish it (Resume) or undo it first. Run:", "有一次复制尚未完成。请先完成它（继续）或撤销它。运行：",
+     "Une copie n'est pas terminée. Terminez-la (Reprendre) ou annulez-la d'abord. Exécution :",
+     "Una copia no ha terminado. Termínela (Reanudar) o deshágala primero. Ejecución:"),
+    ("Originals are still set aside in _ORIGINALS. Restore or delete them first.",
+     "仍有原始文件存放在 _ORIGINALS 中。请先恢复或删除它们。",
+     "Des originaux sont encore mis de côté dans _ORIGINALS. Restaurez-les ou supprimez-les d'abord.",
+     "Todavía hay originales apartados en _ORIGINALS. Restáurelos o elimínelos primero."),
+    ("Path changed. Retire originals is off for this folder again. Scan now?",
+     "路径已更改。此文件夹的“整理原始文件”已重新关闭。立即扫描吗？",
+     "Chemin changé. Mettre les originaux de côté est de nouveau désactivé pour ce dossier. Analyser maintenant?",
+     "Ruta cambiada. Apartar los originales vuelve a estar desactivado para esta carpeta. ¿Escanear ahora?"),
+    ("No such collection folder.", "没有这个收藏文件夹。", "Ce dossier de collection n'existe pas.", "No existe esa carpeta de la colección."),
+    ("this plan was made before its collection folder's path changed; make a new plan (your decisions are kept)",
+     "此计划是在收藏文件夹路径更改之前制定的；请制定新计划（你的决定会保留）",
+     "ce plan a été fait avant le changement de chemin de son dossier de collection; faites un nouveau plan (vos décisions sont conservées)",
+     "este plan se hizo antes de que cambiara la ruta de su carpeta de la colección; haga un plan nuevo (sus decisiones se conservan)"),
 ]
 
 
