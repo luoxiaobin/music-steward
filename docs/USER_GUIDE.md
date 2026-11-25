@@ -196,3 +196,10 @@ reads only what differs. Afterwards *Retire originals* is off again for that fol
 cannot be applied any more: make a new plan. The change waits while a job is running, while a copy is unfinished
 (finish it with Resume or undo it), and while originals are still set aside in `_ORIGINALS` (restore or delete them
 first). From the command line: `music-steward collection list` and `music-steward collection set-path OLD NEW`.
+
+## 13. History
+
+**History** (in the header) lists every copy run, Resume, Retry failed and Undo, everything done to your originals
+(Retire, Restore, Archive, Delete) and every Change path, newest first, with the time, the albums and the folders.
+An album's details have a **History** section with its own lines. The list is kept on this Mac and cannot be edited;
+the journals described in [RECOVERY.md](RECOVERY.md) remain what Resume and Undo rely on.

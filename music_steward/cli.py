@@ -6,7 +6,7 @@ import json
 import os
 import sys
 
-from . import audit, db, hashpass
+from . import audit, db, hashpass, history
 from .hashing import HashError, audio_hash, file_sha256
 from .paths import ext_of, nfc
 from .probe import ProbeError, probe
@@ -152,7 +152,9 @@ def cmd_apply(a):
     from .apply import runner
     con = db.connect(a.db)
     try:
-        print(json.dumps(runner.apply(con, a.plan, progress=_progress("applying")), indent=2, ensure_ascii=False))
+        res = runner.apply(con, a.plan, progress=_progress("applying"))
+        history.after_job(con, "apply", a.plan, res)
+        print(json.dumps(res, indent=2, ensure_ascii=False))
     except KeyboardInterrupt:   # applying again would start a second run: point to resume
         run = con.execute("SELECT MAX(id) FROM run WHERE plan_id=?", (a.plan,)).fetchone()[0]
         return _resume_hint(con, run)
@@ -162,14 +164,19 @@ def cmd_resume(a):
     from .apply import runner
     con = db.connect(a.db)
     try:
-        print(json.dumps(runner.resume(con, a.run), indent=2, ensure_ascii=False))
+        res = runner.resume(con, a.run)
+        history.after_job(con, "resume", a.run, res)
+        print(json.dumps(res, indent=2, ensure_ascii=False))
     except KeyboardInterrupt:
         return _resume_hint(con, a.run)
 
 
 def cmd_undo(a):
     from .apply import runner
-    print(json.dumps(runner.undo(db.connect(a.db), a.run), indent=2, ensure_ascii=False))
+    con = db.connect(a.db)
+    res = runner.undo(con, a.run)
+    history.after_job(con, "undo", a.run, res)
+    print(json.dumps(res, indent=2, ensure_ascii=False))
 
 
 def cmd_cache(a):

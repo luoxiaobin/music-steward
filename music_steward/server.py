@@ -312,6 +312,9 @@ class App:
                     from . import hashpass
                     rid = con.execute("SELECT id FROM root WHERE path=?", (nfc(root),)).fetchone()["id"]
                     res = {"status": "complete", **hashpass.run(con, rid, subpath=nfc(path), progress=prog)}
+                if kind in ("apply", "undo", "resume", "retry", "retire", "retire_resume", "restore", "archive", "delete"):
+                    from . import history
+                    history.after_job(con, kind, int(path), res)
                 self.scan_state.update(running=False, result=res, finished=time.time())
             except RootUnavailable as e:
                 self.scan_state.update(running=False, result={"status": "aborted", "abort_reason": str(e)})
@@ -678,6 +681,9 @@ def make_handler(app: App, port_ref: dict):
                                        "scan": app.scan_state})
                 if u.path == "/api/settings":
                     return self._json(app.settings_view(con))
+                if u.path == "/api/history":                                # one readable list; changes nothing
+                    from . import history
+                    return self._json(history.lines(con, _int(q.get("root_id")), _int(q.get("unit_id"))))
                 if u.path in ("/api/archive_plan", "/api/delete_plan"):    # previews: change nothing
                     from . import retire
                     try:
@@ -735,7 +741,10 @@ def make_handler(app: App, port_ref: dict):
                 m = re.fullmatch(r"/api/unit/(\d+)", u.path)
                 if m:
                     from .recognize import results
+                    from . import history
                     d = results.unit_detail(con, int(m.group(1)))
+                    if d:
+                        d["history"] = history.lines(con, unit_id=int(m.group(1)), limit=20)
                     return self._json(d) if d else self._json({"error": "not found"}, 404)
                 m = re.fullmatch(r"/api/file/(\d+)", u.path)
                 if m:

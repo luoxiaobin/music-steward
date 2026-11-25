@@ -182,8 +182,9 @@ Stopped → Complete* with some albums *kept* when their checks fail. Neither ch
 * **Retired album.** An album whose originals are parked keeps its decision and is shown as "Organized · originals set
   aside"; it is left out of Recognize and of new plans; Restore returns it to *Done*; after Delete it reads
   "originals deleted" (final).
-* **History.** One readable list of events, each with time, kind and album: path changed, run applied / undone / resumed,
-  originals retired, restored, archived, deleted.
+* **History** ✓ (`history.py`). One readable list of events, each with time, kind and album: path changed, run
+  applied / undone / resumed / retried, originals retired, restored, archived, deleted. Written after the action from
+  what it reported; it never blocks or fails one. *Removing a not-found album* (below) will add a line when built.
 * **Manual information.** An album with *No match* stays; its own information can be accepted and every field edited
   (album, album artist, year, disc, track titles, and each track's artist, for compilations and collections of
   singles).

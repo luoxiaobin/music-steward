@@ -16,6 +16,10 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   copy is unfinished, and while originals are still set aside. Afterwards *Retire originals* is off again for that
   folder, a history entry records the change, and the app offers **Scan now**. Command line:
   `music-steward collection list` and `music-steward collection set-path OLD NEW`.
+- **History**: one readable list of what changed your copies, your originals or a collection folder's path — each
+  copy run, Resume, Retry failed and Undo, every Retire, Restore, Archive and Delete, and every Change path — with the
+  time, the albums and the folders involved. **History** in the header shows them all; an album's details show its
+  own. Kept on this Mac, never in the way of the action it records, and nothing in it can be changed.
 - **Edit fields: each track's artist.** For duets, guest singers and compilations, *Edit fields* now has an
   **Artist** box per track (per cue-sheet track for albums of one file). It is written to that track's tags, to the
   album's cue sheet (PERFORMER), and to the tracks cut from a cue-sheet album, exactly as typed; empty keeps the

@@ -607,6 +607,8 @@ function renderUnitDetail(d) {
   if (onl.length > nOnl) list.append(h("button", { type: "button", class: "linkbtn",
     onclick: () => { S.allCands = d.id; renderUnitDetail(d); } }, `Show ${onl.length - nOnl} more candidates`));
   parts.unshift(bar);
+  if ((d.history || []).length) parts.push(h("details", {}, h("summary", { class: "strong", style: "cursor:pointer" }, "History"),
+    historyList(d.history, false)));
   parts.push(h("p", { class: "muted xsmall" }, "Decisions are saved immediately. Nothing is copied or changed until you apply a plan."));
   document.getElementById("details").replaceChildren(...parts.filter(Boolean));
 }
@@ -760,6 +762,34 @@ document.getElementById("recognizeBtn").addEventListener("click", async () => {
   await refreshAll();
 })().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });
 
+
+// ---------------------------------------------------------------- history (music_steward/history.py)
+// What changed originals, copies or a collection folder's path, newest first. The message is interface text; album
+// names and paths are data.
+function historyList(lines, withAlbums) {
+  if (!lines.length) return h("p", { class: "muted small" }, "Nothing has been copied, set aside or changed yet.");
+  return h("ul", { class: "history" }, lines.map(e => h("li", {},
+    h("span", { class: "muted xsmall" }, new Date(e.at * 1000).toLocaleString()), " ",
+    h("span", { class: "small" }, e.message),
+    e.old_path ? h("div", { class: "mono xsmall", "data-no-translate": "" }, `${e.old_path} → ${e.new_path}`) : null,
+    e.dest ? h("div", { class: "mono xsmall", "data-no-translate": "" }, e.dest) : null,
+    withAlbums && e.albums.length ? h("div", { class: "xsmall muted" },
+      h("span", { "data-no-translate": "" }, e.albums.join(" · ")),
+      e.n_albums > e.albums.length ? ` +${e.n_albums - e.albums.length}` : "") : null)));
+}
+async function openHistory() {
+  const lines = await api("/api/history");
+  const dlg = h("dialog", { class: "appdialog settings" },
+    h("h2", { class: "h2" }, "History"),
+    h("p", { class: "muted xsmall" }, "Every copy run, undo, and change to your originals or to a collection folder's path. " +
+      "Kept on this Mac; nothing here can be changed."),
+    h("div", { style: "max-height:60vh;overflow:auto" }, historyList(lines, true)),
+    h("div", { class: "btnrow" }, h("button", { type: "button", class: "btn btn-primary", onclick: () => { dlg.close(); dlg.remove(); } }, "Close")));
+  dlg.addEventListener("cancel", e => { e.preventDefault(); dlg.close(); dlg.remove(); });
+  document.body.append(dlg);
+  dlg.showModal();
+}
+document.getElementById("historyBtn").addEventListener("click", openHistory);
 
 // ---------------------------------------------------------------- collection folders (ADR 0004)
 // A collection folder whose drive or share is not mounted: say so, offer the share's new place when the

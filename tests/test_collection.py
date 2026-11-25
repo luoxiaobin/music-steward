@@ -38,8 +38,7 @@ def test_change_path_keeps_albums_and_decisions_and_switches_retire_off(applied,
     assert r["changed"] and con.execute("SELECT path FROM root WHERE id=1").fetchone()[0] == str(new)
     assert settings.retire_allowed(con, 1) is False                          # allowed for the old place only
     h = collection.history(con, 1)
-    assert [(x["event"], x["old_path"], x["new_path"], x["detail"]) for x in h] == \
-        [("path_changed", str(lib), str(new), {"checked": 4, "matched": 4})]
+    assert [(x["old_path"], x["new_path"], x["checked"], x["matched"]) for x in h] == [(str(lib), str(new), 4, 4)]
     assert snapshot(new) == before                                           # nothing read or written there
     # the next scan re-reads nothing: same relative paths, sizes and times; the decision is still there
     s = scan(con, str(new))

@@ -188,3 +188,6 @@ body.resizing{cursor:col-resize;user-select:none}
 .collist{display:grid;gap:8px}
 .collist .colrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .collist .colrow .mono{overflow-wrap:anywhere;flex:1 1 220px}
+.history{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.history li{border-bottom:1px solid var(--btn-line);padding-bottom:6px}
+.history .mono{overflow-wrap:anywhere}

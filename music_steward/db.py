@@ -158,12 +158,19 @@ CREATE TABLE IF NOT EXISTS retired_file(
     PRIMARY KEY(batch_id, relpath)
 );
 
--- collection folders (ADR 0004): what happened to a folder itself, e.g. its path changed
-CREATE TABLE IF NOT EXISTS root_history(
-    id INTEGER PRIMARY KEY, root_id INTEGER NOT NULL REFERENCES root(id), at REAL NOT NULL,
-    event TEXT NOT NULL,                -- path_changed
-    old_path TEXT, new_path TEXT, detail_json TEXT
+-- history (history.py): one line per action that changed originals, copies or a collection folder's path;
+-- written after the action, never in its way (the journals are the truth for recovery)
+CREATE TABLE IF NOT EXISTS event(
+    id INTEGER PRIMARY KEY, at REAL NOT NULL,
+    kind TEXT NOT NULL,                 -- path_changed | run_applied | run_resumed | run_retried | run_undone |
+                                        -- retired | restored | archived | archive_stopped | deleted
+    root_id INTEGER, run_id INTEGER, batch_id INTEGER, detail_json TEXT
 );
+CREATE TABLE IF NOT EXISTS event_unit(
+    event_id INTEGER NOT NULL REFERENCES event(id), unit_id INTEGER NOT NULL,
+    PRIMARY KEY(event_id, unit_id)
+);
+CREATE INDEX IF NOT EXISTS event_unit_unit ON event_unit(unit_id);
 
 CREATE TABLE IF NOT EXISTS dir_note(
     root_id INTEGER NOT NULL, relpath TEXT NOT NULL, note TEXT NOT NULL, detail TEXT,

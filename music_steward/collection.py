@@ -116,11 +116,13 @@ def describe(con: sqlite3.Connection, root_id: int) -> dict:
 
 
 def history(con: sqlite3.Connection, root_id: int) -> list[dict]:
+    """The path changes of this collection folder, oldest first."""
     out = []
-    for h in con.execute("SELECT * FROM root_history WHERE root_id=? ORDER BY id", (root_id,)):
-        d = dict(h)
-        d["detail"] = json.loads(d.pop("detail_json") or "{}")
-        out.append(d)
+    for h in con.execute("SELECT at, detail_json FROM event WHERE root_id=? AND kind='path_changed' ORDER BY id",
+                         (root_id,)):
+        d = json.loads(h["detail_json"] or "{}")
+        out.append({"at": h["at"], "old_path": d.get("old_path"), "new_path": d.get("new_path"),
+                    "checked": d.get("checked"), "matched": d.get("matched")})
     return out
 
 
@@ -231,9 +233,10 @@ def set_path(con: sqlite3.Connection, root_id: int, text: str, job: dict | None 
                               if why else "choose the new folder")
     con.execute("UPDATE root SET path=?, share_host=NULL, share_name=NULL, share_sub=NULL WHERE id=?",
                 (c["path"], root_id))
-    con.execute("INSERT INTO root_history(root_id, at, event, old_path, new_path, detail_json) VALUES(?,?,?,?,?,?)",
-                (root_id, time.time(), "path_changed", c["old_path"], c["path"],
-                 json.dumps({"checked": c["checked"], "matched": c["matched"]})))
+    con.execute("INSERT INTO event(at, kind, root_id, detail_json) VALUES(?, 'path_changed', ?, ?)",
+                (time.time(), root_id, json.dumps({"old_path": c["old_path"], "new_path": c["path"],
+                                                   "checked": c["checked"], "matched": c["matched"]},
+                                                  ensure_ascii=False)))
     con.execute("INSERT OR REPLACE INTO meta VALUES(?, 'off')", (f"setting:retire_root:{int(root_id)}",))
     con.commit()
     remember_share(con, root_id, c["path"])

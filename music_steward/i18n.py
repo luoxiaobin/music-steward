@@ -856,6 +856,40 @@ TABLE: list[tuple[str, str, str, str]] = [
      "此计划是在收藏文件夹路径更改之前制定的；请制定新计划（你的决定会保留）",
      "ce plan a été fait avant le changement de chemin de son dossier de collection; faites un nouveau plan (vos décisions sont conservées)",
      "este plan se hizo antes de que cambiara la ruta de su carpeta de la colección; haga un plan nuevo (sus decisiones se conservan)"),
+    # ---- history (history.py)
+    ("History", "历史记录", "Historique", "Historial"),
+    ("Close", "关闭", "Fermer", "Cerrar"),
+    ("What was copied, set aside, restored or deleted, and when", "复制、搁置、恢复或删除了什么，以及何时",
+     "Ce qui a été copié, mis de côté, restauré ou supprimé, et quand", "Qué se copió, apartó, restauró o eliminó, y cuándo"),
+    ("Every copy run, undo, and change to your originals or to a collection folder's path. Kept on this Mac; nothing "
+     "here can be changed.", "每次复制、撤销，以及对原始文件或收藏文件夹路径的每次更改。保存在这台 Mac 上；这里的内容无法修改。",
+     "Chaque copie, annulation et modification de vos originaux ou du chemin d'un dossier de collection. Conservé sur "
+     "ce Mac; rien ici ne peut être modifié.",
+     "Cada copia, deshacer y cambio en sus originales o en la ruta de una carpeta de la colección. Se guarda en esta "
+     "Mac; nada de aquí se puede cambiar."),
+    ("Nothing has been copied, set aside or changed yet.", "尚未复制、搁置或更改任何内容。",
+     "Rien n'a encore été copié, mis de côté ni modifié.", "Todavía no se ha copiado, apartado ni cambiado nada."),
+    ("The collection folder's path changed", "收藏文件夹的路径已更改", "Le chemin du dossier de la collection a changé",
+     "La ruta de la carpeta de la colección cambió"),
+    ("Copied {n} files (run #{id})", "已复制 {n} 个文件（运行 #{id}）", "{n} fichiers copiés (exécution no {id})",
+     "{n} archivos copiados (ejecución n.º {id})"),
+    ("Resumed run #{id}: {n} files copied in all", "已继续运行 #{id}：共复制 {n} 个文件",
+     "Exécution no {id} reprise : {n} fichiers copiés en tout", "Ejecución n.º {id} reanudada: {n} archivos copiados en total"),
+    ("Retried the failed files of run #{id}: {n} files copied in all", "已重试运行 #{id} 中失败的文件：共复制 {n} 个文件",
+     "Fichiers en échec de l'exécution no {id} réessayés : {n} fichiers copiés en tout",
+     "Se reintentaron los archivos fallidos de la ejecución n.º {id}: {n} archivos copiados en total"),
+    ("Undid run #{id}: {n} copies removed", "已撤销运行 #{id}：删除了 {n} 个副本",
+     "Exécution no {id} annulée : {n} copies retirées", "Ejecución n.º {id} deshecha: {n} copias eliminadas"),
+    ("Set aside the originals of {n} albums ({m} files)", "已搁置 {n} 个专辑的原始文件（{m} 个文件）",
+     "Originaux de {n} albums mis de côté ({m} fichiers)", "Se apartaron los originales de {n} álbumes ({m} archivos)"),
+    ("Restored {n} original files", "已恢复 {n} 个原始文件", "{n} fichiers originaux restaurés", "Se restauraron {n} archivos originales"),
+    ("Archived {n} parked original files (verified)", "已归档 {n} 个搁置的原始文件（已验证）",
+     "{n} fichiers originaux mis de côté archivés (vérifiés)", "Se archivaron {n} archivos originales apartados (verificados)"),
+    ("Archive stopped: {n} parked original files copied so far", "归档已停止：目前已复制 {n} 个搁置的原始文件",
+     "Archivage arrêté : {n} fichiers originaux mis de côté copiés jusqu'ici",
+     "Archivo detenido: {n} archivos originales apartados copiados hasta ahora"),
+    ("Deleted {n} parked original files", "已删除 {n} 个搁置的原始文件", "{n} fichiers originaux mis de côté supprimés",
+     "Se eliminaron {n} archivos originales apartados"),
 ]
 
 
