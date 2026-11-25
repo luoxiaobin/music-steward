@@ -56,3 +56,11 @@ def test_album_names_in_the_list_the_detail_and_the_search_are_data():
     for needle in ("u.label)", "d.label)", "r.label)"):
         lines = [ln for ln in js.splitlines() if needle in ln and "h(" in ln and "aria-label" not in ln]
         assert lines and all("data-no-translate" in ln for ln in lines), needle
+
+
+def test_edit_fields_boxes_are_data():
+    """Their placeholders show the release's titles and artists: an artist called "Album" must stay "Album"."""
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "music_steward/web/app.js").read_text(encoding="utf-8")
+    line = next(ln for ln in js.splitlines() if "const inp = (id, val, ph, w)" in ln)
+    assert "data-no-translate" in line

@@ -185,6 +185,25 @@ def test_cue_track_titles_and_disc_can_be_edited(two_disc_cues, con, tmp_path):
     assert rw["tracks"]["2"]["title"] == "怀念战友 (电影《冰山上的来客》插曲)" and rw["tracks"]["1"]["title"] == "红星照我去战斗"
 
 
+@pytest.mark.parametrize("split", [False, True])
+def test_cue_track_artist_can_be_edited(two_disc_cues, con, tmp_path, monkeypatch, split):
+    """Per-track artist on a cue-sheet album: the rewritten cue sheet's PERFORMER, or the split track's tag."""
+    lib, uids = two_disc_cues
+    if split:
+        monkeypatch.setenv("MLT_CUE_ALBUMS", "tracks")
+    app = App(con.execute("PRAGMA database_list").fetchone()[2], [str(lib)], None)
+    _accept_local(con, uids[0])
+    r = app.edit_fields(con, {"unit_id": uids[0], "overrides": {"cue_artists": {"2": "王洁实 谢莉斯", "9": "x"}}})
+    assert r["overrides"] == {"cue_artists": {"2": "王洁实 谢莉斯"}}
+    p = plan.load(con, plan.build(con, str(tmp_path / "out"), 1, "经典老歌101 CD1"))
+    if split:
+        tracks = sorted((i for i in p["items"] if i["kind"] == "split"), key=lambda i: i["tags"]["track"])
+        assert tracks[1]["tags"]["artist"] == "王洁实 谢莉斯" and tracks[0]["tags"]["artist"] == "柏菲"
+    else:
+        rw = next(i for i in p["items"] if i["kind"] == "cue")["tags"]["cue_rewrite"]
+        assert rw["tracks"]["2"]["performer"] == "王洁实 谢莉斯" and rw["tracks"]["1"]["performer"] == "柏菲"
+
+
 def test_file_albums_set_as_discs_get_disc_prefixed_names(tmp_path, con):
     lib = tmp_path / "lib"
     for n in (1, 2):

@@ -80,8 +80,10 @@ The candidate list shows where each field came from ("album from cue sheet · ye
 
 ### Fix names: Edit fields
 
-After accepting, open **Edit fields** to correct the album, album artist, year, disc number ("Disc 2 of 3") or any
-track title. What you type is used exactly as typed, also for the folder name.
+After accepting, open **Edit fields** to correct the album, album artist, year, disc number ("Disc 2 of 3"), any
+track title or any track's **artist** (a duet, a guest singer, a compilation of several singers). What you type is used
+exactly as typed, also for the folder name. A track's artist goes into that track's tags and the album's cue sheet;
+the album folder follows the album artist, so the album stays together.
 
 **Discs of one set** (separate folders `… CD1`, `… CD2`): give them the same album, album artist and year and each
 its own disc number; they go into one album folder.

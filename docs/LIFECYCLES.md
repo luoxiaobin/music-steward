@@ -185,8 +185,8 @@ Stopped → Complete* with some albums *kept* when their checks fail. Neither ch
 * **History.** One readable list of events, each with time, kind and album: path changed, run applied / undone / resumed,
   originals retired, restored, archived, deleted.
 * **Manual information.** An album with *No match* stays; its own information can be accepted and every field edited
-  (album, album artist, year, disc, track titles). **Gap:** a per-track artist (singer) cannot be edited yet; it is
-  needed for compilations and collections of singles.
+  (album, album artist, year, disc, track titles, and each track's artist, for compilations and collections of
+  singles).
 
 * **Removing a not-found album.** The warning is never resolved by the app. The owner chooses, per album or for all
   not-found albums of a folder: **Leave for now** (the default; nothing changes, the warning stays, the decision is

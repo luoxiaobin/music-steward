@@ -16,6 +16,10 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   copy is unfinished, and while originals are still set aside. Afterwards *Retire originals* is off again for that
   folder, a history entry records the change, and the app offers **Scan now**. Command line:
   `music-steward collection list` and `music-steward collection set-path OLD NEW`.
+- **Edit fields: each track's artist.** For duets, guest singers and compilations, *Edit fields* now has an
+  **Artist** box per track (per cue-sheet track for albums of one file). It is written to that track's tags, to the
+  album's cue sheet (PERFORMER), and to the tracks cut from a cue-sheet album, exactly as typed; empty keeps the
+  release's value. The album artist, and so the album folder, is unchanged.
 - **Not connected**: a collection folder whose drive or share is not mounted is shown as such, with **Check again**
   and **Change path…**; when the same network share is mounted elsewhere, the app suggests that path (it remembers
   the share's host and name on this Mac, never a user name or password). Scan, recognition, copy, retire, restore,
@@ -29,6 +33,8 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 - The header says *Collection folder* instead of *Root*.
 
 ### Fixed
+- In *Edit fields*, the greyed release values in the boxes (titles, artists) are no longer run through the interface
+  translator: a title that happens to be an interface word is shown as it is.
 - **Setting originals aside no longer loses your decisions.** After *Retire originals*, a rescan followed by
   *Recognize folder* used to drop the retired albums **and** your decisions for them. Now an album whose files are
   gone keeps its matches and its decision: it shows **Originals set aside** (after Retire) or **Not found** (the

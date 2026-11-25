@@ -458,11 +458,20 @@ class App:
                       if str(k).isdigit() and int(k) in cue_nos and isinstance(v, str) and v.strip()}
         if cue_titles:
             clean["cue_titles"] = cue_titles
+        # per-track artist (a duet, a compilation): kept as typed, like every edit
+        cue_artists = {str(int(k)): v.strip() for k, v in (ov.get("cue_artists") or {}).items()
+                       if str(k).isdigit() and int(k) in cue_nos and isinstance(v, str) and v.strip()}
+        if cue_artists:
+            clean["cue_artists"] = cue_artists
         ids = set(json.loads(con.execute("SELECT file_ids FROM unit WHERE id=?", (uid,)).fetchone()[0]))
         titles = {str(int(k)): v.strip() for k, v in (ov.get("titles") or {}).items()
                   if str(k).isdigit() and int(k) in ids and isinstance(v, str) and v.strip()}
         if titles:
             clean["titles"] = titles
+        artists = {str(int(k)): v.strip() for k, v in (ov.get("artists") or {}).items()
+                   if str(k).isdigit() and int(k) in ids and isinstance(v, str) and v.strip()}
+        if artists:
+            clean["artists"] = artists
         con.execute("UPDATE decision SET overrides_json=? WHERE unit_id=?",
                     (json.dumps(clean, ensure_ascii=False) if clean else None, uid))
         con.commit()
