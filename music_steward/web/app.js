@@ -59,8 +59,17 @@ async function loadState() {
   S.summary = st.summary;
   const root = st.roots.find(r => r.root_id === S.rootId) || st.roots[0];
   S.root = root;
-  document.getElementById("rootChip").textContent =
-    root ? `Collection folder: ${root.path}${root.available ? "" : " (not connected)"} · sources read-only` : "No collection folder yet";
+  const chip = document.getElementById("rootChip");
+  const pickable = st.roots.filter(r => r.root_id);
+  if (pickable.length > 1) {          // more than one collection folder: a switcher (ADR 0004 §14); one at a time
+    const sel = h("select", { id: "rootPick", "aria-label": "Collection folder", "data-no-translate": "",
+      onchange: e => { S.rootId = Number(e.target.value); S.path = ""; S.expanded = new Set([""]); S.filter = null; refreshAll(); } },
+      pickable.map(r => h("option", { value: r.root_id, selected: r.root_id === S.rootId ? true : null },
+        r.path + (r.available ? "" : "  ⚠"))));
+    chip.classList.add("pick");
+    chip.replaceChildren(h("span", {}, "Collection folder:"), sel, root && !root.available ? h("span", {}, "(not connected)") : "");
+  } else (chip.classList.remove("pick"), chip.textContent =
+    root ? `Collection folder: ${root.path}${root.available ? "" : " (not connected)"} · sources read-only` : "No collection folder yet");
   renderConn(root);
   renderInventory(st);
   renderFilters();
@@ -865,11 +874,80 @@ async function changePathDialog(rootId, oldPath, suggested) {
 }
 
 function collectionList(d, onChange) {
-  return h("div", { class: "collist" }, (d.collections || []).map(c => h("div", { class: "colrow" },
-    h("span", { class: "mono small", "data-no-translate": "" }, c.path),
-    h("span", { class: "small " + (c.connected ? "ok" : "warn") }, c.connected ? "Connected" : "Not connected"),
-    h("button", { type: "button", class: "btn", onclick: () => { onChange(); changePathDialog(c.id, c.path, c.suggestion); } },
-      "Change path…"))));
+  const hide = async (c, hidden) => {
+    if (hidden && !await ask("Hide this collection folder? It is no longer shown or scanned. Its albums, decisions, plans " +
+                             "and history are kept, and Show brings everything back.", "Hide")) return;
+    const r = await post2("/api/collection_hidden", { root_id: c.id, hidden });
+    if (r.error) return tell(r.error);
+    onChange();
+    if (hidden && S.rootId === c.id) S.rootId = null;
+    await refreshAll();
+    openSettings();
+  };
+  return h("div", { class: "collist" },
+    (d.collections || []).map(c => h("div", { class: "colrow" + (c.hidden ? " muted" : "") },
+      h("span", { class: "mono small", "data-no-translate": "" }, c.path),
+      h("span", { class: "small " + (c.hidden ? "muted" : c.connected ? "ok" : "warn") },
+        c.hidden ? "Hidden" : c.connected ? "Connected" : "Not connected"),
+      c.hidden ? null : h("button", { type: "button", class: "btn", onclick: () => { onChange(); changePathDialog(c.id, c.path, c.suggestion); } },
+        "Change path…"),
+      h("button", { type: "button", class: "btn", onclick: () => hide(c, !c.hidden) }, c.hidden ? "Show" : "Hide"))),
+    h("div", {}, h("button", { type: "button", class: "btn", onclick: () => { onChange(); addCollectionDialog(); } }, "Add…")));
+}
+
+// Add a collection folder (ADR 0004 §3, 4): registers only -- nothing is read until you scan it.
+async function addCollectionDialog() {
+  const input = h("input", { type: "text", id: "addPath", placeholder: "/Volumes/another-share" });
+  const out = h("div", { class: "small", style: "margin-top:8px;min-height:18px" });
+  const msg = h("p", { class: "err" });
+  let seq = 0, timer = null, inside = null, checked = null;
+  const close = () => { dlg.close(); dlg.remove(); };
+  const go = h("button", { type: "button", class: "btn btn-primary", disabled: true, onclick: async () => {
+    go.disabled = true;
+    const r = await post2("/api/collection_add", { path: input.value });
+    if (r.error) { msg.textContent = r.error; return; }
+    close();
+    S.rootId = r.root_id; S.path = ""; S.expanded = new Set([""]);
+    await refreshAll();
+    if (r.done.code === "added" && await ask(r.done.message, "Scan now")) startScan();
+    else if (r.done.code === "shown") tell(r.done.message);
+  } }, "Add");
+  const open = h("button", { type: "button", class: "btn", hidden: true, onclick: async () => {
+    close();
+    S.rootId = inside.root_id; S.path = inside.sub; S.expanded = new Set(["", ...inside.sub.split("/").map((_, i, a) => a.slice(0, i + 1).join("/"))]);
+    await refreshAll();
+  } }, "Open it");
+  const check = async () => {
+    // only when the text changed: leaving the box to click Add fires "change", and disabling Add then would eat the click
+    if (input.value === checked) return;
+    checked = input.value;
+    const mine = ++seq;
+    go.disabled = true; open.hidden = true; msg.textContent = ""; inside = null;
+    if (!input.value.trim()) { out.replaceChildren(); return; }
+    let r;
+    try { r = await api(`/api/collection_add_check?path=${encodeURIComponent(input.value)}`); }
+    catch (e) { r = { ok: false, result: { message: String(e) } }; }
+    if (mine !== seq) return;
+    const res = r.result;
+    out.replaceChildren(...(res ? [h("span", { class: r.ok ? "ok" : "err", style: "font-weight:600" }, r.ok ? "✓ " : "✗ "),
+      h("span", {}, res.message), res.detail ? h("span", { class: "mono", "data-no-translate": "" }, " " + res.detail) : null] : [])
+      .filter(Boolean));
+    go.disabled = !r.ok;
+    if (r.inside && !r.inside.hidden) { inside = r.inside; open.hidden = false; }
+  };
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(check, 400); });
+  input.addEventListener("change", check);
+  const dlg = h("dialog", { class: "appdialog settings" },
+    h("h2", { class: "h2" }, "Add a collection folder"),
+    h("p", { class: "small" }, "Another folder of music to look after, for example a second share or a USB drive. Adding it " +
+      "only registers it: nothing is read until you scan it, and Retire originals is off for it."),
+    h("h3", {}, h("label", { for: "addPath" }, "Folder")),
+    h("div", { style: "display:flex;gap:8px" }, input, chooseButton(input)),
+    out, msg,
+    h("div", { class: "btnrow" }, h("button", { type: "button", class: "btn", onclick: close }, "Cancel"), open, go));
+  dlg.addEventListener("cancel", e => { e.preventDefault(); close(); });
+  document.body.append(dlg);
+  dlg.showModal();
 }
 
 // ---------------------------------------------------------------- settings
@@ -933,7 +1011,7 @@ async function openSettings() {
       destCheck.el,
       h("div", { class: "muted xsmall", style: "margin-top:6px" }, "This is where the organized copies are written, not the folder to scan. The folders Music Steward scans are your collection folders: ",
         ...(d.retire_roots || []).map(r => h("span", { class: "mono", "data-no-translate": "" }, r.path + "  ")),
-        "To add another, start the app with --root and the folder's path.")),
+        "To add another, use Add… under Collection folders above.")),
     msg,
     h("div", { class: "muted xsmall", "data-no-translate": "" }, `Music Steward ${d.version}`),
     h("div", { class: "btnrow" },

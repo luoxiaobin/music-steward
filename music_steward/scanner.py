@@ -60,9 +60,16 @@ def _root_ok(root: str) -> bool:
 
 def _ensure_root(con: sqlite3.Connection, root_abs: str) -> int:
     key = nfc(root_abs)
-    row = con.execute("SELECT id FROM root WHERE path=?", (key,)).fetchone()
+    row = con.execute("SELECT id, hidden FROM root WHERE path=?", (key,)).fetchone()
     if row:
+        if row["hidden"]:       # Hide = stop showing and scanning (ADR 0004 §13)
+            raise RootUnavailable(f"this collection folder is hidden; show it again first: {key}")
         return row["id"]
+    real = os.path.realpath(root_abs)
+    for (r,) in con.execute("SELECT path FROM root"):       # collection folders never overlap (ADR 0004 §3)
+        rr = os.path.realpath(r)
+        if rr == real or rr.startswith(real.rstrip("/") + "/") or real.startswith(rr.rstrip("/") + "/"):
+            raise RootUnavailable(f"this folder overlaps the collection folder {r}; scan that one, or a folder inside it")
     cur = con.execute("INSERT INTO root(path, added_at) VALUES(?,?)", (key, time.time()))
     return cur.lastrowid
 

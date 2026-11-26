@@ -157,7 +157,7 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
    master, every size generated from one geometry, checked at 16–1024 px; Dock, favicon, iPhone home screen, macOS
    `.icns`, iOS app icon). A subtle variant for a future player app, if one is made.
 6. **Collection folders** ([ADR 0004](adr/0004-collection-folders.md), accepted): ✅ the not-connected message and
-   *Change path* (also `music-steward collection set-path`), `--root` adds; later *Add* and *Hide*.
+   *Change path* (also `music-steward collection set-path`), `--root` adds (#18); ✅ *Add*, *Hide* and the folder switcher.
 7. **Lifecycle fixes** ([docs/LIFECYCLES.md](LIFECYCLES.md)): ✅ a *Retired* album state and the *not found* exception,
    so Retire → rescan → Recognize folder no longer drops decisions (#16); ✅ per-track artist in *Edit fields*;
    ✅ one readable history of events.

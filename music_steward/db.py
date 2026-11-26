@@ -195,7 +195,9 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
                  ("retire_batch", "archive_json", "TEXT"), ("retire_batch", "delete_json", "TEXT"),
                  # the network share behind a collection folder, to suggest its new mount point (ADR 0004 §12);
                  # host and share name only, never a user name or password
-                 ("root", "share_host", "TEXT"), ("root", "share_name", "TEXT"), ("root", "share_sub", "TEXT")]
+                 ("root", "share_host", "TEXT"), ("root", "share_name", "TEXT"), ("root", "share_sub", "TEXT"),
+                 # Hide (ADR 0004 §13): not shown and not scanned; everything about it is kept
+                 ("root", "hidden", "INTEGER")]
 
 
 _READY: set[str] = set()   # databases already set up by this process

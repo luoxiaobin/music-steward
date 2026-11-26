@@ -1,9 +1,9 @@
 # ADR 0004: Collection folders — changing, adding and hiding them
 
 * **Status:** Accepted (2026-11-24). Every decision below was settled with the owner in a design interview
-  (2026-11-21) and approved on 2026-11-24. **Built:** rules 5, 6 and 8–12 (*Change path*, *not connected*, `--root`
-  adds, share identity). **Later:** *Add* and *Hide* (rules 3–4, 13) and the folder switcher (14); rule 7 was built
-  with the lifecycle fixes (#16).
+  (2026-11-21) and approved on 2026-11-24. **Built:** all rules — 5, 6 and 8–12 (*Change path*, *not connected*,
+  `--root` adds, share identity) on 2026-11-24 (#18); 3, 4, 13 and 14 (*Add*, *Hide*, the folder switcher) on
+  2026-11-26; rule 7 with the lifecycle fixes (#16).
 * **Date:** 2026-11-21
 * **Deciders:** Kevin Luo
 
@@ -131,3 +131,17 @@ is mounted under another name (`/Volumes/music` → `/Volumes/music-1`) or the N
   is not connected; *Undo run* is not, since it only touches the destination.
 * "A job is running" is known to the app that runs it; the command line cannot see a job running in an open app
   window, so change the path in the app while it is open.
+
+## As built: adding and hiding (2026-11-26)
+
+* *Settings → Collection folders* has **Add…** and, per folder, **Hide** / **Show**; the command line has
+  `music-steward collection add | hide | show PATH`. When more than one collection folder is shown, the header holds a
+  switcher; the screen still shows one collection folder at a time.
+* **Add** checks the folder (exists, is a folder on this Mac), refuses a folder that is or contains a collection
+  folder (hidden ones included) and one that is or overlaps the default destination folder, and for a folder inside a
+  collection folder offers **Open it** there instead. It inserts the folder's record only: no scan, no file read.
+  Adding the path of a hidden folder shows it again.
+* **Hide** is refused while a job runs and for the last folder shown (the app would have nothing to show). A hidden
+  folder is refused by every job that reads it, including a scan typed on the command line; *Undo run* still works.
+  `--root` with a hidden folder's path shows it again (rule 5).
+* A scan can no longer create a collection folder that contains another one (it used to register one silently).

@@ -27,7 +27,7 @@ Everything left of the plan belongs to one collection folder; the plan, run and 
 
 ## 1. Collection folder
 
-States ✓ *Listed* (named on the command line, never scanned) → *Scanned* (at least one complete scan). ◇ *Hidden*.
+States ✓ *Listed* (added, or named on the command line; never scanned) → *Scanned* (at least one complete scan). ✓ *Hidden*.
 *Connected / not connected* is not a stored state: it is observed each time (a drive can drop in the middle of anything).
 
 ```mermaid
@@ -36,20 +36,20 @@ stateDiagram-v2
   Listed --> Scanned: first complete scan
   Scanned --> Scanned: scan (complete, aborted or interrupted)
   Scanned --> Scanned: change path ✓
-  Scanned --> Hidden: hide ◇
-  Hidden --> Scanned: show, or add the same path ◇
+  Scanned --> Hidden: hide ✓
+  Hidden --> Scanned: show, or add the same path ✓
 ```
 
 | Event | By | Effect |
 |---|---|---|
-| Listed ✓ / Added ◇ | owner | registered only; nothing read, nothing scanned; Retire off |
+| Listed ✓ / Added ✓ | owner | registered only; nothing read, nothing scanned; Retire off |
 | Scanned ✓ | owner | inventory refreshed; an *aborted* or *interrupted* scan marks nothing removed |
 | Disconnected / reconnected ✓ (observed) | the drive | shown as *not connected* (with the share's new mount point, if it has one), every action that reads it disabled, nothing removed |
 | Retire allowed / not allowed ✓ | owner | per folder, off by default |
 | Path changed ✓ | owner | same collection, new path: decisions kept, Retire back to off, history entry; plans made before it are not applied |
-| Hidden / shown ◇ | owner | stop / resume showing and scanning; everything kept |
+| Hidden / shown ✓ | owner | stop / resume showing and scanning; everything kept |
 
-**Never:** the app writes to it (except the fenced *Retire*); removes it by itself; lets two collection folders overlap ◇.
+**Never:** the app writes to it (except the fenced *Retire*); removes it by itself; lets two collection folders overlap.
 
 ## 2. Original file
 
@@ -95,7 +95,7 @@ stateDiagram-v2
 |---|---|---|---|
 | Not found ◇ | a complete scan finds none of the album's files at the location (and they are not parked) | shown as a warning; plans leave it out; nothing else changes | its files return, or the owner confirms *Remove…* (or leaves it for now) |
 | Audio changed ✓ | the audio or cue sheet differs from what was decided on | decision kept but flagged; left out of plans; queued again | the owner accepts again |
-| Not connected ◇ | the collection folder's drive or share is not available | writing actions disabled; nothing is marked | it is connected again |
+| Not connected ✓ | the collection folder's drive or share is not available | writing actions disabled; nothing is marked | it is connected again |
 
 **Fixed (this PR's predecessor of the full feature):** an album whose files are gone is no longer dropped with its decision
 at "Recognize folder". It shows *Originals set aside* (Retire) or *Not found*, and plans skip it. Before the fix, on 2026-11-21,
@@ -116,7 +116,7 @@ flagged* ("audio changed").
 | Flagged ✓ | audio or cue sheet changed since: kept, left out of plans, album queued again |
 | Re-accepted | clears the flag |
 
-**Never:** changed by a re-match or a bulk action the owner did not aim at it; dropped only because files are missing ◇.
+**Never:** changed by a re-match or a bulk action the owner did not aim at it; dropped only because files are missing.
 
 ## 5. Plan
 
@@ -169,13 +169,13 @@ Stopped → Complete* with some albums *kept* when their checks fail. Neither ch
 |---|---|
 | Scan: content changed | file *Changed* → album *Queued*, its decision *Flagged*, the plan leaves it out |
 | Scan: folder renamed or moved | file *Moved* → album re-keyed, decision kept |
-| Scan: files gone (complete scan) | file *Gone* → *not found* exception on the album, decision kept ◇ (today: dropped at Recognize) |
+| Scan: files gone (complete scan) | file *Gone* → *not found* exception on the album, decision kept ✓ |
 | Drive not connected | collection folder *not connected* → writing actions disabled; nothing is marked gone |
 | Run undone | the organized copies go → the run's parked batches can no longer be archived or deleted |
 | Retire | files *Parked* → album *Retired*, decision kept; the next scan must not raise *not found* for parked files |
 | Restore | files return → album back to *Done*, decision intact |
 | Any of the above that changes originals, copies or a path | one line in the **history** (see below) |
-| Change path ◇ | blocked while a run is unfinished or originals are parked; otherwise decisions stay, Retire off |
+| Change path ✓ | blocked while a run is unfinished or originals are parked; otherwise decisions stay, Retire off |
 
 ## Decided, to build
 

@@ -37,10 +37,16 @@ class App:
     def __init__(self, db_path: str, roots: list[str], dest: str | None = None):
         self.dest = os.path.abspath(os.path.expanduser(dest)) if dest else None
         self.db_path = db_path
-        # every collection folder the database knows, plus the ones given: --root adds, it never hides one (ADR 0004 §5)
+        # every collection folder the database knows and shows, plus the ones given: --root adds, it never hides
+        # one (ADR 0004 §5); giving the path of a hidden one shows it again (§13)
+        from . import collection
         given = [nfc(os.path.abspath(os.path.expanduser(r))) for r in roots]
         con = db.connect(db_path)
-        known = [r[0] for r in con.execute("SELECT path FROM root ORDER BY id")]
+        for g in given:
+            if collection.is_hidden(con, g):
+                con.execute("UPDATE root SET hidden=NULL WHERE path=?", (g,))
+        con.commit()
+        known = collection.shown_paths(con)
         con.close()
         self.roots = known + [r for r in given if r not in known]
         self.token = secrets.token_urlsafe(24)
@@ -90,6 +96,35 @@ class App:
             self.roots = [r["path"] if p == old["path"] else p for p in self.roots]
             self._summary_cache = {}
         return r
+
+    def add_collection(self, con, body) -> dict:
+        """Add: registers only -- reads nothing, writes nothing there, does not scan (ADR 0004 §4)."""
+        from . import collection
+        with self._lock:
+            try:
+                r = collection.add(con, str(body.get("path", "")))
+            except collection.CollectionError as e:
+                return {"error": str(e)}
+            self._refresh_roots(con)
+        return r
+
+    def hide_collection(self, con, body) -> dict:
+        """Hide or show: under the job lock, so nothing starts on the folder while it changes (ADR 0004 §13)."""
+        from . import collection
+        with self._lock:
+            try:
+                r = collection.set_hidden(con, _int(body.get("root_id")), body.get("hidden") is True, self.scan_state)
+            except collection.CollectionError as e:
+                return {"error": str(e)}
+            self._refresh_roots(con)
+        return r
+
+    def _refresh_roots(self, con) -> None:
+        """The folders shown: every one the database shows, plus --root folders not registered yet (first scan)."""
+        from . import collection
+        self.roots = collection.shown_paths(con) + [
+            p for p in self.roots if not con.execute("SELECT 1 FROM root WHERE path=?", (p,)).fetchone()]
+        self._summary_cache = {}
 
     def _job_root(self, con, kind: str, n: int) -> str | None:
         """The collection folder a job by id works on (a plan, a copy run, a batch of parked originals)."""
@@ -246,8 +281,11 @@ class App:
             try:
                 where = self._job_root(con, kind, int(path)) if str(path).isdigit() and kind not in (
                     "scan", "hash", "recognize") else root
+                hidden = bool(where) and collection.is_hidden(con, where)
             finally:
                 con.close()
+            if hidden:                  # Hide = stop showing and scanning; Undo (destination only) still works
+                return {"error": collection.MESSAGES["is_hidden"]}
             if where and not collection.connected(where):
                 return {"error": collection.MESSAGES["not_connected"], "not_connected": where}
         with self._lock:
@@ -330,7 +368,7 @@ class App:
         from . import __version__
         return {"version": __version__, "settings": settings.all_values(con), "collections": self.collections(con),
                 "retire_roots": [{"id": r["id"], "path": r["path"], "allowed": settings.retire_allowed(con, r["id"])}
-                                 for r in con.execute("SELECT id, path FROM root ORDER BY id")],
+                                 for r in con.execute("SELECT id, path FROM root WHERE hidden IS NULL OR hidden=0 ORDER BY id")],
                 "status": {"acoustid": bool(os.environ.get("ACOUSTID_API_KEY")),
                            "discogs": bool(os.environ.get("DISCOGS_TOKEN"))}}
 
@@ -674,7 +712,10 @@ def make_handler(app: App, port_ref: dict):
             try:
                 if u.path == "/api/state":
                     roots = app.roots_info(con)
-                    rid = _int(q.get("root_id")) or next((r["root_id"] for r in roots if r["root_id"]), None)
+                    shown = [r["root_id"] for r in roots if r["root_id"]]
+                    rid = _int(q.get("root_id"))
+                    if rid not in shown:            # a hidden (or unknown) folder is not shown: the first one instead
+                        rid = shown[0] if shown else None
                     from . import settings as _st
                     return self._json({"roots": roots, "root_id": rid, "dest": _st.get(con, "dest") or app.dest,
                                        "summary": app.summary(con, rid) if rid else None,
@@ -697,6 +738,9 @@ def make_handler(app: App, port_ref: dict):
                         return self._json(collection.check(con, _int(q.get("root_id")), q.get("path", ""), app.scan_state))
                     except collection.CollectionError as e:
                         return self._json({"error": str(e)})
+                if u.path == "/api/collection_add_check":                   # Add, the dry run: changes nothing
+                    from . import collection
+                    return self._json(collection.check_add(con, q.get("path", "")))
                 if u.path == "/api/check_folder":                           # changes nothing
                     from . import folders
                     return self._json(folders.check_folder(con, q.get("path", ""), q.get("purpose", "destination")))
@@ -827,6 +871,13 @@ def make_handler(app: App, port_ref: dict):
                 con = app.con()
                 try:
                     return self._json(app.save_settings(con, body))
+                finally:
+                    con.close()
+            if u.path in ("/api/collection_add", "/api/collection_hidden"):
+                con = app.con()
+                try:
+                    return self._json(app.add_collection(con, body) if u.path == "/api/collection_add"
+                                      else app.hide_collection(con, body))
                 finally:
                     con.close()
             if u.path == "/api/collection_path":

@@ -234,3 +234,117 @@ def test_paths_in_the_collection_screens_are_data():
     for needle in ("root.path)", "root.suggestion)", "oldPath)", "c.path)", "res.detail)", "b.detail)"):
         lines = [ln for ln in body.splitlines() if needle in ln and "h(" in ln]
         assert lines and all("data-no-translate" in ln for ln in lines), needle
+
+
+# ---- adding, hiding, showing (ADR 0004 §3, 4, 13) -----------------------------------------------------------
+def test_adding_only_registers_and_checks_overlap(applied, con, tmp_path):  # noqa: F811
+    lib, dest, run = applied
+    other = tmp_path / "usb"
+    (other / "Some Album").mkdir(parents=True)
+    (other / "Some Album" / "a.flac").write_bytes(b"not read")
+    scans = con.execute("SELECT count(*) FROM scan").fetchone()[0]
+    files = con.execute("SELECT count(*) FROM file").fetchone()[0]
+    c = collection.check_add(con, str(other))
+    assert c["ok"] and c["result"]["code"] == "add_ok"
+    r = collection.add(con, str(other))
+    assert r["done"]["code"] == "added" and r["path"] == str(other)
+    assert con.execute("SELECT count(*) FROM scan").fetchone()[0] == scans          # nothing scanned
+    assert con.execute("SELECT count(*) FROM file").fetchone()[0] == files          # nothing read
+    assert settings.retire_allowed(con, r["root_id"]) is False
+    # no overlap, hidden folders included (§3)
+    inside = collection.check_add(con, str(lib / "Ò¹º½"))
+    assert inside["result"]["code"] == "add_inside" and inside["inside"]["root_id"] == 1 and inside["inside"]["sub"] == "Ò¹º½"
+    assert collection.check_add(con, str(tmp_path))["result"]["code"] == "add_contains"
+    assert collection.check_add(con, str(lib))["result"]["code"] == "already_registered"
+    assert collection.check_add(con, str(tmp_path / "nowhere"))["result"]["code"] == "missing"
+    dest.mkdir(exist_ok=True)
+    settings.save(con, {"dest": str(dest)})
+    assert collection.check_add(con, str(dest))["result"]["code"] == "add_dest"
+
+
+def test_hide_keeps_everything_and_show_brings_it_back(applied, con, tmp_path):  # noqa: F811
+    lib, dest, run = applied
+    other = tmp_path / "usb"
+    other.mkdir()
+    collection.add(con, str(other))
+    decisions = [dict(d) for d in con.execute("SELECT * FROM decision")]
+    with pytest.raises(collection.CollectionError, match="running job"):
+        collection.set_hidden(con, 1, True, {"running": True, "kind": "scan"})
+    assert collection.set_hidden(con, 1, True)["hidden"] is True
+    assert collection.shown_paths(con) == [str(other)]
+    assert [dict(d) for d in con.execute("SELECT * FROM decision")] == decisions   # nothing forgotten
+    from music_steward.scanner import RootUnavailable
+    with pytest.raises(RootUnavailable, match="hidden"):                    # not scanned, even from the command line
+        scan(con, str(lib))
+    with pytest.raises(RootUnavailable, match="hidden"):
+        scan(con, str(lib / "Ò¹º½"))
+    with pytest.raises(collection.CollectionError, match="only collection folder shown"):
+        collection.set_hidden(con, 2, True)
+    assert collection.check_add(con, str(lib))["result"]["code"] == "add_hidden"   # adding the same path shows it
+    assert collection.add(con, str(lib))["done"]["code"] == "shown"
+    assert collection.shown_paths(con) == [str(lib), str(other)]
+    assert [dict(d) for d in con.execute("SELECT * FROM decision")] == decisions
+
+
+def test_a_scan_never_creates_an_overlapping_collection_folder(applied, con, tmp_path):  # noqa: F811
+    lib, dest, run = applied
+    from music_steward.scanner import RootUnavailable
+    with pytest.raises(RootUnavailable, match="overlaps"):
+        scan(con, str(tmp_path))                                            # contains the collection folder
+    assert con.execute("SELECT count(*) FROM root").fetchone()[0] == 1
+
+
+def test_api_add_switch_and_hide(api, tmp_path):
+    app, lib, dest, run, get, post, wait = api
+    other = tmp_path / "usb"
+    other.mkdir()
+    assert get(f"/api/collection_add_check?path={other}")["ok"] is True
+    r = post("/api/collection_add", {"path": str(other)})
+    assert r["root_id"] == 2 and app.roots == [str(lib), str(other)]
+    assert [x["path"] for x in get("/api/state")["roots"]] == [str(lib), str(other)]
+    assert get("/api/state?root_id=2")["root_id"] == 2                      # the switcher
+    assert "error" in post("/api/collection_add", {"path": str(lib / "Ò¹º½")})
+    r = post("/api/collection_hidden", {"root_id": 1, "hidden": True})
+    assert r["hidden"] is True and app.roots == [str(other)]
+    st = get("/api/state?root_id=1")
+    assert st["root_id"] == 2 and [x["path"] for x in st["roots"]] == [str(other)]   # a hidden folder is not shown
+    assert post("/api/retire", {"id": run, "ack": True})["error"] == collection.MESSAGES["is_hidden"]
+    assert post("/api/scan", {"root": str(lib)})["error"] == "not a configured root"
+    assert [(c["path"], c["hidden"]) for c in get("/api/settings")["collections"]] == [(str(lib), True), (str(other), False)]
+    assert "only collection folder" in post("/api/collection_hidden", {"root_id": 2, "hidden": True})["error"]
+    assert post("/api/collection_hidden", {"root_id": 1, "hidden": False})["hidden"] is False
+    assert app.roots == [str(lib), str(other)]
+
+
+def test_root_on_the_command_line_shows_a_hidden_folder_again(applied, con, tmp_path):  # noqa: F811
+    from music_steward.server import App
+    lib, dest, run = applied
+    other = tmp_path / "usb"
+    other.mkdir()
+    collection.add(con, str(other))
+    collection.set_hidden(con, 1, True)
+    assert App(str(tmp_path / "app.sqlite"), []).roots == [str(other)]
+    assert App(str(tmp_path / "app.sqlite"), [str(lib)]).roots == [str(lib), str(other)]
+
+
+def test_command_line_add_hide_show(applied, tmp_path, capsys):  # noqa: F811
+    lib, dest, run = applied
+    db = str(tmp_path / "app.sqlite")
+    other = tmp_path / "usb"
+    other.mkdir()
+    assert cli.main(["--db", db, "collection", "add", str(other)]) == 0
+    assert cli.main(["--db", db, "collection", "hide", str(lib)]) == 0
+    capsys.readouterr()
+    cli.main(["--db", db, "collection", "list"])
+    out = capsys.readouterr().out
+    assert f"hidden         {lib}" in out and f"connected      {other}" in out
+    with pytest.raises(SystemExit, match="only collection folder"):
+        cli.main(["--db", db, "collection", "hide", str(other)])
+    assert cli.main(["--db", db, "collection", "show", str(lib)]) == 0
+
+
+def test_the_folder_switcher_shows_paths_as_data():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "music_steward/web/app.js").read_text(encoding="utf-8")
+    line = next(ln for ln in js.splitlines() if 'h("select", { id: "rootPick"' in ln)
+    assert "data-no-translate" in line
