@@ -27,3 +27,10 @@ m0/results/nas_scan_summary.json
 .venv/
 *.egg-info/
 .pytest_cache/
+
+# macOS app builds (packaging/macos/build.sh) and signing material -- never commit a certificate
+/build/
+/dist/
+*.p12
+*.cer
+*.mobileprovision

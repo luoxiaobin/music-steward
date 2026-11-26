@@ -737,7 +737,9 @@ def make_handler(app: App, port_ref: dict):
                     if rid not in shown:            # a hidden (or unknown) folder is not shown: the first one instead
                         rid = shown[0] if shown else None
                     from . import settings as _st
+                    from .environment import ffmpeg_found
                     return self._json({"roots": roots, "root_id": rid, "dest": _st.get(con, "dest") or app.dest,
+                                       "ffmpeg": ffmpeg_found(),
                                        "summary": app.summary(con, rid) if rid else None,
                                        "scan": app.scan_state})
                 if u.path == "/api/settings":

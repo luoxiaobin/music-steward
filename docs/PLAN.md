@@ -153,7 +153,8 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
 4. ✅ **Retire the originals** ([ADR 0003](adr/0003-retire-originals.md), accepted): retire + restore + labelling
    (README, manifest, opt-in per folder, Originals card); **Archive** (verified copy) and **Delete** (typed word,
    repeated checks).
-5. ✅ Read-only **collection overview** (*Overview*, `music-steward report`: files, albums, copies, originals, and what
+5. 🔄 **macOS app**: built, self-tested and kept as a download by CI (`docs/PACKAGING.md`); signing and notarization
+   switch on when the owner adds the Developer ID secrets. ✅ Read-only **collection overview** (*Overview*, `music-steward report`: files, albums, copies, originals, and what
    to do next); a signed, notarized `.app`; ✅ icon for the chosen concept (vector
    master, every size generated from one geometry, checked at 16–1024 px; Dock, favicon, iPhone home screen, macOS
    `.icns`, iOS app icon). A subtle variant for a future player app, if one is made.

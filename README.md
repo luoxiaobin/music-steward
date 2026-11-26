@@ -27,7 +27,12 @@ from source and needs Python and FFmpeg. See [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Install (macOS)
 
-You need [Homebrew](https://brew.sh). Then, in Terminal:
+**The app (no Terminal needed, Apple silicon):** download `Music Steward.app` from the latest release (or the
+*macOS app* workflow's artifacts), and install FFmpeg and Chromaprint once with [Homebrew](https://brew.sh):
+`brew install ffmpeg chromaprint`. Until builds are signed, open it the first time with right-click → Open. See
+[docs/PACKAGING.md](docs/PACKAGING.md).
+
+**From source:** you need [Homebrew](https://brew.sh). Then, in Terminal:
 
 ```bash
 brew install python@3.12 ffmpeg chromaprint git

@@ -1060,6 +1060,22 @@ TABLE: list[tuple[str, str, str, str]] = [
     ("Retire originals is off for this collection folder", "此收藏文件夹的“整理原始文件”已关闭",
      "Mettre les originaux de côté est désactivé pour ce dossier de collection",
      "Apartar los originales está desactivado para esta carpeta de la colección"),
+    # ---- first launch, FFmpeg (environment.py)
+    ("FFmpeg is not installed.", "未安装 FFmpeg。", "FFmpeg n'est pas installé.", "FFmpeg no está instalado."),
+    ("Music Steward needs it to read and copy audio. Install it with Homebrew (brew install ffmpeg), then quit and "
+     "reopen Music Steward.", "Music Steward 需要它来读取和复制音频。请用 Homebrew 安装（brew install ffmpeg），然后退出并重新打开 Music Steward。",
+     "Music Steward en a besoin pour lire et copier l'audio. Installez-le avec Homebrew (brew install ffmpeg), puis "
+     "quittez et rouvrez Music Steward.",
+     "Music Steward lo necesita para leer y copiar audio. Instálelo con Homebrew (brew install ffmpeg) y luego cierre "
+     "y vuelva a abrir Music Steward."),
+    ("Welcome.", "欢迎。", "Bienvenue.", "Bienvenido."),
+    ("Start by adding the folder that holds your music, for example your NAS share under /Volumes. It is only read: "
+     "nothing in it is changed.", "首先添加存放你音乐的文件夹，例如 /Volumes 下的 NAS 共享。它只会被读取：其中的任何内容都不会被改动。",
+     "Commencez par ajouter le dossier qui contient votre musique, par exemple votre partage NAS sous /Volumes. Il est "
+     "seulement lu : rien n'y est modifié.",
+     "Empiece por añadir la carpeta que contiene su música, por ejemplo su recurso compartido del NAS en /Volumes. Solo "
+     "se lee: no se cambia nada en ella."),
+    ("Add a collection folder…", "添加收藏文件夹…", "Ajouter un dossier de collection…", "Añadir una carpeta de la colección…"),
 ]
 
 

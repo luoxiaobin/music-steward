@@ -16,6 +16,13 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   copy is unfinished, and while originals are still set aside. Afterwards *Retire originals* is off again for that
   folder, a history entry records the change, and the app offers **Scan now**. Command line:
   `music-steward collection list` and `music-steward collection set-path OLD NEW`.
+- **The macOS app** (`docs/PACKAGING.md`): `Music Steward.app`, built by CI on Apple silicon, checked by its own
+  self-test and kept as a download (added to the release on a version tag). It finds FFmpeg in Homebrew's folders and
+  says how to install it when it is missing; it reads the keys (and `MLT_*` settings) from your login shell and keeps
+  them in memory only. Signing and notarization run once the Developer ID secrets are added; until then open it the
+  first time with right-click → Open. New: `music-steward self-test`.
+- **First launch**: `music-steward app` (and the app) open with no collection folder yet and offer **Add a collection
+  folder…**, instead of quitting with "no collection yet".
 - **Overview**: where a collection folder stands, on one page — files (and their problems), albums (found, waiting for
   you, Ready or Likely, Needs review, No match, accepted, skipped, not found), organized copies (copied and verified,
   not copied yet, failed or unfinished copies) and originals (set aside, archived, deleted) — with **Next**: what to do
