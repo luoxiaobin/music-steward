@@ -213,7 +213,15 @@ albums (N)…** above the album list for a whole folder. This removes only the a
 touched, and the History keeps its name. Folder-wide buttons such as *Accept all Ready + Likely* never decide for a
 not-found album.
 
-## 14. History
+## 14. Where things stand: Overview
+
+**Overview** (in the header) answers "how far am I, and what is next?" for the collection folder you are looking at:
+how many files and which problems, how many albums are found, waiting for you, accepted or skipped, how many accepted
+albums are copied and verified and how many are not yet, and what was done with the originals. **Next** lists what to
+do first: a copy to resume, failed files to retry, albums whose audio changed, albums to review, accepted albums to
+copy. **Show →** takes you to them. Looking changes nothing. From the command line: `music-steward report`.
+
+## 15. History
 
 **History** (in the header) lists every copy run, Resume, Retry failed and Undo, everything done to your originals
 (Retire, Restore, Archive, Delete) and every Change path, newest first, with the time, the albums and the folders.

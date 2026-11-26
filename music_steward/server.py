@@ -761,6 +761,12 @@ def make_handler(app: App, port_ref: dict):
                 if u.path == "/api/collection_add_check":                   # Add, the dry run: changes nothing
                     from . import collection
                     return self._json(collection.check_add(con, q.get("path", "")))
+                if u.path == "/api/report":                                 # the overview: changes nothing
+                    from . import report
+                    rid = _int(q.get("root_id"))
+                    if not con.execute("SELECT 1 FROM root WHERE id=?", (rid,)).fetchone():
+                        return self._json({"error": "no such collection folder"}, 404)
+                    return self._json(report.overview(con, rid, app.summary(con, rid)))
                 if u.path == "/api/not_found":                              # what Remove… would remove: changes nothing
                     from . import notfound
                     return self._json(notfound.removable(con, _int(q.get("root_id")), q.get("path", "")))
