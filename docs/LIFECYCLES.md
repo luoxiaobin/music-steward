@@ -93,14 +93,14 @@ stateDiagram-v2
 
 | Exception | Raised when | Effect | Cleared |
 |---|---|---|---|
-| Not found ◇ | a complete scan finds none of the album's files at the location (and they are not parked) | shown as a warning; plans leave it out; nothing else changes | its files return, or the owner confirms *Remove…* (or leaves it for now) |
+| Not found ✓ | a complete scan finds none of the album's files at the location (and they are not parked) | shown as a warning; plans leave it out; nothing else changes | its files return, or the owner confirms *Remove…* (or leaves it for now) |
 | Audio changed ✓ | the audio or cue sheet differs from what was decided on | decision kept but flagged; left out of plans; queued again | the owner accepts again |
 | Not connected ✓ | the collection folder's drive or share is not available | writing actions disabled; nothing is marked | it is connected again |
 
 **Fixed (this PR's predecessor of the full feature):** an album whose files are gone is no longer dropped with its decision
 at "Recognize folder". It shows *Originals set aside* (Retire) or *Not found*, and plans skip it. Before the fix, on 2026-11-21,
-**Retire → rescan → Recognize folder took 2 albums and 2 decisions to 0 and 0.** Still to build: *Leave for now / Remove…*
-for not-found albums and the history. [ADR 0004](adr/0004-collection-folders.md) rule 7 fixes this: the album is never dropped. Albums whose
+**Retire → rescan → Recognize folder took 2 albums and 2 decisions to 0 and 0.** *Leave for now / Remove…* and the
+history were built since. [ADR 0004](adr/0004-collection-folders.md) rule 7 fixes this: the album is never dropped. Albums whose
 originals are parked are not *not found* at all: they are *Retired* (decided below).
 
 ## 4. Decision
@@ -184,15 +184,19 @@ Stopped → Complete* with some albums *kept* when their checks fail. Neither ch
   "originals deleted" (final).
 * **History** ✓ (`history.py`). One readable list of events, each with time, kind and album: path changed, run
   applied / undone / resumed / retried, originals retired, restored, archived, deleted. Written after the action from
-  what it reported; it never blocks or fails one. *Removing a not-found album* (below) will add a line when built.
+  what it reported; it never blocks or fails one. *Removing a not-found album* (below) adds a line, and the album's
+  earlier lines keep its name.
 * **Manual information.** An album with *No match* stays; its own information can be accepted and every field edited
   (album, album artist, year, disc, track titles, and each track's artist, for compilations and collections of
   singles).
 
-* **Removing a not-found album.** The warning is never resolved by the app. The owner chooses, per album or for all
+* **Removing a not-found album** ✓ (`notfound.py`). The warning is never resolved by the app. The owner chooses, per album or for all
   not-found albums of a folder: **Leave for now** (the default; nothing changes, the warning stays, the decision is
   kept) or **Remove…** (a confirmation names what goes: the album record, its decision, matches and edits; nothing on
   disk is touched). Removal is recorded in the history. If the files return later, a scan finds them as a new album.
+  As built: each album is checked again when removed (still not found, not set aside, the collection folder
+  connected, no job running); the request must name the albums and carry the confirmation; folder-wide bulk actions
+  (Accept all Ready + Likely, own info, Skip) leave not-found albums as they are.
 
 ## Open questions
 

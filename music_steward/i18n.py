@@ -948,6 +948,40 @@ TABLE: list[tuple[str, str, str, str]] = [
      "此收藏文件夹已隐藏。请先重新显示它（设置 → 收藏文件夹）。",
      "Ce dossier de collection est masqué. Affichez-le d'abord (Paramètres → Dossiers de la collection).",
      "Esta carpeta de la colección está oculta. Muéstrela primero (Configuración → Carpetas de la colección)."),
+    # ---- removing not-found albums (notfound.py)
+    ("Not found.", "未找到。", "Introuvable.", "No encontrado."),
+    ("None of this album's files are in its folder any more. Its decision, matches and edits are kept, and this "
+     "warning clears by itself if the files come back. Leaving it changes nothing.",
+     "此专辑的文件都已不在其文件夹中。它的决定、匹配和编辑都会保留；如果文件回来，此警告会自动消失。保持不动不会改变任何内容。",
+     "Aucun fichier de cet album ne se trouve plus dans son dossier. Sa décision, ses correspondances et vos "
+     "modifications sont conservées, et cet avertissement disparaît de lui-même si les fichiers reviennent. Le "
+     "laisser ne change rien.",
+     "Ninguno de los archivos de este álbum está ya en su carpeta. Su decisión, coincidencias y ediciones se "
+     "conservan, y este aviso desaparece solo si los archivos vuelven. Dejarlo no cambia nada."),
+    ("Remove…", "移除…", "Retirer…", "Quitar…"),
+    ("Remove", "移除", "Retirer", "Quitar"),
+    ("Remove not-found albums ({n})…", "移除未找到的专辑（{n}）…", "Retirer les albums introuvables ({n})…",
+     "Quitar los álbumes no encontrados ({n})…"),
+    ("Remove this not-found album?", "移除这个未找到的专辑？", "Retirer cet album introuvable?", "¿Quitar este álbum no encontrado?"),
+    ("Remove {n} not-found albums?", "移除 {n} 个未找到的专辑？", "Retirer {n} albums introuvables?",
+     "¿Quitar {n} álbumes no encontrados?"),
+    ("This removes the app's record of it: the album, its decision, its matches and your edits. No file is touched, "
+     "in the collection folder or in the organized copies, and the History keeps its name. If the files come back "
+     "later, a scan finds them as a new album.",
+     "这只会移除应用中的记录：专辑本身、它的决定、匹配和你的编辑。不会动任何文件——无论是收藏文件夹中的还是整理后的副本——历史记录会保留它的名称。如果文件以后回来，扫描会把它们当作新专辑找到。",
+     "Cela retire la fiche de l'application : l'album, sa décision, ses correspondances et vos modifications. Aucun "
+     "fichier n'est touché, ni dans le dossier de la collection ni dans les copies organisées, et l'historique garde "
+     "son nom. Si les fichiers reviennent plus tard, une analyse les trouve comme un nouvel album.",
+     "Esto quita el registro de la aplicación: el álbum, su decisión, sus coincidencias y sus ediciones. No se toca "
+     "ningún archivo, ni en la carpeta de la colección ni en las copias organizadas, y el historial conserva su nombre. "
+     "Si los archivos vuelven más tarde, un escaneo los encuentra como un álbum nuevo."),
+    ("Removed: {n}. Kept: {m}, because their files are in the collection folder again or they were set aside.",
+     "已移除：{n}。保留：{m}，因为它们的文件已回到收藏文件夹，或已被搁置。",
+     "Retirés : {n}. Conservés : {m}, car leurs fichiers sont de nouveau dans le dossier de la collection ou ont été mis de côté.",
+     "Quitados: {n}. Conservados: {m}, porque sus archivos vuelven a estar en la carpeta de la colección o se apartaron."),
+    ("Removed {n} not-found albums from the app (no file touched)", "已从应用中移除 {n} 个未找到的专辑（未动任何文件）",
+     "{n} albums introuvables retirés de l'application (aucun fichier touché)",
+     "Se quitaron {n} álbumes no encontrados de la aplicación (sin tocar ningún archivo)"),
 ]
 
 

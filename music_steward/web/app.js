@@ -245,8 +245,8 @@ async function renderUnits(where) {
                                                                 : `Albums · ${us.length} recognized units in ${where}`;
   const note = document.getElementById("tableNote");
   note.replaceChildren(Object.entries(counts).map(([k, n]) => `${n} ${k.replace("_", " ")}`).join(" · "));
-  const nLikely = us.filter(u => !u.decision && u.confidence === "likely").length;
-  const nReady = us.filter(u => !u.decision && u.confidence === "ready").length;
+  const nLikely = us.filter(u => !u.decision && u.confidence === "likely" && u.presence === "here").length;
+  const nReady = us.filter(u => !u.decision && u.confidence === "ready" && u.presence === "here").length;
   if (nLikely + nReady) note.append(" ", h("button", { type: "button", class: "btn", style: "min-height:28px;padding:0 10px;margin-left:6px",
     onclick: async () => {
       if (!await ask(`Accept the top candidate for ${nReady} Ready and ${nLikely} Likely albums in this folder? ` +
@@ -257,7 +257,7 @@ async function renderUnits(where) {
       await refreshCenter();
     } }, `Accept all Ready + Likely (${nReady + nLikely})`));
   // ---- folder-wide actions on undecided albums ----
-  const und = us.filter(u => !u.decision && u.status === "done");
+  const und = us.filter(u => !u.decision && u.status === "done" && u.presence === "here");   // as the server counts
   const nNoLocal = und.filter(u => ["no_match", "weak"].includes(u.confidence) && !u.local).length;
   const nLocal = und.filter(u => u.local).length;
   const nSkip = und.filter(u => ["no_match", "weak"].includes(u.confidence)).length;
@@ -278,6 +278,10 @@ async function renderUnits(where) {
     bulkBtn("Skip No match + Weak", nSkip,
       `Skip ${nSkip} undecided No match / Weak albums in this folder? They stay where they are and are left out of plans. Each skip can be undone.`,
       { action: "skip", confidences: ["no_match", "weak"] })].filter(Boolean));
+  // ---- albums whose files are gone: the owner may remove their records (never automatic) ----
+  const gone = us.filter(u => u.presence === "not_found");
+  if (gone.length) note.append(" ", h("button", { type: "button", class: "btn", style: "min-height:28px;padding:0 10px;margin-left:6px",
+    onclick: () => removeNotFound(gone.map(u => u.id)) }, `Remove not-found albums (${gone.length})…`));
   // ---- selection: filter, tick, act on exactly the ticked albums ----
   S.unitSel = new Set([...(S.unitSel || [])].filter(id => us.some(u => u.id === id)));
   const statusOf = u => u.decision ? u.decision.action : u.confidence;
@@ -616,6 +620,13 @@ function renderUnitDetail(d) {
   if (onl.length > nOnl) list.append(h("button", { type: "button", class: "linkbtn",
     onclick: () => { S.allCands = d.id; renderUnitDetail(d); } }, `Show ${onl.length - nOnl} more candidates`));
   parts.unshift(bar);
+  if (d.presence === "not_found") parts.unshift(h("div", { class: "banner warnbanner" },
+    h("strong", {}, "Not found. "),
+    "None of this album's files are in its folder any more. Its decision, matches and edits are kept, and this " +
+    "warning clears by itself if the files come back. Leaving it changes nothing.", " ",
+    h("span", { class: "mono", "data-no-translate": "" }, d.folder), " ",
+    h("button", { type: "button", class: "btn", style: "min-height:28px;padding:0 10px",
+      onclick: () => removeNotFound([d.id]) }, "Remove…")));
   if ((d.history || []).length) parts.push(h("details", {}, h("summary", { class: "strong", style: "cursor:pointer" }, "History"),
     historyList(d.history, false)));
   parts.push(h("p", { class: "muted xsmall" }, "Decisions are saved immediately. Nothing is copied or changed until you apply a plan."));
@@ -771,6 +782,22 @@ document.getElementById("recognizeBtn").addEventListener("click", async () => {
   await refreshAll();
 })().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });
 
+
+// ---------------------------------------------------------------- removing not-found albums (notfound.py)
+// The confirmation names exactly what goes; the server checks each album again and removes only those still not found.
+async function removeNotFound(ids) {
+  const n = ids.length;
+  if (!await ask((n === 1 ? "Remove this not-found album?" : `Remove ${n} not-found albums?`) + "\n\n" +
+      "This removes the app's record of it: the album, its decision, its matches and your edits. No file is touched, " +
+      "in the collection folder or in the organized copies, and the History keeps its name. If the files come back " +
+      "later, a scan finds them as a new album.", "Remove")) return;
+  const r = await post2("/api/remove_not_found", { root_id: S.rootId, unit_ids: ids, confirm: true });
+  if (r.error) return tell(r.error);
+  if (r.kept.length) await tell(`Removed: ${r.removed}. Kept: ${r.kept.length}, because their files are in the collection folder again or they were set aside.`);
+  S.selectedUnit = null;
+  document.getElementById("details").replaceChildren(h("p", { class: "muted" }, "Select a file or album to see its details."));
+  await refreshAll();
+}
 
 // ---------------------------------------------------------------- history (music_steward/history.py)
 // What changed originals, copies or a collection folder's path, newest first. The message is interface text; album

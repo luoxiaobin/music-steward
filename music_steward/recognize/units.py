@@ -202,6 +202,8 @@ def enqueue(con: sqlite3.Connection, root_id: int, units: list[dict], requeue: b
         for row in con.execute("SELECT id, key, folder FROM unit WHERE root_id=?", (root_id,)).fetchall():
             in_scope = not scope or row["folder"] == scope or row["folder"].startswith(scope + "/")
             if in_scope and row["key"] not in keep and row["id"] not in gone:
+                from .. import history          # its History lines must not pass to a later album with the same id
+                history.detach_units(con, [row["id"]])
                 con.execute("DELETE FROM decision WHERE unit_id=?", (row["id"],))
                 con.execute("DELETE FROM unit WHERE id=?", (row["id"],))
                 c["removed_stale"] += 1
