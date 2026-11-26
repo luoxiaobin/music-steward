@@ -70,7 +70,7 @@ async function loadState() {
     chip.replaceChildren(h("span", {}, "Collection folder:"), sel, root && !root.available ? h("span", {}, "(not connected)") : "");
   } else (chip.classList.remove("pick"), chip.textContent =
     root ? `Collection folder: ${root.path}${root.available ? "" : " (not connected)"} · sources read-only` : "No collection folder yet");
-  renderConn(root);
+  renderConn(root, st);
   renderInventory(st);
   renderFilters();
   renderScan(st.scan);
@@ -868,9 +868,25 @@ document.getElementById("historyBtn").addEventListener("click", openHistory);
 // ---------------------------------------------------------------- collection folders (ADR 0004)
 // A collection folder whose drive or share is not mounted: say so, offer the share's new place when the
 // same share is mounted elsewhere, Change path…, and Check again. Nothing about the folder is lost.
-function renderConn(root) {
+function renderConn(root, st) {
   const box = document.getElementById("connNote");
-  if (!root || root.available || !root.root_id) { box.hidden = true; box.replaceChildren(); return; }
+  if (st && st.ffmpeg === false) {            // the packaged app, started from the Finder, cannot find FFmpeg
+    box.hidden = false;
+    box.replaceChildren(h("p", { class: "small" }, h("strong", {}, "FFmpeg is not installed. "),
+      "Music Steward needs it to read and copy audio. Install it with Homebrew (brew install ffmpeg), then quit and " +
+      "reopen Music Steward."));
+    return;
+  }
+  if (!root) {                                  // first launch: no collection folder yet
+    box.hidden = false;
+    box.replaceChildren(h("p", { class: "small" }, h("strong", {}, "Welcome. "),
+      "Start by adding the folder that holds your music, for example your NAS share under /Volumes. It is only read: " +
+      "nothing in it is changed."),
+      h("div", { class: "btnrow" }, h("button", { type: "button", class: "btn btn-primary", onclick: () => addCollectionDialog() },
+        "Add a collection folder…")));
+    return;
+  }
+  if (root.available || !root.root_id) { box.hidden = true; box.replaceChildren(); return; }
   box.hidden = false;
   box.replaceChildren(...[
     h("p", { class: "small" }, "This collection folder is not connected. If the share is now mounted somewhere else, use " +

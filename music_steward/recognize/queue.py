@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import sqlite3
 import subprocess
-import sys
 import threading
 import time
 
@@ -46,8 +45,8 @@ def run(db_path: str, unit_ids: list[int], progress=None, stop: threading.Event 
         if stop is not None and stop.is_set():
             break
         try:
-            r = subprocess.run([sys.executable, "-I", "-m", "music_steward.recognize.worker",
-                                "--db", str(db_path), "--unit", str(uid)],
+            from ..environment import worker_cmd      # `python -m` here; the app binary itself in the packaged app
+            r = subprocess.run(worker_cmd(["--db", str(db_path), "--unit", str(uid)]),
                                capture_output=True, timeout=UNIT_TIMEOUT)
             c["done" if r.returncode == 0 else "errors"] += 1
             if r.returncode != 0:

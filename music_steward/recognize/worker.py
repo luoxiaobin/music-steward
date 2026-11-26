@@ -123,9 +123,14 @@ def run_unit(db_path: str, unit_id: int) -> int:
         return 1
 
 
-if __name__ == "__main__":
-    ap = argparse.ArgumentParser()
+def main(argv: list[str] | None = None) -> int:
+    """Also the packaged app's entry for a worker (environment.worker_cmd: the app binary with --recognize-worker)."""
+    ap = argparse.ArgumentParser(prog="music-steward worker")
     ap.add_argument("--db", required=True)
     ap.add_argument("--unit", type=int, required=True)
-    a = ap.parse_args()
-    sys.exit(run_unit(a.db, a.unit))
+    a = ap.parse_args(argv)
+    return run_unit(a.db, a.unit)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

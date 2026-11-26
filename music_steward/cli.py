@@ -201,7 +201,7 @@ def cmd_app(a):
     except ImportError:
         sys.exit("the desktop window needs pywebview:  pip install -e '.[desktop]'  (or use: music-steward serve)")
     from .desktop import run
-    _need_a_collection(a, "app")
+    # the window opens even with no collection folder yet: it greets you and offers Add… (first launch of the app)
     run(a.db, a.root, dest=a.dest, debug=a.debug)
 
 
@@ -218,6 +218,12 @@ def cmd_serve(a):
     from .server import serve
     _need_a_collection(a, "serve")
     serve(a.db, a.root, port=a.port, open_browser=not a.no_browser, dest=a.dest)
+
+
+def cmd_selftest(a):
+    """Is this install complete? The same check CI runs inside the packaged app."""
+    from . import selftest
+    return selftest.run()
 
 
 def cmd_report(a):
@@ -384,6 +390,10 @@ def main(argv=None):
     sv.add_argument("--no-browser", action="store_true")
     sv.add_argument("--dest", help="default destination folder for organized copies (outside every root)")
     sv.set_defaults(func=cmd_serve)
+
+    st = sub.add_parser("self-test", help="check that this install is complete (plugins, page, worker, FFmpeg); "
+                        "uses a throwaway database")
+    st.set_defaults(func=cmd_selftest)
 
     rp = sub.add_parser("report", help="where each collection folder stands: files, albums, copies, originals, "
                         "and what is left to do (reads the app database only)")

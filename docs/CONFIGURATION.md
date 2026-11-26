@@ -47,7 +47,8 @@ puts them in URLs.
 Fingerprints also need the **`fpcalc`** program from Chromaprint (`brew install chromaprint`). Without it,
 fingerprinting fails quietly and matching continues without fingerprints.
 
-Put the keys where your shell (and the app) will see them, for example in `~/.zshenv`:
+Put the keys where your shell (and the app) will see them, for example in `~/.zshenv`. The packaged app, started
+from the Finder, asks your login shell for these keys (and the `MLT_*` settings) and keeps them in memory only:
 
 ```bash
 export ACOUSTID_API_KEY=your-application-key

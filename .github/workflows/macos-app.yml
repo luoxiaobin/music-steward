@@ -1,0 +1,96 @@
+name: macOS app
+
+# Builds "Music Steward.app" (Apple silicon), runs its self-test, and keeps the zip as a download on the run's page.
+# Signed and notarized only when the Developer ID secrets exist (docs/PACKAGING.md); otherwise an unsigned build,
+# which opens with right-click → Open the first time. On a version tag, the zip is added to that release.
+
+on:
+  pull_request:
+    paths:
+      - packaging/**
+      - .github/workflows/macos-app.yml
+      - pyproject.toml
+      - music_steward/environment.py
+      - music_steward/selftest.py
+      - music_steward/desktop.py
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    env:
+      SIGN: ${{ secrets.MACOS_CERT_P12 != '' && secrets.MACOS_CERT_PASSWORD != '' }}
+      NOTARIZE: ${{ secrets.APPLE_ID != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPLE_APP_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install FFmpeg (for the self-test; the app finds the owner's own)
+        run: brew install ffmpeg
+      - name: Install Music Steward and PyInstaller
+        run: pip install '.[desktop]' pyinstaller==6.22.3
+      - name: Import the Developer ID certificate
+        if: env.SIGN == 'true'
+        env:
+          P12: ${{ secrets.MACOS_CERT_P12 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/build.keychain-db"
+          KC_PASSWORD=$(uuidgen)
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KC_PASSWORD" "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p "$KC_PASSWORD" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KC_PASSWORD" "$KC" > /dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          ID=$(security find-identity -v -p codesigning "$KC" | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -1)
+          test -n "$ID" || { echo "no Developer ID Application identity in the certificate"; exit 1; }
+          echo "CODESIGN_IDENTITY=$ID" >> "$GITHUB_ENV"
+      - name: Build and self-test
+        run: packaging/macos/build.sh
+      - name: Notarize and staple
+        if: env.SIGN == 'true' && env.NOTARIZE == 'true'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: packaging/macos/notarize.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Music-Steward-macOS
+          path: dist/Music-Steward-*-macOS.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Music-Steward-macOS
+      - name: Add the zip to the release (the Release workflow creates it)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for i in $(seq 30); do gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 && break; sleep 20; done
+          gh release upload "$GITHUB_REF_NAME" Music-Steward-*-macOS.zip --clobber
