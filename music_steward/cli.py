@@ -220,6 +220,25 @@ def cmd_serve(a):
     serve(a.db, a.root, port=a.port, open_browser=not a.no_browser, dest=a.dest)
 
 
+def cmd_report(a):
+    """Where each collection folder stands, and what is left to do. Reads the app database only."""
+    from . import report
+    con = db.connect(a.db)
+    if a.path:
+        root, _ = resolve(con, a.path)
+        ids = [_root_id(con, root)]
+    else:
+        ids = [r[0] for r in con.execute("SELECT id FROM root WHERE hidden IS NULL OR hidden=0 ORDER BY id")]
+    if not ids:
+        sys.exit("no collection yet: run  music-steward scan /path/to/music")
+    out = [report.overview(con, i) for i in ids]
+    if a.json:
+        print(json.dumps(out, ensure_ascii=False, indent=2))
+    else:
+        print("\n".join(report.as_text(o) for o in out), end="")
+    return 0
+
+
 def cmd_collection(a):
     """List the collection folders, or change the path of one (ADR 0004): the same checks as the app."""
     from . import collection
@@ -365,6 +384,12 @@ def main(argv=None):
     sv.add_argument("--no-browser", action="store_true")
     sv.add_argument("--dest", help="default destination folder for organized copies (outside every root)")
     sv.set_defaults(func=cmd_serve)
+
+    rp = sub.add_parser("report", help="where each collection folder stands: files, albums, copies, originals, "
+                        "and what is left to do (reads the app database only)")
+    rp.add_argument("path", nargs="?", help="a collection folder (default: every one shown)")
+    rp.add_argument("--json", action="store_true")
+    rp.set_defaults(func=cmd_report)
 
     co = sub.add_parser("collection", help="collection folders: list; add PATH (registers only, scans nothing); "
                         "hide / show PATH (everything is kept); set-path OLD NEW when the same collection is now "

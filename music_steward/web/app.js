@@ -286,9 +286,19 @@ async function renderUnits(where) {
   S.unitSel = new Set([...(S.unitSel || [])].filter(id => us.some(u => u.id === id)));
   const statusOf = u => u.decision ? u.decision.action : u.confidence;
   const FILTERS = [["all", "All"], ["undecided", "Undecided"], ["likely", "Likely"], ["needs_review", "Needs review"],
-                   ["weak", "Weak"], ["no_match", "No match"], ["accept", "Accepted"], ["skip", "Skipped"]];
+                   ["weak", "Weak"], ["no_match", "No match"], ["accept", "Accepted"], ["skip", "Skipped"],
+                   // the groups the Overview counts (and links to)
+                   ["ready_likely", "Ready + Likely"], ["no_match_weak", "No match + Weak"], ["not_found", "Not found"]];
   const f = S.unitFilter || "all";
-  const shown = us.filter(u => (f === "all" || (f === "undecided" ? !u.decision : statusOf(u) === f)) &&
+  const undecided = u => !u.decision && u.presence === "here" && u.status === "done";
+  // one definition for both the list and the count beside each filter's name
+  const matches = (u, v) => v === "all" || (v === "undecided" ? !u.decision
+    : v === "not_found" ? u.presence === "not_found"
+    : v === "ready_likely" ? undecided(u) && ["ready", "likely"].includes(u.confidence)
+    : v === "no_match_weak" ? undecided(u) && ["no_match", "weak"].includes(u.confidence)
+    : statusOf(u) === v);
+  const match = u => matches(u, f);
+  const shown = us.filter(u => match(u) &&
                                (!S.titleOnly || (u.evidence && u.evidence.title_agrees)));
   S.shownIds = shown.map(u => u.id);
   S.unitsById = Object.fromEntries(us.map(u => [u.id, u]));
@@ -307,7 +317,7 @@ async function renderUnits(where) {
     selBar.replaceChildren(
       h("label", { class: "small" }, "Show ", h("select", { onchange: e => { S.unitFilter = e.target.value; S.unitSel.clear(); refreshCenter(); } },
         FILTERS.map(([v, l]) => h("option", { value: v, selected: v === f ? true : null },
-          `${l} (${v === "all" ? us.length : us.filter(u => v === "undecided" ? !u.decision : statusOf(u) === v).length})`)))),
+          `${l} (${us.filter(u => matches(u, v)).length})`)))),
       h("label", { class: "small" }, h("input", { type: "checkbox", checked: S.titleOnly ? true : null,
         onchange: e => { S.titleOnly = e.target.checked; S.unitSel.clear(); refreshCenter(); } }), " only where the album title agrees"),
       h("span", { class: "small strong" }, `${n} selected`),
@@ -782,6 +792,34 @@ document.getElementById("recognizeBtn").addEventListener("click", async () => {
   await refreshAll();
 })().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });
 
+
+// ---------------------------------------------------------------- overview (music_steward/report.py)
+// Where this collection folder stands, and what is left to do. Read-only; each line leads to where you act on it.
+async function openOverview() {
+  if (!S.rootId) return tell("No collection folder yet. Add one in Settings → Collection folders.");
+  const o = await api(`/api/report?root_id=${S.rootId}`);
+  const close = () => { dlg.close(); dlg.remove(); };
+  const go = async g => {
+    close();
+    if (g.plans) return document.getElementById("planBtn").click();
+    S.path = ""; S.expanded = new Set([""]);
+    if (g.files) { await setView("folders"); return setFilter(g.files); }
+    S.filter = null; S.unitFilter = g.albums; await setView("albums"); await refreshAll();
+  };
+  const line = ln => h("li", {}, h("span", {}, ln.text), ln.go ? [" ", h("button", { type: "button", class: "linkbtn",
+    onclick: () => go(ln.go) }, ln.go.plans ? "Plans →" : "Show →")] : null);
+  const dlg = h("dialog", { class: "appdialog settings" },
+    h("h2", { class: "h2" }, "Overview"),
+    h("p", { class: "mono xsmall", "data-no-translate": "" }, o.root),
+    o.next.length ? h("section", {}, h("h3", {}, "Next"), h("ul", { class: "overview next" }, o.next.map(line))) : null,
+    ...o.sections.filter(s => s.lines.length).map(s => h("section", {}, h("h3", {}, s.title), h("ul", { class: "overview" }, s.lines.map(line)))),
+    h("p", { class: "muted xsmall" }, "Read-only: nothing is changed by looking. The command line has the same: music-steward report"),
+    h("div", { class: "btnrow" }, h("button", { type: "button", class: "btn btn-primary", onclick: close }, "Close")));
+  dlg.addEventListener("cancel", e => { e.preventDefault(); close(); });
+  document.body.append(dlg);
+  dlg.showModal();
+}
+document.getElementById("overviewBtn").addEventListener("click", openOverview);
 
 // ---------------------------------------------------------------- removing not-found albums (notfound.py)
 // The confirmation names exactly what goes; the server checks each album again and removes only those still not found.

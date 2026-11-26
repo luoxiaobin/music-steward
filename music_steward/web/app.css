@@ -196,3 +196,6 @@ body.resizing{cursor:col-resize;user-select:none}
 .history{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .history li{border-bottom:1px solid var(--btn-line);padding-bottom:6px}
 .history .mono{overflow-wrap:anywhere}
+.overview{list-style:none;margin:0 0 4px;padding:0;display:grid;gap:4px}
+.overview li{font-size:14px}
+.overview.next li::before{content:"→ ";color:var(--muted)}

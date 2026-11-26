@@ -16,6 +16,12 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   copy is unfinished, and while originals are still set aside. Afterwards *Retire originals* is off again for that
   folder, a history entry records the change, and the app offers **Scan now**. Command line:
   `music-steward collection list` and `music-steward collection set-path OLD NEW`.
+- **Overview**: where a collection folder stands, on one page — files (and their problems), albums (found, waiting for
+  you, Ready or Likely, Needs review, No match, accepted, skipped, not found), organized copies (copied and verified,
+  not copied yet, failed or unfinished copies) and originals (set aside, archived, deleted) — with **Next**: what to do
+  first, in the order of the journey. Each line leads to where you act on it. Read-only; it never opens a file. Command
+  line: `music-steward report` (or `--json`). The album list has two new filters to match: *Ready + Likely* and
+  *No match + Weak* (and *Not found*).
 - **Removing a not-found album.** An album whose files are no longer in its folder shows a *Not found* notice in its
   details: leaving it changes nothing (it clears by itself if the files come back), and **Remove…** removes the app's
   record of it — the album, its decision, its matches and your edits — after a confirmation that says so. No file is
