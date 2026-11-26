@@ -163,7 +163,7 @@ CREATE TABLE IF NOT EXISTS retired_file(
 CREATE TABLE IF NOT EXISTS event(
     id INTEGER PRIMARY KEY, at REAL NOT NULL,
     kind TEXT NOT NULL,                 -- path_changed | run_applied | run_resumed | run_retried | run_undone |
-                                        -- retired | restored | archived | archive_stopped | deleted
+                                        -- retired | restored | archived | archive_stopped | deleted | albums_removed
     root_id INTEGER, run_id INTEGER, batch_id INTEGER, detail_json TEXT
 );
 CREATE TABLE IF NOT EXISTS event_unit(
@@ -197,7 +197,9 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
                  # host and share name only, never a user name or password
                  ("root", "share_host", "TEXT"), ("root", "share_name", "TEXT"), ("root", "share_sub", "TEXT"),
                  # Hide (ADR 0004 §13): not shown and not scanned; everything about it is kept
-                 ("root", "hidden", "INTEGER")]
+                 ("root", "hidden", "INTEGER"),
+                 # the album's name when the line was written: a removed album keeps its name in the History
+                 ("event_unit", "label", "TEXT")]
 
 
 _READY: set[str] = set()   # databases already set up by this process

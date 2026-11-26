@@ -204,7 +204,16 @@ With more than one collection folder, the header has a switcher; the app shows o
 out of view and out of scans without forgetting anything; **Show** brings it back. Command line:
 `music-steward collection add | hide | show PATH`.
 
-## 13. History
+## 13. Albums whose files are gone
+
+If a scan no longer finds any of an album's files (the folder was moved or deleted outside the app), the album shows
+**Not found**. Nothing is lost: its decision, matches and edits stay, plans leave it out, and the notice clears by itself
+if the files come back. If they are gone for good, open the album and press **Remove…**, or use **Remove not-found
+albums (N)…** above the album list for a whole folder. This removes only the app's record of the album; no file is
+touched, and the History keeps its name. Folder-wide buttons such as *Accept all Ready + Likely* never decide for a
+not-found album.
+
+## 14. History
 
 **History** (in the header) lists every copy run, Resume, Retry failed and Undo, everything done to your originals
 (Retire, Restore, Archive, Delete) and every Change path, newest first, with the time, the albums and the folders.

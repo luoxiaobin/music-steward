@@ -16,6 +16,12 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   copy is unfinished, and while originals are still set aside. Afterwards *Retire originals* is off again for that
   folder, a history entry records the change, and the app offers **Scan now**. Command line:
   `music-steward collection list` and `music-steward collection set-path OLD NEW`.
+- **Removing a not-found album.** An album whose files are no longer in its folder shows a *Not found* notice in its
+  details: leaving it changes nothing (it clears by itself if the files come back), and **Remove…** removes the app's
+  record of it — the album, its decision, its matches and your edits — after a confirmation that says so. No file is
+  touched anywhere. *Remove not-found albums (N)…* in the album list does the same for a whole folder. Each album is
+  checked again at that moment, the History keeps the removed album's name, and if the files come back later a scan
+  finds them as a new album.
 - **Add and Hide collection folders** ([ADR 0004](docs/adr/0004-collection-folders.md)). *Settings → Collection
   folders → Add…* registers another folder of music (a second share, a USB drive): nothing is read until you scan it,
   and *Retire originals* is off for it. A folder inside a collection folder is not added (the app offers to open it
@@ -44,6 +50,10 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 - The header says *Collection folder* instead of *Root*.
 
 ### Fixed
+- Folder-wide bulk actions (*Accept all Ready + Likely*, *Add own info*, *Accept own info*, *Skip*) no longer decide
+  for albums whose files are not found (or set aside): they are left as they were. Albums you tick are still acted on.
+- An album deleted by *Recognize folder* (its folder now holds a different album) no longer passes its History lines to
+  a later album that happens to get the same number.
 - A scan of a folder that contains a collection folder no longer registers it as a second, overlapping collection
   folder; it is refused.
 - In *Edit fields*, the greyed release values in the boxes (titles, artists) are no longer run through the interface

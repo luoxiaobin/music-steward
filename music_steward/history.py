@@ -3,7 +3,7 @@
 Each line has a time, a kind, the collection folder and the albums it touched. It is written *after* an action has
 finished, from what the action reported -- never in its way: the journals stay the truth for crash recovery, and a
 history line that cannot be written never fails the action. Album names are looked up when the history is read,
-so an album renamed by *Edit fields* shows its current name.
+so an album renamed by *Edit fields* shows its current name; a removed album shows the name kept with the line.
 
 Messages are fixed sentences with numbers (translated by the interface); paths and album names come separately.
 """
@@ -24,6 +24,7 @@ MESSAGES = {
     "archived": "Archived {n} parked original files (verified)",
     "archive_stopped": "Archive stopped: {n} parked original files copied so far",
     "deleted": "Deleted {n} parked original files",
+    "albums_removed": "Removed {n} not-found albums from the app (no file touched)",
 }
 
 
@@ -35,19 +36,36 @@ def _text(kind: str, **nums) -> str:
 
 
 def record(con: sqlite3.Connection, kind: str, root_id: int | None, units=(), run_id: int | None = None,
-           batch_id: int | None = None, detail: dict | None = None) -> int | None:
-    """Add one line. Best effort: the action it describes has already happened."""
+           batch_id: int | None = None, detail: dict | None = None, labels: dict | None = None) -> int | None:
+    """Add one line. Best effort: the action it describes has already happened. Each album's name is kept with
+    the line (labels: for albums whose record is already gone), so the History can name a removed album."""
     try:
         eid = con.execute("INSERT INTO event(at, kind, root_id, run_id, batch_id, detail_json) VALUES(?,?,?,?,?,?)",
                           (time.time(), kind, root_id, run_id, batch_id,
                            json.dumps(detail or {}, ensure_ascii=False))).lastrowid
-        con.executemany("INSERT OR IGNORE INTO event_unit(event_id, unit_id) VALUES(?,?)",
-                        [(eid, int(u)) for u in set(units) if u is not None])
+        rows = []
+        for u in {int(u) for u in units if u is not None}:
+            name = (labels or {}).get(u)
+            if name is None:
+                r = con.execute("SELECT label FROM unit WHERE id=?", (u,)).fetchone()
+                name = r[0] if r else None
+            rows.append((eid, u, name))
+        con.executemany("INSERT OR IGNORE INTO event_unit(event_id, unit_id, label) VALUES(?,?,?)", rows)
         con.commit()
         return eid
     except sqlite3.Error:
         con.rollback()
         return None
+
+
+def detach_units(con: sqlite3.Connection, ids) -> None:
+    """Before an album's record is deleted: keep its History lines, with its name, under the negative id. SQLite
+    may give a deleted row's id to the next new album, whose History must not inherit them. No commit here: the
+    caller deletes the albums and commits in the same transaction."""
+    for uid in ids:
+        con.execute("UPDATE event_unit SET label=COALESCE(label, (SELECT label FROM unit WHERE id=?)) WHERE unit_id=?",
+                    (uid, uid))
+        con.execute("UPDATE event_unit SET unit_id=? WHERE unit_id=?", (-uid, uid))
 
 
 def _run_root_units(con, run_id: int) -> tuple[int | None, list[int]]:
@@ -125,9 +143,9 @@ def lines(con: sqlite3.Connection, root_id: int | None = None, unit_id: int | No
     out = []
     for e in con.execute(q, args).fetchall():
         d = json.loads(e["detail_json"] or "{}")
-        names = [r[0] for r in con.execute(
-            "SELECT u.label FROM event_unit eu JOIN unit u ON u.id=eu.unit_id WHERE eu.event_id=? ORDER BY u.label LIMIT 6",
-            (e["id"],))]
+        names = [r[0] for r in con.execute(      # the current name; the one kept with the line if the album is gone
+            "SELECT COALESCE(u.label, eu.label) AS name FROM event_unit eu LEFT JOIN unit u ON u.id=eu.unit_id "
+            "WHERE eu.event_id=? AND COALESCE(u.label, eu.label) IS NOT NULL ORDER BY name LIMIT 6", (e["id"],))]
         n_albums = con.execute("SELECT count(*) FROM event_unit WHERE event_id=?", (e["id"],)).fetchone()[0]
         root = con.execute("SELECT path FROM root WHERE id=?", (e["root_id"],)).fetchone() if e["root_id"] else None
         out.append({"id": e["id"], "at": e["at"], "kind": e["kind"],

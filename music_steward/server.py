@@ -119,6 +119,24 @@ class App:
             self._refresh_roots(con)
         return r
 
+    def remove_not_found(self, con, body) -> dict:
+        """Remove… the records of not-found albums, the owner's explicit choice. Under the job lock, so no
+        recognition or scan can change what "not found" means while it happens. Needs the explicit list of albums
+        the confirmation named: never "everything not found"."""
+        from . import notfound
+        ids = body.get("unit_ids")
+        if not isinstance(ids, list) or not ids or not all(isinstance(i, int) for i in ids):
+            return {"error": "name the albums to remove"}
+        if body.get("confirm") is not True:
+            return {"error": "removing needs the confirmation from the dialog"}
+        with self._lock:
+            try:
+                r = notfound.remove(con, _int(body.get("root_id")), ids, self.scan_state)
+            except notfound.RemoveError as e:
+                return {"error": str(e)}
+            self._summary_cache = {}
+        return r
+
     def _refresh_roots(self, con) -> None:
         """The folders shown: every one the database shows, plus --root folders not registered yet (first scan)."""
         from . import collection
@@ -535,7 +553,7 @@ class App:
         for u in results.units(con, rid, nfc(body.get("path", ""))):
             if only is not None and u["id"] not in only:
                 continue    # a filtered list: act only on the albums the user sees
-            if u["decision"] is None and u["confidence"] in wanted and u["top"]:
+            if u["decision"] is None and u["confidence"] in wanted and u["top"] and u["presence"] == "here":
                 cid = u["top"]["id"]
                 con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
                             "VALUES(?, 'accept', ?, ?, ?)", (u["id"], cid, time.time(), release_key(con, cid)))
@@ -610,6 +628,8 @@ class App:
         only = {_int(i) for i in body["only_ids"]} if body.get("only_ids") is not None else None
         for u in results.units(con, rid, nfc(body.get("path", ""))):
             if u["decision"] is not None or u["status"] != "done":
+                continue
+            if u["presence"] != "here":     # files not found (or set aside): a folder-wide action leaves it as it was
                 continue
             if only is not None and u["id"] not in only:
                 continue    # a filtered list: act only on the albums the user sees
@@ -741,6 +761,9 @@ def make_handler(app: App, port_ref: dict):
                 if u.path == "/api/collection_add_check":                   # Add, the dry run: changes nothing
                     from . import collection
                     return self._json(collection.check_add(con, q.get("path", "")))
+                if u.path == "/api/not_found":                              # what Remove… would remove: changes nothing
+                    from . import notfound
+                    return self._json(notfound.removable(con, _int(q.get("root_id")), q.get("path", "")))
                 if u.path == "/api/check_folder":                           # changes nothing
                     from . import folders
                     return self._json(folders.check_folder(con, q.get("path", ""), q.get("purpose", "destination")))
@@ -786,9 +809,11 @@ def make_handler(app: App, port_ref: dict):
                 if m:
                     from .recognize import results
                     from . import history
+                    from .recognize.units import gone_units
                     d = results.unit_detail(con, int(m.group(1)))
                     if d:
                         d["history"] = history.lines(con, unit_id=int(m.group(1)), limit=20)
+                        d["presence"] = gone_units(con, d["root_id"]).get(d["id"], "here")   # here | retired | not_found
                     return self._json(d) if d else self._json({"error": "not found"}, 404)
                 m = re.fullmatch(r"/api/file/(\d+)", u.path)
                 if m:
@@ -871,6 +896,12 @@ def make_handler(app: App, port_ref: dict):
                 con = app.con()
                 try:
                     return self._json(app.save_settings(con, body))
+                finally:
+                    con.close()
+            if u.path == "/api/remove_not_found":
+                con = app.con()
+                try:
+                    return self._json(app.remove_not_found(con, body))
                 finally:
                     con.close()
             if u.path in ("/api/collection_add", "/api/collection_hidden"):
