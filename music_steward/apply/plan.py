@@ -45,7 +45,7 @@ def split_tracks(con=None) -> bool:
     return settings.get(con, "cue_albums") == "tracks"
 
 
-def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None, notes=None):
+def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None, notes=None, cue_artists=None):
     """A cue-sheet image album: copy the image (album-level tags) and a rewritten cue sheet
     (new FILE name, album + track titles from the release, original encoding) -- or, with the
     setting 'one file per track', a lossless FLAC file per track (_split_items)."""
@@ -55,7 +55,7 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None, 
     cf = con.execute("SELECT * FROM file WHERE id=?", (u["cue_file_id"],)).fetchone()
     if split_tracks(con):
         if (f["codec"] or "") in LOSSLESS:
-            return _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, cf)
+            return _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, cf, cue_artists)
         if notes is not None:       # cutting lossy audio would mean re-encoding it: kept as one file
             notes.append({"unit_id": u["id"], "label": u["label"], "type": "kept_image",
                           "from": f["codec"], "to": "one file + cue sheet"})
@@ -76,8 +76,9 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None, 
     # tracks numbered from 1 -- not the whole sheet with every FILE pointing at this one image
     keep = own.name if len([x for x in sheet.files if x.tracks]) > 1 else None
     tracks = {str(t["cue_track"]): {"title": (cue_titles or {}).get(str(t["cue_track"])) or t["title"],
-                                    "performer": _script(c["artist"] if t["artist"] and t["artist"] == c.get("_artist_from")
-                                                         else t["artist"], c.get("_script", "keep")) or c["artist"]}
+                                    "performer": (cue_artists or {}).get(str(t["cue_track"])) or
+                                    _script(c["artist"] if t["artist"] and t["artist"] == c.get("_artist_from")
+                                            else t["artist"], c.get("_script", "keep")) or c["artist"]}
               for t in con.execute("SELECT * FROM cand_cue_track WHERE candidate_id=?", (c["id"],))}
     items.append({"unit_id": u["id"], "file_id": cf["id"], "kind": "cue",
                   "src": os.path.join(root_path, cf["fs_relpath"]), "dest_rel": f"{adir}/{stem}.cue",
@@ -91,7 +92,7 @@ def _cue_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles=None, 
     new_stem_of[f["relpath"].rsplit(".", 1)[0]] = f"{adir}/{stem}"
 
 
-def _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, cf):
+def _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, cf, cue_artists=None):
     """One FLAC file per cue track, cut at the cue sheet's positions (frames of 1/75 s, so exact
     sample positions) from a lossless image. The image itself is never changed; apply checks that
     each track's decoded audio equals the same samples of the image."""
@@ -107,8 +108,8 @@ def _split_items(con, u, c, adir, root_path, items, new_stem_of, cue_titles, f, 
         ct = cand.get(t.number, {})
         title = (cue_titles or {}).get(str(t.number)) or ct.get("title") or t.title or f"Track {i}"
         artist = ct.get("artist")
-        artist = _script(c["artist"] if artist and artist == c.get("_artist_from") else artist,
-                         c.get("_script", "keep")) or c["artist"]
+        artist = (cue_artists or {}).get(str(t.number)) or _script(
+            c["artist"] if artist and artist == c.get("_artist_from") else artist, c.get("_script", "keep")) or c["artist"]
         nxt = own.tracks[i].start if i < len(own.tracks) else None
         # the first track starts at the very beginning of the image: audio before its INDEX 01 (a
         # pregap, "hidden" audio) is kept in it instead of being dropped (Codex review on #7). Gaps
@@ -318,6 +319,9 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
         for fid, title in (ov.get("titles") or {}).items():
             if int(fid) in tracks and title:
                 tracks[int(fid)]["title"] = title
+        for fid, artist in (ov.get("artists") or {}).items():     # per-track artist: as typed, no script rule
+            if int(fid) in tracks and artist:
+                tracks[int(fid)]["artist"] = artist
         adir = (album_dir(c["artist"], c["album"], c["year"]) if u["kind"] in ("album", "cue")
                 else f"{safe_component(c['artist'], 'Unknown Artist')}/Singles")
         # which disc of a set this unit is: the user's edit, else what the release mapping says
@@ -345,7 +349,8 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
             c["_disc"] = disc            # None: this unit holds the whole set (or it is unknown)
         new_stem_of = {}
         if u["kind"] == "cue":
-            _cue_items(con, u, c, adir, root_path, items, new_stem_of, ov.get("cue_titles") or {}, notes)
+            _cue_items(con, u, c, adir, root_path, items, new_stem_of, ov.get("cue_titles") or {}, notes,
+                       ov.get("cue_artists") or {})
         for fid in ([] if u["kind"] == "cue" else json.loads(u["file_ids"])):
             f = con.execute("SELECT * FROM file WHERE id=?", (fid,)).fetchone()
             t = tracks.get(fid)

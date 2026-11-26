@@ -55,8 +55,9 @@ music-steward serve --root "/path/to/your/music"
 
 `serve` prints a one-time link (`http://127.0.0.1:…/?token=…`) and opens it in your browser.
 
-Next time: `cd music-steward && source .venv/bin/activate`, then the same `app` or `serve` command (`app` remembers
-your collection, so `--root` can be left out). `music-steward --version` shows the version.
+Next time: `cd music-steward && source .venv/bin/activate`, then `music-steward app` (or `serve`): both remember
+your collection folders, so `--root` is only needed to add one. If your music share is mounted under a new name, use
+*Settings → Collection folders → Change path…*. `music-steward --version` shows the version.
 
 **Recommended before recognizing:** an AcoustID key for audio fingerprints (free for non-commercial use) and optionally a
 Discogs token. Without them recognition still works, by names and durations only. See

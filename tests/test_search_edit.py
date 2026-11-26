@@ -94,3 +94,23 @@ def test_names_written_in_simplified_unless_the_user_typed_them(accepted, con, m
     con.commit()
     it = next(i for i in plan.load(con, plan.build(con, str(dest) + "3", 1))["items"] if i["kind"] == "audio")
     assert it["dest_rel"].startswith("鄧麗君/势不两立")         # typed by the user: kept as typed
+
+
+def test_per_track_artist_is_written_to_the_copy_and_the_album_cue(accepted, con, monkeypatch):
+    """A duet or a compilation: one track's artist differs from the album artist. Typed by the user: kept as typed."""
+    from music_steward.server import App
+    lib, dest = accepted
+    monkeypatch.setenv("MLT_ALBUM_CUE", "1")
+    app = App(con.execute("PRAGMA database_list").fetchone()[2], [str(lib)], None)
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    fid = con.execute("SELECT id FROM file WHERE relpath LIKE '%02 - x.mp3'").fetchone()[0]
+    r = app.edit_fields(con, {"unit_id": uid, "overrides": {"artists": {str(fid): " 周海晴 & 鄧麗君 ", "99999": "x", "abc": "y"}}})
+    assert r["overrides"] == {"artists": {str(fid): "周海晴 & 鄧麗君"}}       # only this album's files; trimmed
+    p = plan.load(con, plan.build(con, str(dest), 1))
+    by_file = {i["file_id"]: i for i in p["items"] if i["kind"] == "audio"}
+    assert by_file[fid]["tags"]["artist"] == "周海晴 & 鄧麗君"                 # not converted to Simplified
+    assert by_file[fid]["tags"]["albumartist"] == "周海晴"                    # the album artist is unchanged
+    assert next(i for f, i in by_file.items() if f != fid)["tags"]["artist"] == "周海晴"
+    assert by_file[fid]["dest_rel"].startswith("周海晴/")                      # the folder follows the album artist
+    sheet = next(i for i in p["items"] if i["kind"] == "cue_new")["tags"]["generated_text"]
+    assert 'PERFORMER "周海晴 & 鄧麗君"' in sheet

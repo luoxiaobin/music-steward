@@ -80,8 +80,10 @@ The candidate list shows where each field came from ("album from cue sheet · ye
 
 ### Fix names: Edit fields
 
-After accepting, open **Edit fields** to correct the album, album artist, year, disc number ("Disc 2 of 3") or any
-track title. What you type is used exactly as typed, also for the folder name.
+After accepting, open **Edit fields** to correct the album, album artist, year, disc number ("Disc 2 of 3"), any
+track title or any track's **artist** (a duet, a guest singer, a compilation of several singers). What you type is used
+exactly as typed, also for the folder name. A track's artist goes into that track's tags and the album's cue sheet;
+the album folder follows the album artist, so the album stays together.
 
 **Discs of one set** (separate folders `… CD1`, `… CD2`): give them the same album, album artist and year and each
 its own disc number; they go into one album folder.
@@ -177,3 +179,27 @@ listing every file with its original path and its organized copy, so you can res
 
 Interrupted (the app quit, the drive dropped)? **Finish setting aside** on the same card settles what was
 half-done: every file is either at its old place or in `_ORIGINALS`, never lost.
+
+## 12. When your collection folder moves
+
+Music Steward remembers every collection folder; starting it with `--root` adds one, it never hides the others.
+
+**Not connected.** If the drive or share is not mounted, the folder panel says *This collection folder is not
+connected*. Nothing is lost, and nothing that reads the folder can start. Connect it (Finder → Go → Connect to Server)
+and press **Check again**. If the same share is already mounted under another name (macOS sometimes mounts
+`/Volumes/music` as `/Volumes/music-1`), the notice shows that path and offers **Change path…**.
+
+**Change path…** (also in **Settings → Collection folders**) is for *the same collection at a new path*. Choose the
+new folder; the app compares up to 200 files it knows with the new folder (same place, same size — nothing is read
+or written there) and accepts it only if at least 90% match. Your albums, decisions and edits stay; the next scan
+reads only what differs. Afterwards *Retire originals* is off again for that folder, and plans made before the change
+cannot be applied any more: make a new plan. The change waits while a job is running, while a copy is unfinished
+(finish it with Resume or undo it), and while originals are still set aside in `_ORIGINALS` (restore or delete them
+first). From the command line: `music-steward collection list` and `music-steward collection set-path OLD NEW`.
+
+## 13. History
+
+**History** (in the header) lists every copy run, Resume, Retry failed and Undo, everything done to your originals
+(Retire, Restore, Archive, Delete) and every Change path, newest first, with the time, the albums and the folders.
+An album's details have a **History** section with its own lines. The list is kept on this Mac and cannot be edited;
+the journals described in [RECOVERY.md](RECOVERY.md) remain what Resume and Undo rely on.

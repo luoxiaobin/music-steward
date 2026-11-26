@@ -158,6 +158,20 @@ CREATE TABLE IF NOT EXISTS retired_file(
     PRIMARY KEY(batch_id, relpath)
 );
 
+-- history (history.py): one line per action that changed originals, copies or a collection folder's path;
+-- written after the action, never in its way (the journals are the truth for recovery)
+CREATE TABLE IF NOT EXISTS event(
+    id INTEGER PRIMARY KEY, at REAL NOT NULL,
+    kind TEXT NOT NULL,                 -- path_changed | run_applied | run_resumed | run_retried | run_undone |
+                                        -- retired | restored | archived | archive_stopped | deleted
+    root_id INTEGER, run_id INTEGER, batch_id INTEGER, detail_json TEXT
+);
+CREATE TABLE IF NOT EXISTS event_unit(
+    event_id INTEGER NOT NULL REFERENCES event(id), unit_id INTEGER NOT NULL,
+    PRIMARY KEY(event_id, unit_id)
+);
+CREATE INDEX IF NOT EXISTS event_unit_unit ON event_unit(unit_id);
+
 CREATE TABLE IF NOT EXISTS dir_note(
     root_id INTEGER NOT NULL, relpath TEXT NOT NULL, note TEXT NOT NULL, detail TEXT,
     last_scan INTEGER,
@@ -178,7 +192,10 @@ ADDED_COLUMNS = [("file", "audio_offset", "INTEGER"), ("file", "content_note", "
                  # where the collection folder really was when originals were set aside (retire.py)
                  ("retire_batch", "root_real", "TEXT"),
                  # Archive and Delete of the parked originals (ADR 0003): JSON records
-                 ("retire_batch", "archive_json", "TEXT"), ("retire_batch", "delete_json", "TEXT")]
+                 ("retire_batch", "archive_json", "TEXT"), ("retire_batch", "delete_json", "TEXT"),
+                 # the network share behind a collection folder, to suggest its new mount point (ADR 0004 §12);
+                 # host and share name only, never a user name or password
+                 ("root", "share_host", "TEXT"), ("root", "share_name", "TEXT"), ("root", "share_sub", "TEXT")]
 
 
 _READY: set[str] = set()   # databases already set up by this process

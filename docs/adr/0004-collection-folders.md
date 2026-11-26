@@ -1,7 +1,9 @@
 # ADR 0004: Collection folders — changing, adding and hiding them
 
-* **Status:** Proposed (2026-11-21). Every decision below was settled with the owner in a design interview; this
-  record awaits the owner's approval before anything is built.
+* **Status:** Accepted (2026-11-24). Every decision below was settled with the owner in a design interview
+  (2026-11-21) and approved on 2026-11-24. **Built:** rules 5, 6 and 8–12 (*Change path*, *not connected*, `--root`
+  adds, share identity). **Later:** *Add* and *Hide* (rules 3–4, 13) and the folder switcher (14); rule 7 was built
+  with the lifecycle fixes (#16).
 * **Date:** 2026-11-21
 * **Deciders:** Kevin Luo
 
@@ -114,3 +116,18 @@ is mounted under another name (`/Volumes/music` → `/Volumes/music-1`) or the N
 * `--root` changes meaning (rule 5): noted in the CHANGELOG.
 * Work items, in order: finish *Folder check*, *Archive and Delete*; then the not-connected message and *Change path*
   with rules 6–12; later *Add* and *Hide*.
+
+## As built (2026-11-24)
+
+* `music_steward/collection.py` holds the checks; the app (*Settings → Collection folders*, the not-connected notice
+  above the folder tree) and `music-steward collection list | set-path OLD NEW` both use it.
+* The only stored path that changes is the collection folder's own (`root.path`). Plans hold full source paths, so a
+  plan made before the change is refused at Apply, Resume and Retry (`apply/runner.py: sources_moved`) — the old path
+  may by then be another share. Failed files of an old run are therefore not a blocker: *Retry failed* refuses them
+  afterwards, and a new plan copies them.
+* *Retire originals* still works for runs copied before the change: it verifies the organized copy against the audio
+  fingerprint recorded at copy time and moves the original found at the *current* path, after checking its identity.
+* A job that reads a collection folder (scan, recognize, copy, retire, restore, archive, delete) is refused while it
+  is not connected; *Undo run* is not, since it only touches the destination.
+* "A job is running" is known to the app that runs it; the command line cannot see a job running in an open app
+  window, so change the path in the app while it is open.

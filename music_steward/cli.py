@@ -6,7 +6,7 @@ import json
 import os
 import sys
 
-from . import audit, db, hashpass
+from . import audit, db, hashpass, history
 from .hashing import HashError, audio_hash, file_sha256
 from .paths import ext_of, nfc
 from .probe import ProbeError, probe
@@ -152,7 +152,9 @@ def cmd_apply(a):
     from .apply import runner
     con = db.connect(a.db)
     try:
-        print(json.dumps(runner.apply(con, a.plan, progress=_progress("applying")), indent=2, ensure_ascii=False))
+        res = runner.apply(con, a.plan, progress=_progress("applying"))
+        history.after_job(con, "apply", a.plan, res)
+        print(json.dumps(res, indent=2, ensure_ascii=False))
     except KeyboardInterrupt:   # applying again would start a second run: point to resume
         run = con.execute("SELECT MAX(id) FROM run WHERE plan_id=?", (a.plan,)).fetchone()[0]
         return _resume_hint(con, run)
@@ -162,14 +164,19 @@ def cmd_resume(a):
     from .apply import runner
     con = db.connect(a.db)
     try:
-        print(json.dumps(runner.resume(con, a.run), indent=2, ensure_ascii=False))
+        res = runner.resume(con, a.run)
+        history.after_job(con, "resume", a.run, res)
+        print(json.dumps(res, indent=2, ensure_ascii=False))
     except KeyboardInterrupt:
         return _resume_hint(con, a.run)
 
 
 def cmd_undo(a):
     from .apply import runner
-    print(json.dumps(runner.undo(db.connect(a.db), a.run), indent=2, ensure_ascii=False))
+    con = db.connect(a.db)
+    res = runner.undo(con, a.run)
+    history.after_job(con, "undo", a.run, res)
+    print(json.dumps(res, indent=2, ensure_ascii=False))
 
 
 def cmd_cache(a):
@@ -194,19 +201,60 @@ def cmd_app(a):
     except ImportError:
         sys.exit("the desktop window needs pywebview:  pip install -e '.[desktop]'  (or use: music-steward serve)")
     from .desktop import run
-    roots = a.root
-    if not roots:   # the collection(s) this database already knows
-        con = db.connect(a.db)
-        roots = [r[0] for r in con.execute("SELECT path FROM root ORDER BY id")]
-        con.close()
-    if not roots:
-        sys.exit("no collection yet: run  music-steward app --root /path/to/music")
-    run(a.db, roots, dest=a.dest, debug=a.debug)
+    _need_a_collection(a, "app")
+    run(a.db, a.root, dest=a.dest, debug=a.debug)
+
+
+def _need_a_collection(a, cmd):
+    """--root adds to the collection folders the database knows; it never hides one (ADR 0004 §5)."""
+    con = db.connect(a.db)
+    known = con.execute("SELECT count(*) FROM root").fetchone()[0]
+    con.close()
+    if not known and not a.root:
+        sys.exit(f"no collection yet: run  music-steward {cmd} --root /path/to/music")
 
 
 def cmd_serve(a):
     from .server import serve
+    _need_a_collection(a, "serve")
     serve(a.db, a.root, port=a.port, open_browser=not a.no_browser, dest=a.dest)
+
+
+def cmd_collection(a):
+    """List the collection folders, or change the path of one (ADR 0004): the same checks as the app."""
+    from . import collection
+    con = db.connect(a.db)
+    rows = con.execute("SELECT id, path FROM root ORDER BY id").fetchall()
+    if a.action == "list":
+        for r in rows:
+            d = collection.describe(con, r["id"])
+            print(f"{r['id']:3}  {'connected    ' if d['connected'] else 'NOT CONNECTED'}  {r['path']}"
+                  + (f"\n     the same share is now at: {d['suggestion']}" if d["suggestion"] else ""))
+        return 0
+    if not a.old or not a.new:
+        sys.exit("usage: music-steward collection set-path OLD NEW")
+    old = nfc(os.path.abspath(os.path.expanduser(a.old)))
+    rid = next((r["id"] for r in rows if r["path"] == old or str(r["id"]) == a.old), None)
+    if rid is None:
+        sys.exit(f"not a collection folder: {a.old}  (see: music-steward collection list)")
+    c = collection.check(con, rid, a.new)
+    for b in c["blockers"]:
+        print("blocked:", b["message"], b.get("detail") or "", file=sys.stderr)
+    if c["result"]:
+        print(c["result"]["message"], c["result"].get("detail") or "", file=sys.stderr)
+    if not c["ok"]:
+        return 1
+    if not a.yes:
+        ans = input(f"Change the path of this collection folder\n  from {c['old_path']}\n  to   {c['path']}\n? [y/N] ")
+        if ans.strip().lower() not in ("y", "yes"):
+            print("nothing changed", file=sys.stderr)
+            return 1
+    try:
+        r = collection.set_path(con, rid, a.new)
+    except collection.CollectionError as e:
+        sys.exit(str(e))
+    print(r["done"]["message"].replace(" Scan now?", f" Scan it with:  music-steward scan {r['path']}"))
+    return 0
 
 
 def main(argv=None):
@@ -281,17 +329,27 @@ def main(argv=None):
     ca.set_defaults(func=cmd_cache)
 
     ap_ = sub.add_parser("app", help="open Music Steward in its own desktop window")
-    ap_.add_argument("--root", action="append", default=[], help="collection folder (repeatable)")
+    ap_.add_argument("--root", action="append", default=[],
+                     help="add a collection folder to the ones already known (repeatable)")
     ap_.add_argument("--dest", help="default destination folder")
     ap_.add_argument("--debug", action="store_true", help="web inspector")
     ap_.set_defaults(func=cmd_app)
 
     sv = sub.add_parser("serve", help="local web UI (127.0.0.1 only, token-protected)")
-    sv.add_argument("--root", action="append", required=True, help="a folder the UI may browse (repeatable)")
+    sv.add_argument("--root", action="append", default=[],
+                    help="add a collection folder to the ones already known (repeatable)")
     sv.add_argument("--port", type=int, default=0, help="default: a random free port")
     sv.add_argument("--no-browser", action="store_true")
     sv.add_argument("--dest", help="default destination folder for organized copies (outside every root)")
     sv.set_defaults(func=cmd_serve)
+
+    co = sub.add_parser("collection", help="collection folders: list them, or set-path OLD NEW when the same "
+                        "collection is now at another path (e.g. a share mounted under a new name)")
+    co.add_argument("action", choices=("list", "set-path"))
+    co.add_argument("old", nargs="?", help="the collection folder's current path (or its number from list)")
+    co.add_argument("new", nargs="?", help="where the same collection is now")
+    co.add_argument("--yes", action="store_true", help="do not ask for confirmation")
+    co.set_defaults(func=cmd_collection)
 
     a = ap.parse_args(argv)
     try:

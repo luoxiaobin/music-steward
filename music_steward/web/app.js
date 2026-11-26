@@ -60,7 +60,8 @@ async function loadState() {
   const root = st.roots.find(r => r.root_id === S.rootId) || st.roots[0];
   S.root = root;
   document.getElementById("rootChip").textContent =
-    root ? `Root: ${root.path}${root.available ? "" : " (not available)"} · sources read-only` : "No root configured";
+    root ? `Collection folder: ${root.path}${root.available ? "" : " (not connected)"} · sources read-only` : "No collection folder yet";
+  renderConn(root);
   renderInventory(st);
   renderFilters();
   renderScan(st.scan);
@@ -490,15 +491,19 @@ function renderUnitDetail(d) {
   const accepted = d.decision && d.decision.action === "accept" && d.decision.candidate_id === chosen?.id;
   const ov = accepted && d.decision.overrides_json ? JSON.parse(d.decision.overrides_json) : {};
   if (accepted && chosen) {
-    const inp = (id, val, ph, w) => h("input", { type: "text", id, value: val ?? "", placeholder: ph ?? "",
+    // the placeholders are the release's own values (titles, artists): data, never translated
+    const inp = (id, val, ph, w) => h("input", { type: "text", id, value: val ?? "", placeholder: ph ?? "", "data-no-translate": "",
                                                  style: `font:14px var(--font);min-height:32px;padding:0 8px;border:1px solid var(--btn-line);border-radius:6px;width:${w || "100%"}` });
+    // per-track artist: empty keeps the release's track artist (or the album artist), shown greyed
     const titles = d.kind === "cue"
       ? chosen.tracks.map(t => h("tr", {},
           h("td", { class: "mono" }, `Track ${String(t.cue_track).padStart(2, "0")}`),
-          h("td", {}, inp(`ct-${t.cue_track}`, ov.cue_titles?.[String(t.cue_track)] ?? "", t.title))))
+          h("td", {}, inp(`ct-${t.cue_track}`, ov.cue_titles?.[String(t.cue_track)] ?? "", t.title)),
+          h("td", {}, inp(`ca-${t.cue_track}`, ov.cue_artists?.[String(t.cue_track)] ?? "", t.artist || chosen.artist))))
       : chosen.tracks.map(t => h("tr", {},
           h("td", { class: "mono" }, (files[t.file_id]?.relpath || "").split("/").pop()),
-          h("td", {}, inp(`t-${t.file_id}`, ov.titles?.[String(t.file_id)] ?? "", t.title))));
+          h("td", {}, inp(`t-${t.file_id}`, ov.titles?.[String(t.file_id)] ?? "", t.title)),
+          h("td", {}, inp(`a-${t.file_id}`, ov.artists?.[String(t.file_id)] ?? "", t.artist || chosen.artist))));
     const media = [...new Set(chosen.tracks.map(t => t.medium).filter(Boolean))];
     parts.push(h("details", { open: Object.keys(ov).length ? true : null },
       h("summary", { class: "strong", style: "cursor:pointer" }, "Edit fields" + (Object.keys(ov).length ? " · edited" : "")),
@@ -511,19 +516,24 @@ function renderUnitDetail(d) {
           h("td", {}, inp("e-disc", ov.disc, media.length === 1 ? media[0] : "", "5em"), " of ",
             inp("e-discs", ov.discs, chosen.mediums > 1 ? chosen.mediums : "", "5em"),
             h("div", { class: "muted xsmall" }, "Discs of one set: give them the same album, album artist and year, and each its own disc number. They are put in one album folder."))))),
-      h("table", { class: "kv" }, h("thead", {}, h("tr", {}, h("th", {}, "File"), h("th", {}, "Title"))), h("tbody", {}, titles)),
+      h("table", { class: "kv" }, h("thead", {}, h("tr", {}, h("th", {}, "File"), h("th", {}, "Title"), h("th", {}, "Artist"))), h("tbody", {}, titles)),
       h("div", { style: "display:flex;gap:8px;align-items:center;margin-top:8px" },
         h("button", { type: "button", class: "btn", onclick: async () => {
-          const t = {};
-          const ct = {};
+          const t = {}, ct = {}, a = {}, ca = {};
+          const val = id => document.getElementById(id).value;
           for (const tr of chosen.tracks) {
-            if (d.kind === "cue") { const v = document.getElementById(`ct-${tr.cue_track}`).value; if (v.trim()) ct[tr.cue_track] = v; }
-            else { const v = document.getElementById(`t-${tr.file_id}`).value; if (v.trim()) t[tr.file_id] = v; }
+            if (d.kind === "cue") {
+              if (val(`ct-${tr.cue_track}`).trim()) ct[tr.cue_track] = val(`ct-${tr.cue_track}`);
+              if (val(`ca-${tr.cue_track}`).trim()) ca[tr.cue_track] = val(`ca-${tr.cue_track}`);
+            } else {
+              if (val(`t-${tr.file_id}`).trim()) t[tr.file_id] = val(`t-${tr.file_id}`);
+              if (val(`a-${tr.file_id}`).trim()) a[tr.file_id] = val(`a-${tr.file_id}`);
+            }
           }
           const r = await post2("/api/edit", { unit_id: d.id, overrides: { album: document.getElementById("e-album").value,
             albumartist: document.getElementById("e-aa").value, year: document.getElementById("e-year").value,
             disc: document.getElementById("e-disc").value, discs: document.getElementById("e-discs").value,
-            titles: t, cue_titles: ct } });
+            titles: t, cue_titles: ct, artists: a, cue_artists: ca } });
           document.getElementById("editMsg").textContent = r.error || "Saved.";
           if (!r.error) selectUnit(d.id);
         } }, "Save edits"),
@@ -597,6 +607,8 @@ function renderUnitDetail(d) {
   if (onl.length > nOnl) list.append(h("button", { type: "button", class: "linkbtn",
     onclick: () => { S.allCands = d.id; renderUnitDetail(d); } }, `Show ${onl.length - nOnl} more candidates`));
   parts.unshift(bar);
+  if ((d.history || []).length) parts.push(h("details", {}, h("summary", { class: "strong", style: "cursor:pointer" }, "History"),
+    historyList(d.history, false)));
   parts.push(h("p", { class: "muted xsmall" }, "Decisions are saved immediately. Nothing is copied or changed until you apply a plan."));
   document.getElementById("details").replaceChildren(...parts.filter(Boolean));
 }
@@ -751,6 +763,115 @@ document.getElementById("recognizeBtn").addEventListener("click", async () => {
 })().catch(e => { document.getElementById("tableTitle").textContent = "Error: " + e.message; });
 
 
+// ---------------------------------------------------------------- history (music_steward/history.py)
+// What changed originals, copies or a collection folder's path, newest first. The message is interface text; album
+// names and paths are data.
+function historyList(lines, withAlbums) {
+  if (!lines.length) return h("p", { class: "muted small" }, "Nothing has been copied, set aside or changed yet.");
+  return h("ul", { class: "history" }, lines.map(e => h("li", {},
+    h("span", { class: "muted xsmall" }, new Date(e.at * 1000).toLocaleString()), " ",
+    h("span", { class: "small" }, e.message),
+    e.old_path ? h("div", { class: "mono xsmall", "data-no-translate": "" }, `${e.old_path} → ${e.new_path}`) : null,
+    e.dest ? h("div", { class: "mono xsmall", "data-no-translate": "" }, e.dest) : null,
+    withAlbums && e.albums.length ? h("div", { class: "xsmall muted" },
+      h("span", { "data-no-translate": "" }, e.albums.join(" · ")),
+      e.n_albums > e.albums.length ? ` +${e.n_albums - e.albums.length}` : "") : null)));
+}
+async function openHistory() {
+  const lines = await api("/api/history");
+  const dlg = h("dialog", { class: "appdialog settings" },
+    h("h2", { class: "h2" }, "History"),
+    h("p", { class: "muted xsmall" }, "Every copy run, undo, and change to your originals or to a collection folder's path. " +
+      "Kept on this Mac; nothing here can be changed."),
+    h("div", { style: "max-height:60vh;overflow:auto" }, historyList(lines, true)),
+    h("div", { class: "btnrow" }, h("button", { type: "button", class: "btn btn-primary", onclick: () => { dlg.close(); dlg.remove(); } }, "Close")));
+  dlg.addEventListener("cancel", e => { e.preventDefault(); dlg.close(); dlg.remove(); });
+  document.body.append(dlg);
+  dlg.showModal();
+}
+document.getElementById("historyBtn").addEventListener("click", openHistory);
+
+// ---------------------------------------------------------------- collection folders (ADR 0004)
+// A collection folder whose drive or share is not mounted: say so, offer the share's new place when the
+// same share is mounted elsewhere, Change path…, and Check again. Nothing about the folder is lost.
+function renderConn(root) {
+  const box = document.getElementById("connNote");
+  if (!root || root.available || !root.root_id) { box.hidden = true; box.replaceChildren(); return; }
+  box.hidden = false;
+  box.replaceChildren(...[
+    h("p", { class: "small" }, "This collection folder is not connected. If the share is now mounted somewhere else, use " +
+      "Change path… below. Otherwise connect it (Finder → Go → Connect to Server) and press Check again."),
+    h("p", { class: "mono small", "data-no-translate": "" }, root.path),
+    root.suggestion ? h("p", { class: "small" }, "The same share is now at this path. Change path to it?", " ",
+      h("span", { class: "mono", "data-no-translate": "" }, root.suggestion)) : null,
+    h("div", { class: "btnrow" },
+      h("button", { type: "button", class: "btn", onclick: () => refreshAll() }, "Check again"),
+      h("button", { type: "button", class: "btn" + (root.suggestion ? " btn-primary" : ""),
+        onclick: () => changePathDialog(root.root_id, root.path, root.suggestion) }, "Change path…"))].filter(Boolean));
+}
+
+async function changePathDialog(rootId, oldPath, suggested) {
+  const input = h("input", { type: "text", id: "cpPath", value: suggested || "", placeholder: "/Volumes/music" });
+  const out = h("div", { class: "small", style: "margin-top:8px;min-height:18px" });
+  const msg = h("p", { class: "err" });
+  let checked = null, seq = 0;
+  const go = h("button", { type: "button", class: "btn btn-primary", disabled: true, onclick: async () => {
+    go.disabled = true;
+    const r = await post2("/api/collection_path", { root_id: rootId, path: input.value });
+    if (r.error) { msg.textContent = r.error; return; }
+    close();
+    S.rootId = rootId;
+    await refreshAll();
+    if (await ask(r.done.message, "Scan now")) startScan();
+  } }, "Change path");
+  const fchk = folderCheck(input, "any", () => {});
+  const check = async () => {
+    const mine = ++seq;
+    checked = null; go.disabled = true; msg.textContent = "";
+    if (!input.value.trim()) { out.replaceChildren(); return; }
+    out.replaceChildren(h("span", { class: "muted" }, "Comparing files…"));
+    let r;
+    try { r = await api(`/api/collection_check?root_id=${rootId}&path=${encodeURIComponent(input.value)}`); }
+    catch (e) { r = { error: String(e) }; }
+    if (mine !== seq) return;
+    if (r.error) { out.replaceChildren(h("span", { class: "err" }, r.error)); return; }
+    checked = r;
+    const res = r.result;
+    out.replaceChildren(...[
+      res ? h("div", {}, h("span", { class: res.code.startsWith("accepted") ? "ok" : "err", style: "font-weight:600" }, res.code.startsWith("accepted") ? "✓ " : "✗ "),
+              h("span", {}, res.message),
+              res.detail ? h("span", { class: "mono", "data-no-translate": "" }, " " + res.detail) : null) : null,
+      ...r.blockers.map(b => h("div", { class: "err" }, "✗ ", h("span", {}, b.message),
+        b.detail ? h("span", { class: "mono", "data-no-translate": "" }, " " + b.detail) : null))].filter(Boolean));
+    go.disabled = !r.ok;
+  };
+  let timer = null;
+  input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(check, 500); });
+  const dlg = h("dialog", { class: "appdialog settings" },
+    h("h2", { class: "h2" }, "Change path…"),
+    h("p", { class: "small" }, "Use this when the same collection is now at another path, for example a share mounted under a new name. " +
+      "Music Steward compares up to 200 known files with the new folder; nothing is read or written there."),
+    h("div", { class: "small" }, "Current path: ", h("span", { class: "mono", "data-no-translate": "" }, oldPath)),
+    h("h3", {}, h("label", { for: "cpPath" }, "New path")),
+    h("div", { style: "display:flex;gap:8px" }, input, chooseButton(input)),
+    fchk.el, out, msg,
+    h("div", { class: "btnrow" },
+      h("button", { type: "button", class: "btn", onclick: () => close() }, "Cancel"), go));
+  const close = () => { dlg.close(); dlg.remove(); };
+  dlg.addEventListener("cancel", e => { e.preventDefault(); close(); });
+  document.body.append(dlg);
+  dlg.showModal();
+  if (input.value) check();
+}
+
+function collectionList(d, onChange) {
+  return h("div", { class: "collist" }, (d.collections || []).map(c => h("div", { class: "colrow" },
+    h("span", { class: "mono small", "data-no-translate": "" }, c.path),
+    h("span", { class: "small " + (c.connected ? "ok" : "warn") }, c.connected ? "Connected" : "Not connected"),
+    h("button", { type: "button", class: "btn", onclick: () => { onChange(); changePathDialog(c.id, c.path, c.suggestion); } },
+      "Change path…"))));
+}
+
 // ---------------------------------------------------------------- settings
 async function openSettings() {
   const d = await api("/api/settings");
@@ -773,6 +894,10 @@ async function openSettings() {
          ["fr-ca", "Français (Canada)"], ["es-us", "Español (EE. UU.)"]].map(([val, label]) =>
           h("option", { value: val, selected: v("language") === val ? true : null }, val === "auto" ? tr(label) : label))),
       envNote("language")),
+    h("section", {}, h("h3", {}, "Collection folders"),
+      h("div", { class: "muted xsmall" }, "The folders Music Steward scans. They are only read. If one is now at another path, " +
+        "for example a share mounted under a new name, choose Change path…: your albums and decisions stay."),
+      collectionList(d, () => { dlg.close(); dlg.remove(); })),
     h("section", {}, h("h3", {}, "Names in the organized copies"),
       radios("script", [["simplified", "Simplified Chinese", "one folder per artist (鄧麗君 → 邓丽君)"],
                         ["traditional", "Traditional Chinese"], ["keep", "As each release has it"]]), envNote("script")),

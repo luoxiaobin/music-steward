@@ -35,7 +35,7 @@ stateDiagram-v2
   [*] --> Listed: named with --root
   Listed --> Scanned: first complete scan
   Scanned --> Scanned: scan (complete, aborted or interrupted)
-  Scanned --> Scanned: change path ◇
+  Scanned --> Scanned: change path ✓
   Scanned --> Hidden: hide ◇
   Hidden --> Scanned: show, or add the same path ◇
 ```
@@ -44,9 +44,9 @@ stateDiagram-v2
 |---|---|---|
 | Listed ✓ / Added ◇ | owner | registered only; nothing read, nothing scanned; Retire off |
 | Scanned ✓ | owner | inventory refreshed; an *aborted* or *interrupted* scan marks nothing removed |
-| Disconnected / reconnected ✓ (observed) | the drive | ◇ shown as *not connected*, writing actions disabled, nothing removed |
+| Disconnected / reconnected ✓ (observed) | the drive | shown as *not connected* (with the share's new mount point, if it has one), every action that reads it disabled, nothing removed |
 | Retire allowed / not allowed ✓ | owner | per folder, off by default |
-| Path changed ◇ | owner | same collection, new path: decisions kept, Retire back to off, history entry |
+| Path changed ✓ | owner | same collection, new path: decisions kept, Retire back to off, history entry; plans made before it are not applied |
 | Hidden / shown ◇ | owner | stop / resume showing and scanning; everything kept |
 
 **Never:** the app writes to it (except the fenced *Retire*); removes it by itself; lets two collection folders overlap ◇.
@@ -182,11 +182,12 @@ Stopped → Complete* with some albums *kept* when their checks fail. Neither ch
 * **Retired album.** An album whose originals are parked keeps its decision and is shown as "Organized · originals set
   aside"; it is left out of Recognize and of new plans; Restore returns it to *Done*; after Delete it reads
   "originals deleted" (final).
-* **History.** One readable list of events, each with time, kind and album: path changed, run applied / undone / resumed,
-  originals retired, restored, archived, deleted.
+* **History** ✓ (`history.py`). One readable list of events, each with time, kind and album: path changed, run
+  applied / undone / resumed / retried, originals retired, restored, archived, deleted. Written after the action from
+  what it reported; it never blocks or fails one. *Removing a not-found album* (below) will add a line when built.
 * **Manual information.** An album with *No match* stays; its own information can be accepted and every field edited
-  (album, album artist, year, disc, track titles). **Gap:** a per-track artist (singer) cannot be edited yet; it is
-  needed for compilations and collections of singles.
+  (album, album artist, year, disc, track titles, and each track's artist, for compilations and collections of
+  singles).
 
 * **Removing a not-found album.** The warning is never resolved by the app. The owner chooses, per album or for all
   not-found albums of a folder: **Leave for now** (the default; nothing changes, the warning stays, the decision is
