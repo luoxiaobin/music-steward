@@ -44,6 +44,16 @@ MESSAGES = {
     "unfinished_run": "A copy is unfinished. Finish it (Resume) or undo it first. Run:",
     "parked": "Originals are still set aside in _ORIGINALS. Restore or delete them first.",
     "done": "Path changed. Retire originals is off for this folder again. Scan now?",
+    # adding and hiding (ADR 0004 §3, 4, 13)
+    "add_ok": "This folder can be added. Nothing is read until you scan it.",
+    "add_inside": "This folder is already inside a collection folder, so it needs no folder of its own. Open it there:",
+    "add_contains": "This folder contains a collection folder, so it cannot be added. Collection folder:",
+    "add_dest": "This folder is, or overlaps, your default destination folder, where organized copies are written:",
+    "add_hidden": "This is a hidden collection folder. Adding it shows it again, with its albums and decisions.",
+    "added": "Collection folder added. Retire originals is off for it. Scan now?",
+    "shown": "Collection folder shown again, with its albums and decisions.",
+    "hide_last": "This is the only collection folder shown. Add or show another one first.",
+    "is_hidden": "This collection folder is hidden. Show it again first (Settings → Collection folders).",
     "unknown": "No such collection folder.",
 }
 
@@ -108,7 +118,7 @@ def suggestion(con: sqlite3.Connection, root_id: int) -> str | None:
 def describe(con: sqlite3.Connection, root_id: int) -> dict:
     r = _row(con, root_id)
     ok = connected(r["path"])
-    return {"id": r["id"], "path": r["path"], "connected": ok,
+    return {"id": r["id"], "path": r["path"], "connected": ok, "hidden": bool(r["hidden"]),
             "message": None if ok else MESSAGES["not_connected"],
             "suggestion": None if ok else suggestion(con, root_id),
             "retire_allowed": settings.retire_allowed(con, r["id"]),
@@ -241,3 +251,91 @@ def set_path(con: sqlite3.Connection, root_id: int, text: str, job: dict | None 
     con.commit()
     remember_share(con, root_id, c["path"])
     return {**c, "changed": True, "done": _msg("done")}
+
+
+# ---- adding, hiding, showing (ADR 0004 §3, 4, 13) -----------------------------------------------------------
+def _clean(text: str) -> str:
+    return nfc(os.path.abspath(os.path.expanduser((text or "").strip().strip("\"'").strip())))
+
+
+def check_add(con: sqlite3.Connection, text: str) -> dict:
+    """Can this folder be added as a collection folder? Changes nothing. {ok, path, result, hidden_id, inside}."""
+    out = {"ok": False, "path": None, "result": None, "hidden_id": None, "inside": None}
+    fc = folders.check_folder(con, text, "any")
+    if fc["level"] == "empty":
+        return out
+    if fc["level"] == "error":
+        out["result"] = {"code": "folder", "message": fc["message"], "detail": fc.get("detail"),
+                         "suggestion": fc.get("suggestion")}
+        return out
+    if not fc["exists"]:
+        out["result"] = _msg("missing")
+        return out
+    new = _clean(text)
+    out["path"] = new
+    real = os.path.realpath(new)
+    for o in con.execute("SELECT id, path, hidden FROM root ORDER BY id"):          # hidden ones count too
+        o_real = os.path.realpath(o["path"])
+        if new == o["path"] or real == o_real:
+            if o["hidden"]:
+                out.update(ok=True, hidden_id=o["id"], result=_msg("add_hidden"))
+            else:
+                out["result"] = _msg("already_registered", o["path"])
+            return out
+        if _inside(real, o_real):
+            sub = os.path.relpath(real, o_real)
+            out["inside"] = {"root_id": o["id"], "path": o["path"], "sub": nfc(sub), "hidden": bool(o["hidden"])}
+            out["result"] = _msg("add_inside", os.path.join(o["path"], sub))
+            return out
+        if _inside(o_real, real):
+            out["result"] = _msg("add_contains", o["path"])
+            return out
+    dest = settings.get(con, "dest")
+    if dest:
+        d = os.path.realpath(dest)
+        if _inside(real, d) or _inside(d, real):
+            out["result"] = _msg("add_dest", dest)
+            return out
+    out.update(ok=True, result=_msg("add_ok"))
+    return out
+
+
+def add(con: sqlite3.Connection, text: str) -> dict:
+    """Register a collection folder. Reads nothing, writes nothing there and does not scan (ADR 0004 §4). A new one
+    starts with Retire originals off; adding the path of a hidden one shows it again."""
+    c = check_add(con, text)
+    if not c["ok"]:
+        why = c["result"]
+        raise CollectionError(why["message"] + (f" {why['detail']}" if why.get("detail") else "") if why
+                              else "choose a folder")
+    if c["hidden_id"]:
+        con.execute("UPDATE root SET hidden=NULL WHERE id=?", (c["hidden_id"],))
+        con.commit()
+        return {**c, "root_id": c["hidden_id"], "done": _msg("shown")}
+    rid = con.execute("INSERT INTO root(path, added_at) VALUES(?,?)", (c["path"], time.time())).lastrowid
+    con.execute("INSERT OR REPLACE INTO meta VALUES(?, 'off')", (f"setting:retire_root:{int(rid)}",))
+    con.commit()
+    return {**c, "root_id": rid, "done": _msg("added")}
+
+
+def set_hidden(con: sqlite3.Connection, root_id: int, hidden: bool, job: dict | None = None) -> dict:
+    """Hide: stop showing and scanning it; keep everything (ADR 0004 §13). Show: bring it all back."""
+    r = _row(con, root_id)
+    if hidden:
+        if job and job.get("running"):
+            raise CollectionError(MESSAGES["job_running"] + f" {job.get('kind')}")
+        shown = con.execute("SELECT count(*) FROM root WHERE hidden IS NULL OR hidden=0").fetchone()[0]
+        if not r["hidden"] and shown <= 1:
+            raise CollectionError(MESSAGES["hide_last"])
+    con.execute("UPDATE root SET hidden=? WHERE id=?", (1 if hidden else None, root_id))
+    con.commit()
+    return describe(con, root_id)
+
+
+def shown_paths(con: sqlite3.Connection) -> list[str]:
+    return [r[0] for r in con.execute("SELECT path FROM root WHERE hidden IS NULL OR hidden=0 ORDER BY id")]
+
+
+def is_hidden(con: sqlite3.Connection, path: str) -> bool:
+    r = con.execute("SELECT hidden FROM root WHERE path=?", (nfc(path),)).fetchone()
+    return bool(r and r["hidden"])

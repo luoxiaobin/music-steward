@@ -658,7 +658,9 @@ TABLE: list[tuple[str, str, str, str]] = [
     ("Use this path", "使用此路径", "Utiliser ce chemin", "Usar esta ruta"),
     ("{size} free", "剩余 {size}", "{size} libres", "{size} libres"),
     ("This is where the organized copies are written, not the folder to scan. The folders Music Steward scans are your collection folders: ", "这是整理后的副本的写入位置，不是要扫描的文件夹。Music Steward 扫描的是您的收藏文件夹：", "C'est l'endroit où les copies organisées sont écrites, pas le dossier à analyser. Les dossiers que Music Steward analyse sont vos dossiers de collection : ", "Aquí se escriben las copias organizadas, no es la carpeta que se escanea. Las carpetas que Music Steward escanea son sus carpetas de colección: "),
-    ("To add another, start the app with --root and the folder's path.", "要添加其他收藏文件夹，请用 --root 加上文件夹路径来启动应用。", "Pour en ajouter un autre, démarrez l'application avec --root et le chemin du dossier.", "Para añadir otra, inicie la aplicación con --root y la ruta de la carpeta."),
+    ("To add another, use Add… under Collection folders above.", "要添加其他收藏文件夹，请使用上方“收藏文件夹”中的“添加…”。",
+     "Pour en ajouter un autre, utilisez Ajouter… sous Dossiers de la collection, plus haut.",
+     "Para añadir otra, use Añadir… en Carpetas de la colección, más arriba."),
     # README written into every folder of retired originals (retire.py); no placeholders: dynamic facts
     # go on their own "label: value" lines
     ("ORIGINAL FILES — set aside by Music Steward", "原始文件 — 由 Music Steward 收起", "FICHIERS ORIGINAUX — mis de côté par Music Steward",
@@ -890,6 +892,62 @@ TABLE: list[tuple[str, str, str, str]] = [
      "Archivo detenido: {n} archivos originales apartados copiados hasta ahora"),
     ("Deleted {n} parked original files", "已删除 {n} 个搁置的原始文件", "{n} fichiers originaux mis de côté supprimés",
      "Se eliminaron {n} archivos originales apartados"),
+    # ---- adding, hiding, showing collection folders (ADR 0004)
+    ("Collection folder:", "收藏文件夹：", "Dossier de la collection :", "Carpeta de la colección:"),
+    ("(not connected)", "（未连接）", "(non connecté)", "(no conectada)"),
+    ("Collection folder", "收藏文件夹", "Dossier de la collection", "Carpeta de la colección"),
+    ("Hide", "隐藏", "Masquer", "Ocultar"),
+    ("Hidden", "已隐藏", "Masqué", "Oculta"),
+    ("Add…", "添加…", "Ajouter…", "Añadir…"),
+    ("Add", "添加", "Ajouter", "Añadir"),
+    ("Open it", "打开它", "L'ouvrir", "Abrirla"),
+    ("Folder", "文件夹", "Dossier", "Carpeta"),
+    ("Add a collection folder", "添加收藏文件夹", "Ajouter un dossier de collection", "Añadir una carpeta de la colección"),
+    ("Another folder of music to look after, for example a second share or a USB drive. Adding it only registers it: "
+     "nothing is read until you scan it, and Retire originals is off for it.",
+     "另一个需要管理的音乐文件夹，例如第二个共享或 USB 硬盘。添加只是登记它：在你扫描之前不会读取任何内容，并且对它关闭“整理原始文件”。",
+     "Un autre dossier de musique à prendre en charge, par exemple un deuxième partage ou un disque USB. L'ajouter ne fait "
+     "que l'enregistrer : rien n'est lu avant que vous l'analysiez, et Mettre les originaux de côté est désactivé pour lui.",
+     "Otra carpeta de música que cuidar, por ejemplo un segundo recurso compartido o un disco USB. Añadirla solo la "
+     "registra: no se lee nada hasta que la escanee, y Apartar los originales está desactivado para ella."),
+    ("Hide this collection folder? It is no longer shown or scanned. Its albums, decisions, plans and history are kept, "
+     "and Show brings everything back.", "隐藏此收藏文件夹？它将不再显示或扫描。它的专辑、决定、计划和历史记录都会保留，“显示”可恢复一切。",
+     "Masquer ce dossier de collection? Il n'est plus affiché ni analysé. Ses albums, décisions, plans et historique sont "
+     "conservés, et Afficher rétablit tout.",
+     "¿Ocultar esta carpeta de la colección? Ya no se muestra ni se escanea. Sus álbumes, decisiones, planes e historial "
+     "se conservan, y Mostrar lo recupera todo."),
+    ("This folder can be added. Nothing is read until you scan it.", "可以添加此文件夹。在你扫描之前不会读取任何内容。",
+     "Ce dossier peut être ajouté. Rien n'est lu avant que vous l'analysiez.",
+     "Esta carpeta se puede añadir. No se lee nada hasta que la escanee."),
+    ("This folder is already inside a collection folder, so it needs no folder of its own. Open it there:",
+     "此文件夹已在某个收藏文件夹之内，因此不需要单独添加。请在那里打开它：",
+     "Ce dossier se trouve déjà dans un dossier de collection; il n'a pas besoin d'être ajouté. Ouvrez-le là :",
+     "Esta carpeta ya está dentro de una carpeta de la colección, así que no necesita una propia. Ábrala allí:"),
+    ("This folder contains a collection folder, so it cannot be added. Collection folder:",
+     "此文件夹包含一个收藏文件夹，因此无法添加。收藏文件夹：",
+     "Ce dossier contient un dossier de collection; il ne peut pas être ajouté. Dossier de la collection :",
+     "Esta carpeta contiene una carpeta de la colección, así que no se puede añadir. Carpeta de la colección:"),
+    ("This folder is, or overlaps, your default destination folder, where organized copies are written:",
+     "此文件夹就是或重叠于你的默认目标文件夹（整理后的副本写入的位置）：",
+     "Ce dossier est, ou chevauche, votre dossier de destination par défaut, où les copies organisées sont écrites :",
+     "Esta carpeta es, o se superpone con, su carpeta de destino predeterminada, donde se escriben las copias organizadas:"),
+    ("This is a hidden collection folder. Adding it shows it again, with its albums and decisions.",
+     "这是一个已隐藏的收藏文件夹。添加它会重新显示它，连同它的专辑和决定。",
+     "C'est un dossier de collection masqué. L'ajouter l'affiche de nouveau, avec ses albums et ses décisions.",
+     "Es una carpeta de la colección oculta. Añadirla la vuelve a mostrar, con sus álbumes y decisiones."),
+    ("Collection folder added. Retire originals is off for it. Scan now?", "已添加收藏文件夹。它的“整理原始文件”已关闭。立即扫描吗？",
+     "Dossier de collection ajouté. Mettre les originaux de côté est désactivé pour lui. Analyser maintenant?",
+     "Carpeta de la colección añadida. Apartar los originales está desactivado para ella. ¿Escanear ahora?"),
+    ("Collection folder shown again, with its albums and decisions.", "收藏文件夹已重新显示，连同它的专辑和决定。",
+     "Dossier de collection affiché de nouveau, avec ses albums et ses décisions.",
+     "Carpeta de la colección mostrada de nuevo, con sus álbumes y decisiones."),
+    ("This is the only collection folder shown. Add or show another one first.", "这是唯一显示的收藏文件夹。请先添加或显示另一个。",
+     "C'est le seul dossier de collection affiché. Ajoutez-en ou affichez-en un autre d'abord.",
+     "Es la única carpeta de la colección que se muestra. Añada o muestre otra primero."),
+    ("This collection folder is hidden. Show it again first (Settings → Collection folders).",
+     "此收藏文件夹已隐藏。请先重新显示它（设置 → 收藏文件夹）。",
+     "Ce dossier de collection est masqué. Affichez-le d'abord (Paramètres → Dossiers de la collection).",
+     "Esta carpeta de la colección está oculta. Muéstrela primero (Configuración → Carpetas de la colección)."),
 ]
 
 

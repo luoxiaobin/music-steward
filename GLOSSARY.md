@@ -55,6 +55,10 @@ _Avoid_: retire, clean up
 A collection folder whose drive or share is not available on this Mac right now. Nothing about it is lost.
 _Avoid_: offline, missing, unavailable
 
+**Hidden**:
+A collection folder that is no longer shown or scanned. Its albums, decisions, plans and history are kept, and showing it again (or adding the same path) brings everything back.
+_Avoid_: removed, forgotten, deleted
+
 **Not found**:
 An exception raised on an album whose files are not at its collection folder's current location. The album and its decision are unchanged, and it clears when the files return.
 _Avoid_: missing, deleted, removed

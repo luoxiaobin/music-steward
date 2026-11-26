@@ -16,6 +16,13 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   copy is unfinished, and while originals are still set aside. Afterwards *Retire originals* is off again for that
   folder, a history entry records the change, and the app offers **Scan now**. Command line:
   `music-steward collection list` and `music-steward collection set-path OLD NEW`.
+- **Add and Hide collection folders** ([ADR 0004](docs/adr/0004-collection-folders.md)). *Settings → Collection
+  folders → Add…* registers another folder of music (a second share, a USB drive): nothing is read until you scan it,
+  and *Retire originals* is off for it. A folder inside a collection folder is not added (the app offers to open it
+  there), and one that contains a collection folder, or overlaps the default destination folder, is refused. **Hide**
+  stops showing and scanning a collection folder and keeps everything about it; **Show** (or adding the same path)
+  brings it all back. With more than one collection folder, the header has a switcher. Command line:
+  `music-steward collection add | hide | show PATH`.
 - **History**: one readable list of what changed your copies, your originals or a collection folder's path — each
   copy run, Resume, Retry failed and Undo, every Retire, Restore, Archive and Delete, and every Change path — with the
   time, the albums and the folders involved. **History** in the header shows them all; an album's details show its
@@ -37,6 +44,8 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 - The header says *Collection folder* instead of *Root*.
 
 ### Fixed
+- A scan of a folder that contains a collection folder no longer registers it as a second, overlapping collection
+  folder; it is refused.
 - In *Edit fields*, the greyed release values in the boxes (titles, artists) are no longer run through the interface
   translator: a title that happens to be an interface word is shown as it is.
 - **Setting originals aside no longer loses your decisions.** After *Retire originals*, a rescan followed by

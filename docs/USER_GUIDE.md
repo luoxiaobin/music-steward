@@ -197,6 +197,13 @@ cannot be applied any more: make a new plan. The change waits while a job is run
 (finish it with Resume or undo it), and while originals are still set aside in `_ORIGINALS` (restore or delete them
 first). From the command line: `music-steward collection list` and `music-steward collection set-path OLD NEW`.
 
+**More than one collection folder.** **Settings → Collection folders → Add…** adds another folder of music, such as a
+second share or a USB drive. Adding only registers it; scan it when you are ready (it can take hours for a big share).
+A folder that is already inside a collection folder needs no folder of its own: the app offers to open it there.
+With more than one collection folder, the header has a switcher; the app shows one at a time. **Hide** takes a folder
+out of view and out of scans without forgetting anything; **Show** brings it back. Command line:
+`music-steward collection add | hide | show PATH`.
+
 ## 13. History
 
 **History** (in the header) lists every copy run, Resume, Retry failed and Undo, everything done to your originals

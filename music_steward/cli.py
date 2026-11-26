@@ -228,8 +228,31 @@ def cmd_collection(a):
     if a.action == "list":
         for r in rows:
             d = collection.describe(con, r["id"])
-            print(f"{r['id']:3}  {'connected    ' if d['connected'] else 'NOT CONNECTED'}  {r['path']}"
+            state = "hidden       " if d["hidden"] else "connected    " if d["connected"] else "NOT CONNECTED"
+            print(f"{r['id']:3}  {state}  {r['path']}"
                   + (f"\n     the same share is now at: {d['suggestion']}" if d["suggestion"] else ""))
+        return 0
+    if a.action == "add":
+        if not a.old:
+            sys.exit("usage: music-steward collection add PATH")
+        try:
+            r = collection.add(con, a.old)
+        except collection.CollectionError as e:
+            sys.exit(str(e))
+        print(r["done"]["message"].replace(" Scan now?", "") + f"\n  scan it with:  music-steward scan {r['path']}")
+        return 0
+    if a.action in ("hide", "show"):
+        if not a.old:
+            sys.exit(f"usage: music-steward collection {a.action} PATH")
+        old = nfc(os.path.abspath(os.path.expanduser(a.old)))
+        rid = next((r["id"] for r in rows if r["path"] == old or str(r["id"]) == a.old), None)
+        if rid is None:
+            sys.exit(f"not a collection folder: {a.old}  (see: music-steward collection list)")
+        try:
+            collection.set_hidden(con, rid, a.action == "hide")
+        except collection.CollectionError as e:
+            sys.exit(str(e))
+        print(f"{'hidden' if a.action == 'hide' else 'shown'}: {old}  (albums, decisions and history are kept)")
         return 0
     if not a.old or not a.new:
         sys.exit("usage: music-steward collection set-path OLD NEW")
@@ -343,10 +366,11 @@ def main(argv=None):
     sv.add_argument("--dest", help="default destination folder for organized copies (outside every root)")
     sv.set_defaults(func=cmd_serve)
 
-    co = sub.add_parser("collection", help="collection folders: list them, or set-path OLD NEW when the same "
-                        "collection is now at another path (e.g. a share mounted under a new name)")
-    co.add_argument("action", choices=("list", "set-path"))
-    co.add_argument("old", nargs="?", help="the collection folder's current path (or its number from list)")
+    co = sub.add_parser("collection", help="collection folders: list; add PATH (registers only, scans nothing); "
+                        "hide / show PATH (everything is kept); set-path OLD NEW when the same collection is now "
+                        "at another path (e.g. a share mounted under a new name)")
+    co.add_argument("action", choices=("list", "add", "hide", "show", "set-path"))
+    co.add_argument("old", nargs="?", help="the folder to add, or a collection folder's path (or its number from list)")
     co.add_argument("new", nargs="?", help="where the same collection is now")
     co.add_argument("--yes", action="store_true", help="do not ask for confirmation")
     co.set_defaults(func=cmd_collection)
