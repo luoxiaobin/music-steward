@@ -27,8 +27,8 @@ SAMPLE = 200          # files compared at the new path
 NEEDED = 0.90         # share of them that must be there with the same size; there is no override (ADR 0004 §8)
 
 MESSAGES = {
-    "not_connected": "This collection folder is not connected. If the share is mounted somewhere else now, choose "
-                     "Change path…. Otherwise connect it (Finder → Go → Connect to Server) and press Check again.",
+    "not_connected": "This collection folder is not connected. If the share is now mounted somewhere else, use "
+                     "Change path… below. Otherwise connect it (Finder → Go → Connect to Server) and press Check again.",
     "share_elsewhere": "The same share is now at this path. Change path to it?",
     "accepted": "Checked {a} files: {b} are at the new path with the same size. Your albums and decisions stay. "
                 "The next scan updates the inventory.",

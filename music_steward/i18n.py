@@ -800,13 +800,13 @@ TABLE: list[tuple[str, str, str, str]] = [
      "sous un nouveau nom. Music Steward compare jusqu'à 200 fichiers connus avec le nouveau dossier; rien n'y est lu ni écrit.",
      "Use esto cuando la misma colección está ahora en otra ruta, por ejemplo un recurso compartido montado con otro "
      "nombre. Music Steward compara hasta 200 archivos conocidos con la carpeta nueva; allí no se lee ni se escribe nada."),
-    ("This collection folder is not connected. If the share is mounted somewhere else now, choose Change path…. "
+    ("This collection folder is not connected. If the share is now mounted somewhere else, use Change path… below. "
      "Otherwise connect it (Finder → Go → Connect to Server) and press Check again.",
-     "此收藏文件夹未连接。如果共享现在挂载在别处，请选择“更改路径…”。否则请先连接它（访达 → 前往 → 连接服务器），再按“再次检查”。",
-     "Ce dossier de la collection n'est pas connecté. Si le partage est maintenant monté ailleurs, choisissez Changer "
-     "le chemin…. Sinon, connectez-le (Finder → Aller → Se connecter au serveur) et appuyez sur Vérifier de nouveau.",
-     "Esta carpeta de la colección no está conectada. Si el recurso compartido está montado ahora en otro lugar, elija "
-     "Cambiar ruta…. Si no, conéctelo (Finder → Ir → Conectarse al servidor) y pulse Comprobar de nuevo."),
+     "此收藏文件夹未连接。如果共享现在挂载在别处，请使用下面的“更改路径…”。否则请先连接它（访达 → 前往 → 连接服务器），再按“再次检查”。",
+     "Ce dossier de la collection n'est pas connecté. Si le partage est maintenant monté ailleurs, utilisez Changer "
+     "le chemin… ci-dessous. Sinon, connectez-le (Finder → Aller → Se connecter au serveur) et appuyez sur Vérifier de nouveau.",
+     "Esta carpeta de la colección no está conectada. Si el recurso compartido está montado ahora en otro lugar, use "
+     "Cambiar ruta… abajo. Si no, conéctelo (Finder → Ir → Conectarse al servidor) y pulse Comprobar de nuevo."),
     ("The same share is now at this path. Change path to it?", "同一个共享现在位于此路径。要将路径更改为它吗？",
      "Le même partage se trouve maintenant à ce chemin. Changer le chemin pour celui-ci?",
      "El mismo recurso compartido está ahora en esta ruta. ¿Cambiar la ruta a esta?"),

@@ -799,8 +799,8 @@ function renderConn(root) {
   if (!root || root.available || !root.root_id) { box.hidden = true; box.replaceChildren(); return; }
   box.hidden = false;
   box.replaceChildren(...[
-    h("p", { class: "small" }, "This collection folder is not connected. If the share is mounted somewhere else now, choose " +
-      "Change path…. Otherwise connect it (Finder → Go → Connect to Server) and press Check again."),
+    h("p", { class: "small" }, "This collection folder is not connected. If the share is now mounted somewhere else, use " +
+      "Change path… below. Otherwise connect it (Finder → Go → Connect to Server) and press Check again."),
     h("p", { class: "mono small", "data-no-translate": "" }, root.path),
     root.suggestion ? h("p", { class: "small" }, "The same share is now at this path. Change path to it?", " ",
       h("span", { class: "mono", "data-no-translate": "" }, root.suggestion)) : null,
