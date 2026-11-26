@@ -62,7 +62,7 @@ function tagDiff(it) {
 
 async function renderPlan(id) {
   const p = await api(`/api/plan/${id}`);
-  const st = await api("/api/state");
+  const st = await api("/api/job");
   const s = p.summary, items = p.items;
   const ok = items.filter(i => i.status === "ok"), blocked = items.filter(i => !["ok", "duplicate_source"].includes(i.status));
   const dups = items.filter(i => i.status === "duplicate_source");
@@ -449,7 +449,7 @@ function previewTree(list) {
 function pollPlan(id) {
   clearTimeout(P.poll);
   const tick = async () => {
-    const st = await api("/api/state");
+    const st = await api("/api/job");
     await renderPlan(id);
     if (st.scan && st.scan.running) P.poll = setTimeout(tick, 1000);
   };

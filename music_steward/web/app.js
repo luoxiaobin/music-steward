@@ -119,11 +119,14 @@ function renderScan(sc) {
       onclick: async e => { e.target.disabled = true; e.target.textContent = "Stopping after this album…";
                             const r = await post2("/api/stop", {}); if (r.error) tell(r.error); } }, "Stop"));
     clearTimeout(S.scanTimer);
-    S.scanTimer = setTimeout(async () => { const st = await api("/api/state"); renderScan(st.scan);
+    // poll the job alone: the full state recomputes the inventory, seconds on a big collection, every 1.5 s
+    S.scanTimer = setTimeout(async () => { const st = await api("/api/job"); renderScan(st.scan);
                                            if (!st.scan.running) refreshAll(); }, 1500);
   } else if (sc && sc.result) {
     const r = sc.result, where = sc.path ? ` of “${sc.path}”` : "";
-    el.textContent = r.status !== "complete" ? `${sc.kind === "hash" ? "Hash" : "Scan"}${where} ${r.status}: ${r.abort_reason || ""}`
+    // name the job that stopped: "Scan stopped" after a stopped recognition was misleading (seen on the owner's Mac)
+    const JOB = { hash: "Hash", recognize: "Recognition", recognize_unit: "Search again", scan: "Scan" };
+    el.textContent = r.status !== "complete" ? `${JOB[sc.kind] || "Scan"}${where} ${r.status}: ${r.abort_reason || ""}`
       : sc.kind === "recognize_unit" ? `Searched again: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
       : sc.kind === "recognize" ? `Recognized${where}: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
       : sc.kind === "hash" ? `Hashed${where}: ${r.hashed} files (${fmtSize(r.bytes)}) in ${r.seconds}s, ${r.errors} errors`
@@ -135,7 +138,7 @@ async function startJob(kind, path) {
   const r = await api(`/api/${kind}`, { method: "POST", headers: { "Content-Type": "application/json", "X-MLT": "1" },
                                         body: JSON.stringify({ root: S.root.path, path: path || "" }) });
   if (r.error) { document.getElementById("scanNote").textContent = r.error; return; }
-  const st = await api("/api/state");
+  const st = await api("/api/job");
   renderScan(st.scan);
 }
 const startScan = () => startJob("scan", "");
@@ -151,7 +154,9 @@ async function treeNode(path, name, count) {
   const btn = h("button", { type: "button", "aria-current": String(S.path === path), "aria-expanded": String(open),
                             onclick: async () => { if (S.path === path) { open ? S.expanded.delete(path) : S.expanded.add(path); }
                                                    else { S.expanded.add(path); }
-                                                   S.path = path; S.filter = null; clearListFilter(); await refreshCenter(); renderFilters(); await renderTree(); } },
+                                                   S.path = path; S.filter = null; clearListFilter(); renderFilters();
+                                                   // the tree answers the click at once; the list follows when it is loaded
+                                                   await renderTree(); await refreshCenter(); } },
                 h("span", { class: "tw", "aria-hidden": "true" }, open ? "▾" : "▸"), name,
                 count !== null ? h("span", { class: "cnt" }, count) : null);
   const li = h("li", {}, btn);
@@ -169,11 +174,18 @@ async function treeNode(path, name, count) {
 // ---------------------------------------------------------------- table
 async function refreshCenter() {
   if (!S.rootId) return;
+  // each click starts a new load; an answer that arrives after a newer click is dropped, so a slow folder can never
+  // overwrite the one you moved on to (and the window keeps reacting while it loads)
+  const mine = S.centerSeq = (S.centerSeq || 0) + 1;
+  const stale = () => mine !== S.centerSeq;
+  document.getElementById("tableNote").replaceChildren(h("span", { class: "muted" }, "Loading…"));
   document.querySelectorAll(".selbar").forEach(el => el.remove());   // album selection bar: Albums view only
   const d = await api(`/api/files?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}` +
                       (S.filter ? `&filter=${S.filter}` : "") + (S.listQ ? `&q=${encodeURIComponent(S.listQ)}` : ""));
+  if (stale()) return;
   S.files = d.files;
   const fs = await api(`/api/folders?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}`);
+  if (stale()) return;
   document.getElementById("folderStats").textContent =
     `${fs.audio.toLocaleString()} audio · ${fs.audio ? Math.round(100 * fs.hashed / fs.audio) : 0}% hashed`;
   document.getElementById("hashFolderBtn").textContent = fs.hashed >= fs.audio && fs.audio ? "Hashed ✓" : "Hash folder";
@@ -181,7 +193,7 @@ async function refreshCenter() {
   const fl = S.filter ? ` · ${FILTER_LABELS[S.filter]}` : "";
   document.getElementById("tableNote").textContent =
     d.total > d.shown ? `showing first ${d.shown} of ${d.total.toLocaleString()} — pick a sub-folder to narrow` : "";
-  if (S.view === "albums") { if (S.filter || !(await renderUnits(where))) renderAlbums(where, fl); }
+  if (S.view === "albums") { if (S.filter || !(await renderUnits(where, stale))) { if (!stale()) renderAlbums(where, fl); } }
   else renderFiles(d.total, where, fl);
 }
 function renderFiles(total, where, fl) {
@@ -230,9 +242,10 @@ function unitBadge(u) {
   const [cls, txt] = CONF[u.confidence] || ["b-unid", u.confidence];
   return h("span", { class: `badge ${cls}` }, txt);
 }
-async function renderUnits(where) {
+async function renderUnits(where, stale = () => false) {
   const us = await api(`/api/units?root_id=${S.rootId}&path=${encodeURIComponent(S.path)}` +
                        (S.listQ ? `&q=${encodeURIComponent(S.listQ)}` : ""));
+  if (stale()) return true;                 // you have moved on: this folder's list is no longer wanted
   if (!us.length && S.listQ) {
     document.getElementById("tableTitle").textContent = `Albums · none match “${S.listQ}” in ${where}`;
     document.getElementById("table").replaceChildren();
@@ -351,7 +364,19 @@ async function renderUnits(where) {
     onchange: e => { for (const u of shown) e.target.checked ? S.unitSel.add(u.id) : S.unitSel.delete(u.id);
                      boxes.forEach(b => { b.checked = e.target.checked; }); drawBar(); } });
   const body = h("tbody");
-  for (const u of shown) {
+  // pages of rows: a folder of thousands of albums must not freeze the window while thousands of rows are built
+  const PAGE = 500;
+  let drawn = 0;
+  const more = h("tr", { class: "morerow" }, h("td", { colspan: "5" }));
+  const drawMore = () => {
+    for (const u of shown.slice(drawn, drawn + PAGE)) body.insertBefore(unitRow(u), more);
+    drawn = Math.min(shown.length, drawn + PAGE);
+    more.hidden = drawn >= shown.length;
+    more.firstChild.replaceChildren(h("button", { type: "button", class: "btn", onclick: drawMore },
+      `Show ${Math.min(PAGE, shown.length - drawn)} more`), h("span", { class: "muted small" }, `  ${drawn} of ${shown.length} shown`));
+  };
+  S.drawMoreUnits = id => { while (drawn < shown.length && !body.querySelector(`tr[data-unit="${id}"]`)) drawMore(); };
+  function unitRow(u) {
     const t = u.top;
     const box = h("input", { type: "checkbox", "aria-label": `Select ${u.label}`, checked: S.unitSel.has(u.id) ? true : null,
       onclick: e => e.stopPropagation(),
@@ -372,8 +397,10 @@ async function renderUnits(where) {
                        u.local ? h("div", { class: "sub" }, h("strong", {}, "Own info: "),
                          `${u.local.album || "?"} · ${u.local.artist || "Unknown Artist"}${u.local.year ? " · " + u.local.year : ""}`) : null),
       h("td", {}, unitBadge(u)));
-    body.append(tr);
+    return tr;
   }
+  body.append(more);
+  drawMore();
   note.after(selBar);
   selBar.append(h("span", { class: "muted xsmall" }, "Keys: ↓/↑ move · A accept · O own info · S skip · U undo · X tick"));
   document.querySelectorAll(".selbar").forEach(el => { if (el !== selBar) el.remove(); });
@@ -391,6 +418,7 @@ function nextUnitId(id, step = 1) {
 }
 async function gotoUnit(id) {
   if (id == null) return;
+  if (S.drawMoreUnits) S.drawMoreUnits(id);          // moving with ↓ past the rows drawn so far draws the next page
   const tr = document.querySelector(`#table tbody tr[data-unit="${id}"]`);
   if (tr) tr.scrollIntoView({ block: "nearest" });
   await selectUnit(id, tr);
@@ -598,7 +626,7 @@ function renderUnitDetail(d) {
         const r = await post2("/api/search", { unit_id: d.id, artist: document.getElementById("s-artist").value,
           name: document.getElementById("s-name").value, link: document.getElementById("s-link").value });
         document.getElementById("searchMsg").textContent = r.error || "Searching… (this album will refresh when done)";
-        if (!r.error) { const st = await api("/api/state"); renderScan(st.scan); waitThenReload(d.id); }
+        if (!r.error) { const st = await api("/api/job"); renderScan(st.scan); waitThenReload(d.id); }
       } }, "Search"),
       h("span", { id: "searchMsg", class: "muted small" }))));
   const decide = async (action, advance = action !== "clear") => {
@@ -646,7 +674,7 @@ const post2 = (url, body) => api(url, { method: "POST", headers: { "Content-Type
                                         body: JSON.stringify(body) });
 function waitThenReload(unitId) {
   const tick = async () => {
-    const st = await api("/api/state");
+    const st = await api("/api/job");
     if (st.scan && st.scan.running) return setTimeout(tick, 1500);
     await refreshCenter();
     const tr = [...document.querySelectorAll("#table tbody tr")].find(r => r.getAttribute("aria-selected") === "true");
