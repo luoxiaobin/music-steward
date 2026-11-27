@@ -115,8 +115,8 @@ def pick(con: sqlite3.Connection, root_id: int) -> list[dict]:
         for n, folder, u in sorted(pools[cat], key=lambda x: (x[0], x[1])):
             parent = folder.rsplit("/", 1)[0]
             name = folder.rsplit("/", 1)[-1].casefold()
-            # variety: not two of a kind from one folder, and never the same album twice -- the owner's NAS holds
-            # exact copies of an album in two places (Mp3(20200426)/… and 音乐mp3/…), first picked as two duets
+            # variety: not two of a kind from one folder, and never the same album twice -- a real collection held
+            # exact copies of one album in two top-level folders, and the first version picked both as the two duets
             if u["id"] in used or (parent, cat) in parents or name in names:
                 continue
             chosen.append({"category": cat, "unit_ids": [u["id"]], "folder": folder, "label": u["label"], "n": n})
