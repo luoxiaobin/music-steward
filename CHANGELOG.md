@@ -14,6 +14,11 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   `plan --trial --dest …` work on exactly those albums, `trial show` says where each one stands, and the album list
   has a **Trial set** filter.
 
+### Changed
+- `trial show` says under which name each album was accepted and where the name came from (MusicBrainz, Deezer,
+  Discogs or own info, and "edited" after Edit fields) — the first trial on a real collection accepted several
+  albums under another album's name, which "copied" alone did not show.
+
 ### Fixed
 - `trial pick` no longer picks the same album twice when it exists in two folders, and its *garbled tags* albums are
   albums of separate tracks (images already have their own kinds).

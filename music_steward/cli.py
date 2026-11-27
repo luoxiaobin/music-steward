@@ -275,6 +275,9 @@ def cmd_trial(a):
             sys.exit("no trial set yet: music-steward trial pick")
     for c in rows:
         print(f"  {c['category']:12} {c['n']:3} files  {c['folder']}" + (f"   [{c['state']}]" if "state" in c else ""))
+        for acc in c.get("accepted", [])[:3]:      # under which name, from where (singles: the first few tracks)
+            year = f" ({acc['year']})" if acc["year"] else ""
+            print(f"  {'':12}            → {acc['album'] or '?'} — {acc['artist'] or '?'}{year}   [{acc['source']}]")
     if a.action == "pick":
         missing = [cat for cat, _, _ in trial.CATEGORIES if cat not in {c["category"] for c in chosen}]
         if missing:

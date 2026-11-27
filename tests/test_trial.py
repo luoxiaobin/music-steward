@@ -138,3 +138,21 @@ def test_never_the_same_album_twice_and_garbled_means_separate_tracks(con):
     garbled = [c for c in chosen if c["category"] == "garbled"]
     assert [c["unit_ids"] for c in garbled] == [[tracks]]
     assert any(c["unit_ids"] == [img] and c["category"] == "cue_ape" for c in chosen)       # still an image case
+
+
+@needs_ffmpeg
+def test_show_says_under_which_name_and_from_where(accepted, con, tmp_path, monkeypatch, capsys):  # noqa: F811
+    """The first trial on a real collection accepted albums under another album's name; "copied" did not show it."""
+    lib, dest = accepted
+    uid = con.execute("SELECT id FROM unit").fetchone()[0]
+    monkeypatch.setattr(trial, "path", lambda: tmp_path / "trial.json")
+    trial.save(1, [{"category": "garbled", "unit_ids": [uid], "folder": "x", "label": "x", "n": 2}])
+    row = trial.status(con)[0]
+    assert row["state"] == "accepted"
+    assert row["accepted"] == [{"album": "夜航", "artist": "周海晴", "year": 2004, "source": "MusicBrainz"}]
+    con.execute("UPDATE decision SET overrides_json=? WHERE unit_id=?", (json.dumps({"album": "夜航 (改)"}), uid))
+    con.commit()
+    assert trial.status(con)[0]["accepted"][0] == {"album": "夜航 (改)", "artist": "周海晴", "year": 2004,
+                                                  "source": "MusicBrainz, edited"}
+    cli.main(["--db", con.execute("PRAGMA database_list").fetchone()[2], "trial", "show"])
+    assert "→ 夜航 (改) — 周海晴 (2004)   [MusicBrainz, edited]" in capsys.readouterr().out
