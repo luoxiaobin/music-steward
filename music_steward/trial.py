@@ -171,5 +171,18 @@ def status(con: sqlite3.Connection, where: Path | None = None) -> list[dict]:
                  "skipped" if all(p["decision"] and p["decision"]["action"] == "skip" for p in parts) else
                  "decided in part" if any(p["decision"] for p in parts) else
                  "waiting: " + ", ".join(sorted({p["confidence"] for p in parts})))
-        out.append({**a, "state": state})
+        out.append({**a, "state": state, "accepted": [_accepted_as(con, p) for p in parts if p["decision"]
+                                                      and p["decision"]["action"] == "accept"]})
     return out
+
+
+def _accepted_as(con: sqlite3.Connection, u: dict) -> dict:
+    """Under which name an album was accepted, and where the name came from -- the first trial's main finding was
+    albums accepted under ANOTHER album's name, which "copied" alone does not show. Edit fields win, as in the plan."""
+    d = u["decision"]
+    c = con.execute("SELECT album, artist, year, source FROM candidate WHERE id=?", (d["candidate_id"],)).fetchone()
+    ov = json.loads(d.get("overrides_json") or "{}")
+    c = dict(c) if c else {"album": None, "artist": None, "year": None, "source": None}
+    source = {"Local": "own info", None: "?"}.get(c["source"], c["source"])
+    return {"album": ov.get("album") or c["album"], "artist": ov.get("albumartist") or c["artist"],
+            "year": ov.get("year") or c["year"], "source": source + (", edited" if ov else "")}
