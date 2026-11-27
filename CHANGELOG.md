@@ -6,6 +6,12 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-11-27
+
+Highlights: collection folders that move, come and go (Change path, not connected, Add, Hide); History; the
+Overview; removing not-found albums; each track's artist; a big collection stays responsive; and `Music Steward.app`,
+built and self-tested by CI.
+
 ### Added
 - **Change path of a collection folder** ([ADR 0004](docs/adr/0004-collection-folders.md)): when the same collection
   is now at another path — the share mounted as `/Volumes/music-1` instead of `/Volumes/music`, a new NAS address —
@@ -54,37 +60,6 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   and **Change path…**; when the same network share is mounted elsewhere, the app suggests that path (it remembers
   the share's host and name on this Mac, never a user name or password). Scan, recognition, copy, retire, restore,
   archive and delete are refused for it; *Undo run* still works (it only touches the destination).
-
-### Changed
-- **`--root` adds a collection folder; it no longer hides the others.** `music-steward app` and `serve` show every
-  collection folder the app knows, plus any named with `--root`; `serve` no longer requires `--root` once one is known.
-- A plan made before its collection folder's path changed is no longer applied, resumed or retried (its source paths
-  point at the old place, which may by then be another share): make a new plan.
-- The header says *Collection folder* instead of *Root*.
-
-### Fixed
-- **A big collection no longer freezes the window.** On a library like the owner's (142,000 files, 18,000 albums,
-  91,000 candidates) listing one folder's albums took 27 s and the whole collection's — and the Overview — 134 s;
-  now 0.4 s and 1.5 s. The candidates are indexed by album and the list is read in a few queries instead of four per
-  album (the result is identical). The folder tree now opens at once and the list follows with "Loading…"; a list
-  that arrives after you have clicked elsewhere is dropped; long album lists show 500 rows at a time (*Show 500
-  more*, and ↓ keeps going); while a job runs the window asks only for its progress, not the whole inventory.
-- A stopped recognition said "Scan stopped"; it now says "Recognition stopped".
-- Folder-wide bulk actions (*Accept all Ready + Likely*, *Add own info*, *Accept own info*, *Skip*) no longer decide
-  for albums whose files are not found (or set aside): they are left as they were. Albums you tick are still acted on.
-- An album deleted by *Recognize folder* (its folder now holds a different album) no longer passes its History lines to
-  a later album that happens to get the same number.
-- A scan of a folder that contains a collection folder no longer registers it as a second, overlapping collection
-  folder; it is refused.
-- In *Edit fields*, the greyed release values in the boxes (titles, artists) are no longer run through the interface
-  translator: a title that happens to be an interface word is shown as it is.
-- **Setting originals aside no longer loses your decisions.** After *Retire originals*, a rescan followed by
-  *Recognize folder* used to drop the retired albums **and** your decisions for them. Now an album whose files are
-  gone keeps its matches and its decision: it shows **Originals set aside** (after Retire) or **Not found** (the
-  files are simply not there), and a new plan does not try to copy it again ("Albums whose originals are no longer in
-  the collection folder: N"). Restoring the originals brings it back as normal.
-
-### Added
 - **Folder check**: wherever you type a folder (Settings → Default destination folder, the plan's Destination) the
   app now tells you, as you type, whether it is written correctly, whether it exists, and whether it can be used —
   and refuses to save or build with one that cannot. It recognises a **network address** such as
@@ -147,7 +122,35 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   disconnected, disk full) are tried again in the same run, so Undo still covers everything. A **Not copied** list
   shows each file that was not copied and why.
 
+### Changed
+- **`--root` adds a collection folder; it no longer hides the others.** `music-steward app` and `serve` show every
+  collection folder the app knows, plus any named with `--root`; `serve` no longer requires `--root` once one is known.
+- A plan made before its collection folder's path changed is no longer applied, resumed or retried (its source paths
+  point at the old place, which may by then be another share): make a new plan.
+- The header says *Collection folder* instead of *Root*.
+- CI: GitHub Actions updated to actions/checkout v7 and actions/setup-python v7 (Node.js 20 is deprecated on runners).
+
 ### Fixed
+- **A big collection no longer freezes the window.** On a library like the owner's (142,000 files, 18,000 albums,
+  91,000 candidates) listing one folder's albums took 27 s and the whole collection's — and the Overview — 134 s;
+  now 0.4 s and 1.5 s. The candidates are indexed by album and the list is read in a few queries instead of four per
+  album (the result is identical). The folder tree now opens at once and the list follows with "Loading…"; a list
+  that arrives after you have clicked elsewhere is dropped; long album lists show 500 rows at a time (*Show 500
+  more*, and ↓ keeps going); while a job runs the window asks only for its progress, not the whole inventory.
+- A stopped recognition said "Scan stopped"; it now says "Recognition stopped".
+- Folder-wide bulk actions (*Accept all Ready + Likely*, *Add own info*, *Accept own info*, *Skip*) no longer decide
+  for albums whose files are not found (or set aside): they are left as they were. Albums you tick are still acted on.
+- An album deleted by *Recognize folder* (its folder now holds a different album) no longer passes its History lines to
+  a later album that happens to get the same number.
+- A scan of a folder that contains a collection folder no longer registers it as a second, overlapping collection
+  folder; it is refused.
+- In *Edit fields*, the greyed release values in the boxes (titles, artists) are no longer run through the interface
+  translator: a title that happens to be an interface word is shown as it is.
+- **Setting originals aside no longer loses your decisions.** After *Retire originals*, a rescan followed by
+  *Recognize folder* used to drop the retired albums **and** your decisions for them. Now an album whose files are
+  gone keeps its matches and its decision: it shows **Originals set aside** (after Retire) or **Not found** (the
+  files are simply not there), and a new plan does not try to copy it again ("Albums whose originals are no longer in
+  the collection folder: N"). Restoring the originals brings it back as normal.
 - **Apply could write into the collection through a link.** The destination was only checked when the plan was
   built; a destination folder replaced afterwards by a link into the collection made Apply write copies there. Apply
   and Resume now re-check the destination, and every file's real path is checked before it is written.
@@ -159,9 +162,6 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   mapping, previews and own info now use each image's own tracks, and each disc's copy gets its own cue sheet.
 - Documentation accuracy: what the app reads and writes, NAS publishing marked experimental with its residual
   limitation, beets' license (MIT), the process model, milestone status.
-
-### Changed
-- CI: GitHub Actions updated to actions/checkout v7 and actions/setup-python v7 (Node.js 20 is deprecated on runners).
 
 ## [0.3.0] — 2026-11-19
 
@@ -219,5 +219,6 @@ checked by the owner in foobar2000.
 - **Inventory and audit** (read-only): incremental scan over SMB, per-folder re-scan, tag-independent audio hashes,
   audit filters (garbled tags, unreadable, wrong extension, duplicates, cue sheets, orphan lyrics …).
 
-[Unreleased]: https://github.com/luoxiaobin/music-steward/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/luoxiaobin/music-steward/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/luoxiaobin/music-steward/releases/tag/v0.4.0
 [0.3.0]: https://github.com/luoxiaobin/music-steward/releases/tag/v0.3.0

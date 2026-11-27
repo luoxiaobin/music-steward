@@ -18,11 +18,11 @@ mkdir -p ~/.music-steward/navidrome
 ```
 
 ```bash
-ND_MUSICFOLDER="/Users/kevinluo/Projects/MP3LibraryTool/m0/scratch/organized" ND_DATAFOLDER="$HOME/.music-steward/navidrome" ND_ADDRESS=0.0.0.0 ND_PORT=4533 ND_ENABLEINSIGHTSCOLLECTOR=false caffeinate -i navidrome
+ND_MUSICFOLDER="$HOME/Music/Organized" ND_DATAFOLDER="$HOME/.music-steward/navidrome" ND_ADDRESS=0.0.0.0 ND_PORT=4533 ND_ENABLEINSIGHTSCOLLECTOR=false caffeinate -i navidrome
 ```
 
-The folder in `ND_MUSICFOLDER` is the destination folder of your earlier runs (337 files, 40 GB). Change it to your real
-destination folder when you have one. macOS may ask "Allow navidrome to accept incoming network connections?" — choose
+Put your **destination folder** in `ND_MUSICFOLDER` (where Music Steward wrote the organized copies; `$HOME/Music/Organized`
+is only an example). Never point it at the collection folder itself. macOS may ask "Allow navidrome to accept incoming network connections?" — choose
 **Allow**, or the phone cannot reach it.
 
 **2. Create the account.** On the Mac open <http://localhost:4533>. The first visit asks you to create an admin user:
