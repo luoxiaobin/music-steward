@@ -98,6 +98,24 @@ def _target(con, path):
 def cmd_recognize(a):
     from .recognize import queue, units
     con = db.connect(a.db)
+    if a.trial:                                    # exactly the trial set (music-steward trial pick)
+        from . import trial
+        ids = sorted(trial.unit_ids())
+        if not ids:
+            sys.exit("no trial set yet: music-steward trial pick")
+        marks = ",".join("?" * len(ids))
+        # albums not matched yet (or that failed) are queued; with --requeue every album of the set is matched again
+        con.execute(f"UPDATE unit SET status='queued' WHERE id IN ({marks})"
+                    + ("" if a.requeue else " AND status<>'done'"), ids)
+        con.commit()
+        todo = [i for (i,) in con.execute(f"SELECT id FROM unit WHERE id IN ({','.join('?' * len(ids))}) "
+                                          f"AND status IN ('queued','running')", ids)]
+        con.close()
+        print(f"{len(todo)} of the trial's {len(ids)} albums and tracks to recognize", file=sys.stderr)
+        print(json.dumps(queue.run(a.db, todo, progress=_progress("recognizing")), indent=2))
+        return 0
+    if not a.path:
+        sys.exit("usage: music-steward recognize PATH   (or --trial)")
     rid, sub = _target(con, a.path)
     us = units.plan_units(con, rid, sub)
     n_tracks = sum(1 for u in us if u["kind"] == "track")
@@ -130,9 +148,19 @@ def cmd_results(a):
 def cmd_plan(a):
     from .apply import plan
     con = db.connect(a.db)
-    rid, sub = _target(con, a.path)
+    only = None
+    if a.trial:
+        from . import trial
+        t = trial.load()
+        if not t:
+            sys.exit("no trial set yet: music-steward trial pick")
+        rid, sub, only = t["root_id"], "", trial.unit_ids()
+    elif a.path:
+        rid, sub = _target(con, a.path)
+    else:
+        sys.exit("usage: music-steward plan PATH --dest DIR   (or --trial --dest DIR)")
     try:
-        pid = plan.build(con, a.dest, rid, sub)
+        pid = plan.build(con, a.dest, rid, sub, unit_ids=only)
     except plan.PlanError as e:
         sys.exit(str(e))
     p = plan.load(con, pid)
@@ -218,6 +246,40 @@ def cmd_serve(a):
     from .server import serve
     _need_a_collection(a, "serve")
     serve(a.db, a.root, port=a.port, open_browser=not a.no_browser, dest=a.dest)
+
+
+def cmd_trial(a):
+    """The thin slice for the end-to-end trial (docs/TRIAL_E2E.md): pick it, or show where it stands."""
+    from . import trial
+    con = db.connect(a.db)
+    if a.action == "pick":
+        if trial.load() and not a.replace:
+            sys.exit(f"a trial set exists already ({trial.path()}); show it, or pick again with --replace")
+        if a.path:
+            root, _ = resolve(con, a.path)
+            rid = _root_id(con, root)
+        else:
+            row = con.execute("SELECT id FROM root WHERE hidden IS NULL OR hidden=0 ORDER BY id").fetchone()
+            if not row:
+                sys.exit("no collection yet")
+            rid = row["id"]
+        chosen = trial.pick(con, rid)
+        if not chosen:
+            sys.exit("nothing to pick: recognize the folders first? (albums appear once a folder was queued)")
+        p = trial.save(rid, chosen)
+        rows = chosen
+        print(f"trial set: {sum(len(c['unit_ids']) for c in chosen)} albums and tracks, saved in {p}")
+    else:
+        rows = trial.status(con)
+        if not rows:
+            sys.exit("no trial set yet: music-steward trial pick")
+    for c in rows:
+        print(f"  {c['category']:12} {c['n']:3} files  {c['folder']}" + (f"   [{c['state']}]" if "state" in c else ""))
+    if a.action == "pick":
+        missing = [cat for cat, _, _ in trial.CATEGORIES if cat not in {c["category"] for c in chosen}]
+        if missing:
+            print("  (none found for: " + ", ".join(missing) + ")")
+    return 0
 
 
 def cmd_selftest(a):
@@ -343,7 +405,8 @@ def main(argv=None):
     i.set_defaults(func=cmd_inspect)
 
     rc = sub.add_parser("recognize", help="queue and match the albums in a folder (resumable)")
-    rc.add_argument("path")
+    rc.add_argument("path", nargs="?")
+    rc.add_argument("--trial", action="store_true", help="only the trial set (music-steward trial pick)")
     rc.add_argument("--plan-only", action="store_true", help="only show the units that would be matched")
     rc.add_argument("--requeue", action="store_true", help="match again even if already done")
     rc.add_argument("--limit", type=int)
@@ -355,7 +418,8 @@ def main(argv=None):
     rs.set_defaults(func=cmd_results)
 
     pl = sub.add_parser("plan", help="build a plan from accepted albums in a folder (changes nothing)")
-    pl.add_argument("path")
+    pl.add_argument("path", nargs="?")
+    pl.add_argument("--trial", action="store_true", help="only the accepted albums of the trial set")
     pl.add_argument("--dest", required=True, help="destination folder for organized copies")
     pl.add_argument("--limit", type=int, default=40)
     pl.set_defaults(func=cmd_plan)
@@ -390,6 +454,13 @@ def main(argv=None):
     sv.add_argument("--no-browser", action="store_true")
     sv.add_argument("--dest", help="default destination folder for organized copies (outside every root)")
     sv.set_defaults(func=cmd_serve)
+
+    tr = sub.add_parser("trial", help="the end-to-end trial (docs/TRIAL_E2E.md): pick about 20 albums covering the "
+                        "hard cases (reads the database only), or show where they stand")
+    tr.add_argument("action", choices=("pick", "show"))
+    tr.add_argument("path", nargs="?", help="pick: a collection folder (default: the first shown)")
+    tr.add_argument("--replace", action="store_true", help="pick again, replacing the saved set")
+    tr.set_defaults(func=cmd_trial)
 
     st = sub.add_parser("self-test", help="check that this install is complete (plugins, page, worker, FFmpeg); "
                         "uses a throwaway database")

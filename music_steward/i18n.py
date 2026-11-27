@@ -1089,6 +1089,7 @@ TABLE: list[tuple[str, str, str, str]] = [
     ("{n} albums waiting for you have no real match (No match or Weak)", "有 {n} 个等待你处理的专辑没有真正的匹配（无匹配或弱匹配）",
      "{n} albums en attente sans vraie correspondance (Aucune correspondance ou Faible)",
      "{n} álbumes pendientes sin coincidencia real (Sin coincidencia o Débil)"),
+    ("Trial set", "试用集", "Ensemble d'essai", "Conjunto de prueba"),
 ]
 
 

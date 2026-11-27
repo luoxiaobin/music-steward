@@ -6,6 +6,18 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 
 ## [Unreleased]
 
+### Added
+- **The end-to-end trial** ([docs/TRIAL_E2E.md](docs/TRIAL_E2E.md)): `music-steward trial pick` chooses about 20
+  albums from the database (nothing on disk is read) that together cover the hard cases — a clean album, garbled
+  tags, a mainland compilation, APE and FLAC images with cue sheets, a multi-disc set, a folder of singles, surround
+  audio, duets — and saves the set on this Mac (`~/.music-steward/trial.json`). `recognize --trial` and
+  `plan --trial --dest …` work on exactly those albums, `trial show` says where each one stands, and the album list
+  has a **Trial set** filter.
+
+### Fixed
+- The status line after recognizing or hashing a folder said "Recognized of “folder”"; it now says "Recognized
+  “folder”" (and "Hashed “folder”").
+
 ## [0.4.0] — 2026-11-27
 
 Highlights: collection folders that move, come and go (Change path, not connected, Add, Hide); History; the

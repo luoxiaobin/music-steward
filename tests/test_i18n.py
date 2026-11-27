@@ -64,3 +64,12 @@ def test_edit_fields_boxes_are_data():
     js = (Path(__file__).resolve().parents[1] / "music_steward/web/app.js").read_text(encoding="utf-8")
     line = next(ln for ln in js.splitlines() if "const inp = (id, val, ph, w)" in ln)
     assert "data-no-translate" in line
+
+
+def test_finished_jobs_name_the_folder_without_of():
+    """0.4.0 showed "Recognized of “Mp3(20200426)/…”"; "Scan of …" and "Recognition of … stopped" keep their "of"."""
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "music_steward/web/app.js").read_text(encoding="utf-8")
+    assert "`Recognized${named}:" in js and "`Hashed${named}:" in js
+    assert "`Recognized${where}" not in js and "`Hashed${where}" not in js
+    assert "`Scan${where}:" in js

@@ -801,6 +801,10 @@ def make_handler(app: App, port_ref: dict):
                 if u.path == "/api/units":
                     from .recognize import results
                     us = results.units(con, _int(q["root_id"]), q.get("path", ""))
+                    from . import trial as _trial
+                    in_trial = _trial.unit_ids()
+                    for x in us:
+                        x["trial"] = x["id"] in in_trial         # the album list's "Trial set" filter
                     if q.get("q"):   # "Filter this list": the album, its folder, matched and own names
                         from .search import matcher
                         hit = matcher(q["q"][:100])

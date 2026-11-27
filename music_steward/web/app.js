@@ -123,13 +123,14 @@ function renderScan(sc) {
     S.scanTimer = setTimeout(async () => { const st = await api("/api/job"); renderScan(st.scan);
                                            if (!st.scan.running) refreshAll(); }, 1500);
   } else if (sc && sc.result) {
-    const r = sc.result, where = sc.path ? ` of “${sc.path}”` : "";
+    // "Scan of “X”", "Recognition of “X” stopped" -- but "Recognized “X”", not "Recognized of “X”" (owner, 0.4.0)
+    const r = sc.result, where = sc.path ? ` of “${sc.path}”` : "", named = sc.path ? ` “${sc.path}”` : "";
     // name the job that stopped: "Scan stopped" after a stopped recognition was misleading (seen on the owner's Mac)
     const JOB = { hash: "Hash", recognize: "Recognition", recognize_unit: "Search again", scan: "Scan" };
     el.textContent = r.status !== "complete" ? `${JOB[sc.kind] || "Scan"}${where} ${r.status}: ${r.abort_reason || ""}`
       : sc.kind === "recognize_unit" ? `Searched again: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
-      : sc.kind === "recognize" ? `Recognized${where}: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
-      : sc.kind === "hash" ? `Hashed${where}: ${r.hashed} files (${fmtSize(r.bytes)}) in ${r.seconds}s, ${r.errors} errors`
+      : sc.kind === "recognize" ? `Recognized${named}: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
+      : sc.kind === "hash" ? `Hashed${named}: ${r.hashed} files (${fmtSize(r.bytes)}) in ${r.seconds}s, ${r.errors} errors`
       : `Scan${where}: ${r.n_new} new, ${r.n_changed} changed, ${r.n_unchanged} unchanged, ${r.n_removed} removed`;
   } else el.textContent = "";
 }
@@ -301,12 +302,15 @@ async function renderUnits(where, stale = () => false) {
   const FILTERS = [["all", "All"], ["undecided", "Undecided"], ["likely", "Likely"], ["needs_review", "Needs review"],
                    ["weak", "Weak"], ["no_match", "No match"], ["accept", "Accepted"], ["skip", "Skipped"],
                    // the groups the Overview counts (and links to)
-                   ["ready_likely", "Ready + Likely"], ["no_match_weak", "No match + Weak"], ["not_found", "Not found"]];
+                   ["ready_likely", "Ready + Likely"], ["no_match_weak", "No match + Weak"], ["not_found", "Not found"],
+                   // the thin slice of docs/TRIAL_E2E.md (music-steward trial pick)
+                   ...(us.some(u => u.trial) ? [["trial", "Trial set"]] : [])];
   const f = S.unitFilter || "all";
   const undecided = u => !u.decision && u.presence === "here" && u.status === "done";
   // one definition for both the list and the count beside each filter's name
   const matches = (u, v) => v === "all" || (v === "undecided" ? !u.decision
     : v === "not_found" ? u.presence === "not_found"
+    : v === "trial" ? !!u.trial
     : v === "ready_likely" ? undecided(u) && ["ready", "likely"].includes(u.confidence)
     : v === "no_match_weak" ? undecided(u) && ["no_match", "weak"].includes(u.confidence)
     : statusOf(u) === v);

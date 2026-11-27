@@ -168,7 +168,9 @@ Then widen by value: garbled-tag repair before matching → own confidence rule 
    ([PHONE_TRIAL.md](PHONE_TRIAL.md): Amperfy on the iPhone, Wi-Fi then away from home); a *Listen* screen (status, QR code,
    account, start/stop, rescan after each Apply); login item and `serve`; remote-listening guide (Tailscale); Windows.
    An own Subsonic server or player only if the trial proves a gap.
-9. Outside trial users when the above is solid.
+9. **End-to-end trial** ([TRIAL_E2E.md](TRIAL_E2E.md)): one thin, hard set of about 20 albums through every step,
+   from recognition to the phone and Retire/Restore; its findings decide the next items.
+10. Outside trial users when the above is solid.
 
 ## M2 backlog (original order)
 
