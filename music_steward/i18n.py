@@ -1080,6 +1080,15 @@ TABLE: list[tuple[str, str, str, str]] = [
     ("Show {n} more", "再显示 {n} 个", "Afficher {n} de plus", "Mostrar {n} más"),
     ("{a} of {b} shown", "已显示 {a} / {b}", "{a} sur {b} affichés", "{a} de {b} mostrados"),
     ("Loading…", "正在加载…", "Chargement…", "Cargando…"),
+    ("{n} albums waiting for you are Ready or Likely (accept them together)", "有 {n} 个等待你处理的专辑为就绪或可能（可一起接受）",
+     "{n} albums en attente sont Prêts ou Probables (acceptez-les ensemble)",
+     "{n} álbumes pendientes están Listos o son Probables (acéptelos juntos)"),
+    ("{n} albums waiting for you need a closer look (Needs review)", "有 {n} 个等待你处理的专辑需要仔细查看（需复核）",
+     "{n} albums en attente demandent un examen attentif (À revoir)",
+     "{n} álbumes pendientes necesitan una revisión atenta (Revisar)"),
+    ("{n} albums waiting for you have no real match (No match or Weak)", "有 {n} 个等待你处理的专辑没有真正的匹配（无匹配或弱匹配）",
+     "{n} albums en attente sans vraie correspondance (Aucune correspondance ou Faible)",
+     "{n} álbumes pendientes sin coincidencia real (Sin coincidencia o Débil)"),
 ]
 
 

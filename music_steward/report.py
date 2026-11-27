@@ -52,6 +52,14 @@ TEXT = {
 }
 
 
+# the same facts under "Next", where they stand alone ("213 of them have no real match" needs the line above it)
+NEXT_TEXT = {
+    "ready_likely": "{n} albums waiting for you are Ready or Likely (accept them together)",
+    "needs_review": "{n} albums waiting for you need a closer look (Needs review)",
+    "no_match": "{n} albums waiting for you have no real match (No match or Weak)",
+}
+
+
 def _size(b: int) -> str:
     for unit, f in (("TB", 1e12), ("GB", 1e9), ("MB", 1e6)):
         if b >= f:
@@ -167,7 +175,10 @@ def overview(con: sqlite3.Connection, root_id: int, inventory: dict | None = Non
     for key in ("never_scanned", "rec_errors", "copy_unfinished", "copy_failed", "flagged", "ready_likely",
                 "needs_review", "no_match", "not_copied"):
         if key in by_key and (by_key[key]["n"] is None or by_key[key]["n"]):
-            nxt.append(by_key[key])
+            ln = dict(by_key[key])
+            if key in NEXT_TEXT:
+                ln["text"] = NEXT_TEXT[key].replace("{n}", f"{ln['n']:,}")
+            nxt.append(ln)
     if scanned and not us:
         nxt.append({"key": "recognize", "n": None, "text": "Recognize the collection folder's albums (Recognize folder)",
                     "go": None})

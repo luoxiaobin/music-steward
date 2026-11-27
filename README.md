@@ -13,7 +13,7 @@ album's own cue sheet, tags and folder names), lets you review every decision, a
 It was built for collections where other tools struggle: **Chinese and other East Asian music** with garbled
 GBK/Big5 tags, single-file "image" albums with cue sheets (APE, FLAC, WAV), and albums that no online catalogue knows.
 
-**Status: 0.3.0, early release.** It works end to end and was tried on a real 3 TB collection, but it is installed
+**Status: 0.4.0, early release.** It works end to end and was tried on a real 3 TB collection, but it is installed
 from source and needs Python and FFmpeg. See [`CHANGELOG.md`](CHANGELOG.md).
 
 | Platform | Status |

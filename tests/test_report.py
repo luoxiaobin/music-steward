@@ -104,9 +104,20 @@ def test_the_command_line_and_the_api(accepted, con, tmp_path, capsys):  # noqa:
         httpd.shutdown()
 
 
-@pytest.mark.parametrize("key", sorted(report.TEXT))
-def test_every_overview_sentence_can_be_translated(key):
-    assert report.TEXT[key] in {r[0] for r in i18n.TABLE}
+@pytest.mark.parametrize("text", sorted(report.TEXT.values()) + sorted(report.NEXT_TEXT.values()))
+def test_every_overview_sentence_can_be_translated(text):
+    assert text in {r[0] for r in i18n.TABLE}
+
+
+def test_next_lines_read_on_their_own(accepted, con):  # noqa: F811
+    """Owner's screenshot, 0.4.0: "213 of them have no real match" under Next, with no "them" in sight."""
+    con.execute("DELETE FROM decision")
+    con.execute("UPDATE candidate SET distance=0.9, fingerprint_agrees=0")
+    con.commit()
+    o = report.overview(con, 1)
+    nxt = {ln["key"]: ln["text"] for ln in o["next"]}
+    assert nxt["no_match"] == "1 albums waiting for you have no real match (No match or Weak)"
+    assert lines(o)["no_match"]["text"] == "1 of them have no real match (No match or Weak)"   # under Albums: unchanged
 
 
 def test_the_collection_folder_path_in_the_overview_is_data():
