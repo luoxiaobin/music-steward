@@ -742,6 +742,8 @@ def make_handler(app: App, port_ref: dict):
                                        "ffmpeg": ffmpeg_found(),
                                        "summary": app.summary(con, rid) if rid else None,
                                        "scan": app.scan_state})
+                if u.path == "/api/job":                                    # the running job only: cheap, polled
+                    return self._json({"scan": app.scan_state})
                 if u.path == "/api/settings":
                     return self._json(app.settings_view(con))
                 if u.path == "/api/history":                                # one readable list; changes nothing

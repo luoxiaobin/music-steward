@@ -63,6 +63,13 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 - The header says *Collection folder* instead of *Root*.
 
 ### Fixed
+- **A big collection no longer freezes the window.** On a library like the owner's (142,000 files, 18,000 albums,
+  91,000 candidates) listing one folder's albums took 27 s and the whole collection's — and the Overview — 134 s;
+  now 0.4 s and 1.5 s. The candidates are indexed by album and the list is read in a few queries instead of four per
+  album (the result is identical). The folder tree now opens at once and the list follows with "Loading…"; a list
+  that arrives after you have clicked elsewhere is dropped; long album lists show 500 rows at a time (*Show 500
+  more*, and ↓ keeps going); while a job runs the window asks only for its progress, not the whole inventory.
+- A stopped recognition said "Scan stopped"; it now says "Recognition stopped".
 - Folder-wide bulk actions (*Accept all Ready + Likely*, *Add own info*, *Accept own info*, *Skip*) no longer decide
   for albums whose files are not found (or set aside): they are left as they were. Albums you tick are still acted on.
 - An album deleted by *Recognize folder* (its folder now holds a different album) no longer passes its History lines to

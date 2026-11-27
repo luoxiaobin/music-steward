@@ -1076,6 +1076,10 @@ TABLE: list[tuple[str, str, str, str]] = [
      "Empiece por añadir la carpeta que contiene su música, por ejemplo su recurso compartido del NAS en /Volumes. Solo "
      "se lee: no se cambia nada en ella."),
     ("Add a collection folder…", "添加收藏文件夹…", "Ajouter un dossier de collection…", "Añadir una carpeta de la colección…"),
+    # ---- long lists (pages of rows)
+    ("Show {n} more", "再显示 {n} 个", "Afficher {n} de plus", "Mostrar {n} más"),
+    ("{a} of {b} shown", "已显示 {a} / {b}", "{a} sur {b} affichés", "{a} de {b} mostrados"),
+    ("Loading…", "正在加载…", "Chargement…", "Cargando…"),
 ]
 
 

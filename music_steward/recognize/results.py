@@ -115,27 +115,46 @@ def units(con: sqlite3.Connection, root_id: int, folder: str = "") -> list[dict]
     if folder:
         q += " AND (folder=? OR (folder >= ? AND folder < ?))"
         args += (folder, folder + "/", folder + "/￿")
-    out = []
     from .units import gone_units
     gone = gone_units(con, root_id)
-    for r in con.execute(q + " ORDER BY folder, label", args):
-        u = dict(r)
+    rows = [dict(r) for r in con.execute(q + " ORDER BY folder, label", args)]
+    # everything else in a few queries for all the albums at once, not a few per album: a folder of thousands of
+    # albums must list in a second or two, not minutes (the window waits for it)
+    ids = [u["id"] for u in rows]
+    tops, local, dec = {}, {}, {}
+    for chunk in (ids[i:i + 900] for i in range(0, len(ids), 900)):          # SQLite's limit on ? per query
+        marks = ",".join("?" * len(chunk))
+        for c in con.execute(
+                f"SELECT * FROM (SELECT *, row_number() OVER (PARTITION BY unit_id ORDER BY rank) AS _n FROM candidate "
+                f"WHERE unit_id IN ({marks}) AND COALESCE(source,'')<>'Local') WHERE _n=1", chunk):
+            c = dict(c)
+            c.pop("_n")
+            tops[c["unit_id"]] = c
+        for c in con.execute(f"SELECT id, unit_id, album, artist, year FROM candidate WHERE unit_id IN ({marks}) "
+                             f"AND source='Local' ORDER BY id", chunk):
+            local.setdefault(c["unit_id"], {k: c[k] for k in ("id", "album", "artist", "year")})
+        for d in con.execute(f"SELECT * FROM decision WHERE unit_id IN ({marks})", chunk):
+            dec[d["unit_id"]] = dict(d)
+    media: dict[int, set] = {}
+    for table, kinds in (("cand_track", lambda k: k != "cue"), ("cand_cue_track", lambda k: k == "cue")):
+        cids = [tops[u["id"]]["id"] for u in rows if u["id"] in tops and kinds(u["kind"])]
+        for chunk in (cids[i:i + 900] for i in range(0, len(cids), 900)):
+            for cid, m in con.execute(f"SELECT DISTINCT candidate_id, medium FROM {table} WHERE candidate_id IN "
+                                      f"({','.join('?' * len(chunk))}) AND medium IS NOT NULL", chunk):
+                media.setdefault(cid, set()).add(m)
+    out = []
+    for u in rows:
         u["presence"] = gone.get(u["id"], "here")          # here | retired | not_found
         u["n_files"] = len(json.loads(u["file_ids"]))
-        c = con.execute("SELECT * FROM candidate WHERE unit_id=? AND COALESCE(source,'')<>'Local' "
-                        "ORDER BY rank LIMIT 1", (u["id"],)).fetchone()
-        u["top"] = dict(c) if c else None
+        u["top"] = tops.get(u["id"])
         if u["top"]:
-            u["top"]["_mapped_media"] = _mapped_media(con, u["kind"], u["top"]["id"])
+            u["top"]["_mapped_media"] = media.get(u["top"]["id"], set())
         u["confidence"] = confidence(u, u["top"])
         if u["top"]:
             u["evidence"] = evidence(u, u["top"])
             u["top"].pop("_mapped_media")
-        loc = con.execute("SELECT id, album, artist, year FROM candidate WHERE unit_id=? AND source='Local'",
-                          (u["id"],)).fetchone()
-        u["local"] = dict(loc) if loc else None
-        d = con.execute("SELECT * FROM decision WHERE unit_id=?", (u["id"],)).fetchone()
-        u["decision"] = dict(d) if d else None
+        u["local"] = local.get(u["id"])
+        u["decision"] = dec.get(u["id"])
         out.append(u)
     return out
 

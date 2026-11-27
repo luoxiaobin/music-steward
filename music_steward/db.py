@@ -228,6 +228,9 @@ def connect(path: Path | str = DEFAULT_DB) -> sqlite3.Connection:
         if col not in {r[1] for r in con.execute(f"PRAGMA table_info({table})")}:
             con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
     con.execute("CREATE INDEX IF NOT EXISTS file_content ON file(root_id, content_id)")
+    # an album's candidates: without this every album lookup scanned all candidates (27 s for one folder of 457 albums
+    # in a library of 18,000 albums and 91,000 candidates; measured 2026-11-26)
+    con.execute("CREATE INDEX IF NOT EXISTS candidate_unit ON candidate(unit_id, rank)")
     # runs recorded before the rename point at journals under the old folder (only if any do)
     if not OLD_APP_DIR.exists() and APP_DIR.exists() and con.execute(
             "SELECT 1 FROM run WHERE journal LIKE ? LIMIT 1", (str(OLD_APP_DIR) + "%",)).fetchone():
