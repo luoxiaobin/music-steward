@@ -302,12 +302,15 @@ async function renderUnits(where, stale = () => false) {
   const FILTERS = [["all", "All"], ["undecided", "Undecided"], ["likely", "Likely"], ["needs_review", "Needs review"],
                    ["weak", "Weak"], ["no_match", "No match"], ["accept", "Accepted"], ["skip", "Skipped"],
                    // the groups the Overview counts (and links to)
-                   ["ready_likely", "Ready + Likely"], ["no_match_weak", "No match + Weak"], ["not_found", "Not found"]];
+                   ["ready_likely", "Ready + Likely"], ["no_match_weak", "No match + Weak"], ["not_found", "Not found"],
+                   // the thin slice of docs/TRIAL_E2E.md (music-steward trial pick)
+                   ...(us.some(u => u.trial) ? [["trial", "Trial set"]] : [])];
   const f = S.unitFilter || "all";
   const undecided = u => !u.decision && u.presence === "here" && u.status === "done";
   // one definition for both the list and the count beside each filter's name
   const matches = (u, v) => v === "all" || (v === "undecided" ? !u.decision
     : v === "not_found" ? u.presence === "not_found"
+    : v === "trial" ? !!u.trial
     : v === "ready_likely" ? undecided(u) && ["ready", "likely"].includes(u.confidence)
     : v === "no_match_weak" ? undecided(u) && ["no_match", "weak"].includes(u.confidence)
     : statusOf(u) === v);

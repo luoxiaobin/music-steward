@@ -267,7 +267,8 @@ def check_destination(con: sqlite3.Connection, dest: Path):
             raise PlanError(f"destination overlaps the source root {r}; choose a folder outside your collection")
 
 
-def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = "") -> int:
+def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = "", unit_ids=None) -> int:
+    """unit_ids: only these albums (the trial set, or albums chosen by hand); None = every accepted one in scope."""
     dest = Path(dest_root).expanduser().resolve()
     check_destination(con, dest)
     q = ("SELECT u.*, d.candidate_id, d.overrides_json, d.stale_reason FROM unit u JOIN decision d ON d.unit_id=u.id "
@@ -276,6 +277,12 @@ def build(con: sqlite3.Connection, dest_root: str, root_id: int, scope: str = ""
     if scope:
         q += " AND (u.folder=? OR (u.folder >= ? AND u.folder < ?))"
         args += (scope, scope + "/", scope + "/￿")
+    if unit_ids is not None:
+        wanted = sorted({int(i) for i in unit_ids})
+        if not wanted:
+            raise PlanError("no albums to plan")
+        q += f" AND u.id IN ({','.join('?' * len(wanted))})"
+        args += tuple(wanted)
     root_path = con.execute("SELECT path FROM root WHERE id=?", (root_id,)).fetchone()["path"]
     items, prepared, notes, left_out = [], [], [], []
     from ..recognize.units import gone_units
