@@ -6,6 +6,10 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 
 ## [Unreleased]
 
+### Fixed
+- The status line after recognizing or hashing a folder said "Recognized of “folder”"; it now says "Recognized
+  “folder”" (and "Hashed “folder”").
+
 ## [0.4.0] — 2026-11-27
 
 Highlights: collection folders that move, come and go (Change path, not connected, Add, Hide); History; the

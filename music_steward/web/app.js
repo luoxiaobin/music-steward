@@ -123,13 +123,14 @@ function renderScan(sc) {
     S.scanTimer = setTimeout(async () => { const st = await api("/api/job"); renderScan(st.scan);
                                            if (!st.scan.running) refreshAll(); }, 1500);
   } else if (sc && sc.result) {
-    const r = sc.result, where = sc.path ? ` of “${sc.path}”` : "";
+    // "Scan of “X”", "Recognition of “X” stopped" -- but "Recognized “X”", not "Recognized of “X”" (owner, 0.4.0)
+    const r = sc.result, where = sc.path ? ` of “${sc.path}”` : "", named = sc.path ? ` “${sc.path}”` : "";
     // name the job that stopped: "Scan stopped" after a stopped recognition was misleading (seen on the owner's Mac)
     const JOB = { hash: "Hash", recognize: "Recognition", recognize_unit: "Search again", scan: "Scan" };
     el.textContent = r.status !== "complete" ? `${JOB[sc.kind] || "Scan"}${where} ${r.status}: ${r.abort_reason || ""}`
       : sc.kind === "recognize_unit" ? `Searched again: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
-      : sc.kind === "recognize" ? `Recognized${where}: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
-      : sc.kind === "hash" ? `Hashed${where}: ${r.hashed} files (${fmtSize(r.bytes)}) in ${r.seconds}s, ${r.errors} errors`
+      : sc.kind === "recognize" ? `Recognized${named}: ${r.done} done, ${r.errors} errors in ${r.seconds}s`
+      : sc.kind === "hash" ? `Hashed${named}: ${r.hashed} files (${fmtSize(r.bytes)}) in ${r.seconds}s, ${r.errors} errors`
       : `Scan${where}: ${r.n_new} new, ${r.n_changed} changed, ${r.n_unchanged} unchanged, ${r.n_removed} removed`;
   } else el.textContent = "";
 }
