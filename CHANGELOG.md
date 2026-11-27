@@ -15,6 +15,10 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   has a **Trial set** filter.
 
 ### Fixed
+- `trial pick` no longer picks the same album twice when it exists in two folders, and its *garbled tags* albums are
+  albums of separate tracks (images already have their own kinds).
+- `pip install` no longer prints long "Package would be ignored" warnings (the package list now finds the web page's
+  folders itself).
 - The status line after recognizing or hashing a folder said "Recognized of “folder”"; it now says "Recognized
   “folder”" (and "Hashed “folder”").
 

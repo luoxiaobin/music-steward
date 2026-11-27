@@ -63,7 +63,7 @@ def _category_of(u: dict, files: list[sqlite3.Row]) -> list[str]:
     if u["kind"] == "track":
         return ["singles"] if SINGLES.search(u["folder"]) else []
     n = len(files)
-    if any(f["tag_issues_json"] for f in files):
+    if u["kind"] != "cue" and any(f["tag_issues_json"] for f in files):     # an image is already an image's case
         out.append("garbled")
     if any(DISC_DIR.match(f["relpath"].rsplit("/", 2)[-2] if f["relpath"].count("/") >= 1 else "") for f in files):
         out.append("multi_disc")
@@ -101,7 +101,7 @@ def pick(con: sqlite3.Connection, root_id: int) -> list[dict]:
             continue
         for c in _category_of(u, files):
             pools[c].append((len(files), u["folder"], u))
-    chosen, used, parents = [], set(), set()
+    chosen, used, parents, names = [], set(), set(), set()
     want_of = {c: n for c, n, _ in CATEGORIES}
     for cat in FILL_ORDER:
         want = want_of[cat]
@@ -114,11 +114,15 @@ def pick(con: sqlite3.Connection, root_id: int) -> list[dict]:
         got = 0
         for n, folder, u in sorted(pools[cat], key=lambda x: (x[0], x[1])):
             parent = folder.rsplit("/", 1)[0]
-            if u["id"] in used or (parent, cat) in parents:        # variety: not two of a kind from one folder
+            name = folder.rsplit("/", 1)[-1].casefold()
+            # variety: not two of a kind from one folder, and never the same album twice -- the owner's NAS holds
+            # exact copies of an album in two places (Mp3(20200426)/… and 音乐mp3/…), first picked as two duets
+            if u["id"] in used or (parent, cat) in parents or name in names:
                 continue
             chosen.append({"category": cat, "unit_ids": [u["id"]], "folder": folder, "label": u["label"], "n": n})
             used.add(u["id"])
             parents.add((parent, cat))
+            names.add(name)
             got += 1
             if got == want:
                 break

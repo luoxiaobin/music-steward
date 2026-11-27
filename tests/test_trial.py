@@ -121,3 +121,19 @@ def test_the_album_list_marks_the_trial_set(collection, con, tmp_path, monkeypat
         assert [u["id"] for u in us if u["trial"]] == [collection["garbled"]]
     finally:
         httpd.shutdown()
+
+
+def test_never_the_same_album_twice_and_garbled_means_separate_tracks(con):
+    """Owner's first pick: one duet album chosen twice (copies in two folders), and three garbled cue images."""
+    con.execute("INSERT INTO root(path, added_at) VALUES('/music', 0)")
+    a = _album(con, "Mp3(20200426)/群星.-.[中国著名男女对唱歌曲.CD1].专辑 mp3", 5, artists=["张也", "张也 & 阎维文"])
+    b = _album(con, "音乐mp3/群星.-.[中国著名男女对唱歌曲.CD1].专辑 mp3", 5, artists=["张也", "张也 & 阎维文"])
+    img = _album(con, "music_cd/周治平.-.[周治平.白金精选].专辑", 1, codec="ape", kind="cue", issues=[{"field": "album"}])
+    tracks = _album(con, "mp3/Garbled album", 6, issues=[{"field": "artist"}])
+    con.commit()
+    chosen = trial.pick(con, 1)
+    duets = [c for c in chosen if c["category"] == "duet"]
+    assert len(duets) == 1 and duets[0]["unit_ids"][0] in (a, b)
+    garbled = [c for c in chosen if c["category"] == "garbled"]
+    assert [c["unit_ids"] for c in garbled] == [[tracks]]
+    assert any(c["unit_ids"] == [img] and c["category"] == "cue_ape" for c in chosen)       # still an image case
