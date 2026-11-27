@@ -33,19 +33,19 @@ def collection(con):
         "clean": _album(con, "Western/Phil Collins - Hits", 8, artist="Phil Collins"),
         "clean_big": _album(con, "Western/Huge Box", 40, artist="Somebody"),
         "garbled": _album(con, "mp3/Garbled", 6, issues=[{"field": "artist"}]),
-        "comp": _album(con, "Mp3(20200426)/[世纪歌典VOL.17.民歌篇.1].专辑.(MP3)", 12, artist="群星"),
-        "ape": _album(con, "Ape.Flac/邓丽君 - 精选", 1, codec="ape", kind="cue"),
-        "flacimg": _album(con, "CD上翻录/image", 1, codec="flac", kind="cue"),
+        "comp": _album(con, "Downloads/[歌典VOL.1].专辑.(MP3)", 12, artist="群星"),
+        "ape": _album(con, "images/歌手丁 - 精选", 1, codec="ape", kind="cue"),
+        "flacimg": _album(con, "rips/image", 1, codec="flac", kind="cue"),
         "discs": _album(con, "music_cd/Two Discs", 8, disc_dirs=True),
-        "surround": _album(con, "5.1声道.flac/一水隔天涯", 6, channels=6, artist="梦之旅合唱组合"),
-        "duet": _album(con, "QQ.flac/对唱", 6, artists=["张也", "张也 & 阎维文"]),
+        "surround": _album(con, "surround/合唱专辑", 6, channels=6, artist="合唱团"),
+        "duet": _album(con, "lossless/对唱", 6, artists=["歌手甲", "歌手甲 & 歌手乙"]),
         "scratch": _album(con, "_mlt_scratch/x", 8, artist="Test"),
     }
     for i in range(4):
         fid = con.execute("INSERT INTO file(root_id, relpath, fs_relpath, kind, ext, size, mtime_ns, probe_status, codec, "
                           "channels, tags_json) VALUES(1,?,?,'audio','.mp3',1,1,'ok','mp3',2,'{}')",
-                          (f"刘晓-单曲/{i}.mp3", f"刘晓-单曲/{i}.mp3")).lastrowid
-        con.execute("INSERT INTO unit(root_id, folder, label, kind, key, file_ids, status) VALUES(1,'刘晓-单曲',?,'track',?,?,'queued')",
+                          (f"歌手戊-单曲/{i}.mp3", f"歌手戊-单曲/{i}.mp3")).lastrowid
+        con.execute("INSERT INTO unit(root_id, folder, label, kind, key, file_ids, status) VALUES(1,'歌手戊-单曲',?,'track',?,?,'queued')",
                     (f"song{i}", f"track:{fid}", json.dumps([fid])))
     con.commit()
     return u
@@ -61,7 +61,7 @@ def test_the_pick_covers_every_hard_case_once(collection, con):
     assert by["cue_ape"]["unit_ids"] == [u["ape"]] and by["cue_flac"]["unit_ids"] == [u["flacimg"]]
     assert by["multi_disc"]["unit_ids"] == [u["discs"]] and by["surround"]["unit_ids"] == [u["surround"]]
     assert by["duet"]["unit_ids"] == [u["duet"]]
-    assert by["singles"]["folder"] == "刘晓-单曲" and len(by["singles"]["unit_ids"]) == 4
+    assert by["singles"]["folder"] == "歌手戊-单曲" and len(by["singles"]["unit_ids"]) == 4
     assert all(u["scratch"] not in c["unit_ids"] for c in chosen)            # the experiment's leftovers never
 
 
@@ -121,3 +121,20 @@ def test_the_album_list_marks_the_trial_set(collection, con, tmp_path, monkeypat
         assert [u["id"] for u in us if u["trial"]] == [collection["garbled"]]
     finally:
         httpd.shutdown()
+
+
+def test_never_the_same_album_twice_and_garbled_means_separate_tracks(con):
+    """The first pick on a real collection: one duet album chosen twice (copies in two folders), and three garbled cue
+    images. (Names here are made up.)"""
+    con.execute("INSERT INTO root(path, added_at) VALUES('/music', 0)")
+    a = _album(con, "Downloads A/群星.-.[男女对唱.CD1].专辑", 5, artists=["歌手甲", "歌手甲 & 歌手乙"])
+    b = _album(con, "Downloads B/群星.-.[男女对唱.CD1].专辑", 5, artists=["歌手甲", "歌手甲 & 歌手乙"])
+    img = _album(con, "images/歌手丙.-.[精选].专辑", 1, codec="ape", kind="cue", issues=[{"field": "album"}])
+    tracks = _album(con, "mp3/Garbled album", 6, issues=[{"field": "artist"}])
+    con.commit()
+    chosen = trial.pick(con, 1)
+    duets = [c for c in chosen if c["category"] == "duet"]
+    assert len(duets) == 1 and duets[0]["unit_ids"][0] in (a, b)
+    garbled = [c for c in chosen if c["category"] == "garbled"]
+    assert [c["unit_ids"] for c in garbled] == [[tracks]]
+    assert any(c["unit_ids"] == [img] and c["category"] == "cue_ape" for c in chosen)       # still an image case
