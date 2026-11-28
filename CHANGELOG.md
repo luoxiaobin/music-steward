@@ -36,6 +36,9 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   albums under another album's name, which "copied" alone did not show.
 
 ### Fixed
+- Pressing ▶ in the track mapping did nothing in the desktop window for some files. A track the window cannot play,
+  or that does not start within 8 seconds, is now converted to an MP3 preview and played; if that fails too, the
+  reason is shown.
 - `trial pick` no longer picks the same album twice when it exists in two folders, and its *garbled tags* albums are
   albums of separate tracks (images already have their own kinds).
 - `pip install` no longer prints long "Package would be ignored" warnings (the package list now finds the web page's
