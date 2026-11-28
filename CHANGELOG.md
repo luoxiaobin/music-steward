@@ -26,6 +26,9 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 - In the review's artist check, a Latin-script artist name must be a whole word of the folder name, and format words (APE, FLAC, MP3, CD…) never
   count: an opera in a folder called *Ape.Flac* agreed with a release by the band *Ape*. Chinese volume numbers
   (*之五*, *第十集*) are read as numbers.
+- A match by another artist whose title agrees shows a warning on the album's screen (*This release is by … — your
+  files say …*). Names written with a variant character (叶倩文 / 葉蒨文) count as the same singer, and the folder's
+  volume number wins over the tags' (own info named disc 2 in a folder of disc 5).
 
 ### Changed
 - `trial show` says under which name each album was accepted and where the name came from (MusicBrainz, Deezer,

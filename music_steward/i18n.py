@@ -1115,6 +1115,12 @@ TABLE: list[tuple[str, str, str, str]] = [
     ("The volume or disc number is different.", "卷号或碟号不同。", "Le numéro de volume ou de disque est différent.",
      "El número de volumen o de disco es distinto."),
     ("The title is different.", "标题不同。", "Le titre est différent.", "El título es distinto."),
+    ("The artist differs. ", "艺术家不同。", "L'artiste est différent. ", "El artista es distinto. "),
+    ("This release is by", "此发行版的艺术家是", "Cette édition est de", "Esta edición es de"),
+    ("your files say", "你的文件写的是", "vos fichiers indiquent", "sus archivos dicen"),
+    ("Check the track mapping below before you accept it.", "接受之前请检查下方的曲目对应。",
+     "Vérifiez la correspondance des pistes ci-dessous avant de l'accepter.",
+     "Compruebe la correspondencia de pistas abajo antes de aceptarla."),
     ("Often a different album by the same artist — compare the track mapping below, pick another candidate, or use Own info.",
      "通常是同一艺术家的另一张专辑——请比较下方的曲目对应，选择另一个候选，或使用自有信息。",
      "Souvent un autre album du même artiste — comparez la correspondance des pistes ci-dessous, choisissez un autre "

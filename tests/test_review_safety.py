@@ -162,3 +162,28 @@ def test_trial_show_says_what_the_checks_think_of_each_decision(music, tmp_path,
     out = capsys.readouterr().out
     assert "⚠ different album: another artist, another title" in out
     assert "⚠ own info names another volume than the folder" in out
+
+
+def test_the_folders_volume_wins_over_the_tags(music):
+    """Own info from tags named disc 2 in a folder of disc 5; the tags' label hid it from the check."""
+    uid = _album(music, "合辑/舞台5CD之五岁月", 4, artist="歌手甲", label="舞台5CD之二时光")
+    _cand(music, uid, "舞台5CD之二时光", "歌手甲", source="Local")
+    d = results.unit_detail(music, uid)
+    assert d["candidates"][0]["evidence"]["numbers_differ"]
+
+
+def test_a_variant_character_is_the_same_singer(music):
+    uid = _album(music, "Pop/叶倩文 - 珍重", 10, artist="叶倩文")
+    _cand(music, uid, "珍重", "葉蒨文")
+    assert _unit(music, uid)["evidence"]["artist"] == "agrees"
+    other = _album(music, "Pop/关正杰 - 精选", 10, artist="关正杰")
+    _cand(music, other, "精选", "關淑怡")
+    ev = _unit(music, other)["evidence"]
+    assert ev["artist"] == "differs" and ev["our_artists"] == ["关正杰"]
+
+
+def test_the_album_screen_warns_about_another_artist():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "music_steward/web/app.js").read_text(encoding="utf-8")
+    assert 'ev.artist === "differs") parts.splice(1, 0, h("div", { class: "banner warnbanner" }' in js
+    assert 'data(ev.our_artists.join(", "))' in js

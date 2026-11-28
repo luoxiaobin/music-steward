@@ -686,6 +686,10 @@ function renderUnitDetail(d) {
     h("span", {}, "Your album"), " ", h("span", { class: "strong", "data-no-translate": "" }, d.label), " ", h("span", {}, "vs this release"), " ", data(chosen.album), ". ",
     h("span", {}, "Often a different album by the same artist — compare the track mapping below, pick another candidate, or use Own info."),
     ev.artist === "differs" ? h("div", { class: "small" }, "The artist is not the one in your folder name or tags either.") : null));
+  else if (chosen && chosen.source !== "Local" && ev.artist === "differs") parts.splice(1, 0, h("div", { class: "banner warnbanner" },
+    h("strong", {}, "The artist differs. "), h("span", {}, "This release is by"), " ", data(chosen.artist),
+    (ev.our_artists || []).length ? [" — ", h("span", {}, "your files say"), " ", data(ev.our_artists.join(", "))] : null, ". ",
+    h("span", {}, "Check the track mapping below before you accept it.")));
   if (onl.length > nOnl) list.append(h("button", { type: "button", class: "linkbtn",
     onclick: () => { S.allCands = d.id; renderUnitDetail(d); } }, `Show ${onl.length - nOnl} more candidates`));
   parts.unshift(bar);

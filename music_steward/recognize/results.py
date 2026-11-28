@@ -119,16 +119,18 @@ def readable_tags(tags_json: str | None, issues_json: str | None) -> dict:
 
 def ours(u: dict, file_tags: list[dict] | None) -> dict:
     """What the album says about itself: {"artists": [names from tags], "text": folder + label, "various": bool}."""
-    artists = []
+    artists, shown = [], []
     for t in file_tags or []:
         for k in ("albumartist", "artist"):
             artists += _names(t.get(k))
+            if t.get(k) and t[k] not in shown and _plain(t[k]) not in VARIOUS:
+                shown.append(t[k])
     folder = (u.get("folder") or "").split("/")
     raw = " ".join(folder[-3:] + [u.get("label") or ""])
     text = _plain(raw)
     various = any(a in VARIOUS for a in artists) or any(v in text for v in ("群星", "variousartists", "va."))
     return {"artists": sorted(set(a for a in artists if a not in VARIOUS)), "text": text, "words": _words(raw),
-            "various": various}
+            "various": various, "shown": shown}
 
 
 def _words(s: str | None, formats: bool = False) -> str:
@@ -164,12 +166,18 @@ def artist_check(u: dict, top: dict) -> str:
         if n.isascii():                     # whole words in the folder; a whole name (or 4+ letters) in the tags
             return latin.get(n, f" {n} ") in me.get("words", "") or any(
                 n == a or (len(n) >= 4 and len(a) >= 4 and (n in a or a in n)) for a in me["artists"])
-        return n in me["text"] or any(n in a or a in n for a in me["artists"])
+        return n in me["text"] or any(n in a or a in n or _one_char_off(n, a) for a in me["artists"])
     if any(named(n) for n in names):
         return "agrees"
     if me["artists"] or me["various"]:      # the album names its artists (or says "various"), and these are not them
         return "differs"
     return "unknown"                         # nothing to compare with: neither agreement nor a warning
+
+
+def _one_char_off(a: str, b: str) -> bool:
+    """叶倩文 / 葉蒨文: the same singer written with a variant character no Simplified table maps. Names of three or
+    more characters that differ in one place only (two-character names are too short to tell apart this way)."""
+    return len(a) == len(b) >= 3 and not a.isascii() and sum(x != y for x, y in zip(a, b)) == 1
 
 
 def evidence(u: dict, top: dict) -> dict:
@@ -182,7 +190,8 @@ def evidence(u: dict, top: dict) -> dict:
     disc_of_set = bool((top.get("mediums") or 1) > 1 and len(media) == 1)
     folder_leaf = (u.get("folder") or "").rsplit("/", 1)[-1]
     agrees = title_agrees(u.get("label"), top.get("album")) or title_agrees(folder_leaf, top.get("album"))
-    mine_n = _volume_numbers(u.get("label")) | _volume_numbers(folder_leaf)
+    # the folder's number wins: own info and garbled tags named disc 2 in a folder of disc 5 (舞台…5CD之五)
+    mine_n = _volume_numbers(folder_leaf) or _volume_numbers(u.get("label"))
     theirs_n = _volume_numbers(top.get("album"))
     numbers_differ = bool(mine_n and theirs_n and not (mine_n & theirs_n))
     artist = artist_check(u, top) if (top.get("source") or "") != "Local" else "agrees"
@@ -190,7 +199,8 @@ def evidence(u: dict, top: dict) -> dict:
     return {"n": n, "all_mapped": (top.get("n_mapped") or 0) >= n, "missing": len(extra),
             "disc_of_set": disc_of_set, "disc": next(iter(media)) if disc_of_set else None,
             "title_agrees": agrees and not numbers_differ, "artist": artist,
-            "numbers_differ": numbers_differ, "different_album": different}
+            "numbers_differ": numbers_differ, "different_album": different,
+            "our_artists": (u.get("_ours") or {}).get("shown", [])[:3]}
 
 
 def confidence(u: dict, top: dict | None) -> str:
