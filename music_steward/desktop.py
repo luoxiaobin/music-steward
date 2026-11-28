@@ -44,7 +44,37 @@ class Api:
         return r[0] if r else None
 
 
+def _to_front(window) -> None:
+    """Bring the window forward when the app is started again (a second launch only asks, then exits)."""
+    try:
+        window.restore()
+        window.show()
+    except Exception:       # noqa: BLE001 -- best effort
+        pass
+    if sys.platform == "darwin":
+        try:
+            from AppKit import NSApplication
+            from PyObjCTools import AppHelper
+            AppHelper.callAfter(NSApplication.sharedApplication().activateIgnoringOtherApps_, True)
+        except Exception:   # noqa: BLE001
+            pass
+
+
 def run(db_path: str, roots: list[str], dest: str | None = None, debug: bool = False) -> None:
+    from . import single
+    me = single.acquire(db_path)
+    if me is None:          # one window per database: two would both start scans and copies (owner, 2026-11-28)
+        shown = single.ask_to_show(db_path)
+        print("Music Steward is already open" + ("; its window was brought to the front." if shown else
+              " (a window or `music-steward serve`)."), flush=True)
+        return
+    try:
+        _run(db_path, roots, dest, debug, me)
+    finally:
+        me.close()
+
+
+def _run(db_path: str, roots: list[str], dest: str | None, debug: bool, me) -> None:
     import webview
     from .server import App, make_handler
 
@@ -60,6 +90,7 @@ def run(db_path: str, roots: list[str], dest: str | None = None, debug: bool = F
     window = webview.create_window("Music Steward", url, js_api=api, width=1440, height=900,
                                    min_size=(960, 600), text_select=True)
     api.window = window
+    me.listen(lambda: _to_front(window))
 
     def closing():
         job = app.scan_state
