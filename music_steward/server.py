@@ -1017,6 +1017,18 @@ def _int(x):
 
 
 def serve(db_path: str, roots: list[str], port: int = 0, open_browser: bool = True, dest: str | None = None):
+    from . import single
+    me = single.acquire(db_path)
+    if me is None:          # one window or server per database (see single.py)
+        single.ask_to_show(db_path)
+        raise SystemExit("Music Steward is already open on this database (a window or another `serve`).")
+    try:
+        return _serve(db_path, roots, port, open_browser, dest)
+    finally:
+        me.close()
+
+
+def _serve(db_path: str, roots: list[str], port: int, open_browser: bool, dest: str | None):
     app = App(db_path, roots, dest)
     port_ref = {"port": port}
     httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app, port_ref))

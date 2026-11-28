@@ -31,6 +31,10 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   volume number wins over the tags' (own info named disc 2 in a folder of disc 5).
 
 ### Changed
+- **One window per database.** Starting the app (or `music-steward serve`) while it is already open no longer opens
+  a second copy that could start a scan or a copy at the same time as the first: the open window is brought to the
+  front instead. A crash never leaves the app unable to start (the system releases the lock); command-line commands
+  are not affected.
 - `trial show` says under which name each album was accepted and where the name came from (MusicBrainz, Deezer,
   Discogs or own info, and "edited" after Edit fields) — the first trial on a real collection accepted several
   albums under another album's name, which "copied" alone did not show.
