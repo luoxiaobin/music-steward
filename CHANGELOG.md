@@ -43,6 +43,9 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
 - Pressing ▶ in the track mapping did nothing in the desktop window for some files. A track the window cannot play,
   or that does not start within 8 seconds, is now converted to an MP3 preview and played; if that fails too, the
   reason is shown.
+- …and the real cause on the Mac: the app sent audio in pieces of at most 8 MB, and the Mac window's media engine
+  (which asks for a whole file at once) stalled silently on any file bigger than that — the player showed the length
+  and never started. The app now sends exactly the bytes asked for.
 - `trial pick` no longer picks the same album twice when it exists in two folders, and its *garbled tags* albums are
   albums of separate tracks (images already have their own kinds).
 - `pip install` no longer prints long "Package would be ignored" warnings (the package list now finds the web page's

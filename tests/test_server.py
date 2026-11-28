@@ -82,6 +82,9 @@ def test_audio_served_only_for_inventory_files_with_ranges(server):
     mp3 = next(f for f in files if f["relpath"] == "Clean Album/01 - one.mp3")
     st, hd, body = req(port, f"/api/audio/{mp3['id']}", cookie=ck, headers={"Range": "bytes=0-99"})
     assert st == 206 and len(body) == 100 and hd["Content-Range"].startswith("bytes 0-99/")
+    size = int(hd["Content-Range"].rsplit("/", 1)[1])
+    st, hd, body = req(port, f"/api/audio/{mp3['id']}", cookie=ck, headers={"Range": f"bytes=0-{size - 1}"})
+    assert st == 206 and len(body) == size           # the whole range asked for, never a smaller piece (WebKit)
     assert req(port, "/api/audio/999999", cookie=ck)[0] == 404
 
 
@@ -164,3 +167,23 @@ def test_bulk_accept_only_ready_or_likely_and_undecided(server):
     assert post({"root": app.roots[0], "path": "", "confidences": ["ready", "likely"]}) == {"accepted": 2}
     assert post({"root": app.roots[0], "path": "", "confidences": ["ready", "likely"]}) == {"accepted": 0}  # idempotent
     assert {r[0] for r in c.execute("SELECT unit_id FROM decision")} == {1, 2}
+
+
+def test_a_big_file_is_sent_in_full_when_the_whole_range_is_asked_for(server, library):
+    """The Mac window (Apple's media engine) asks for a whole 25 MB FLAC at once and stalled silently when the server
+    sent an 8 MB piece: playing did nothing, while the browser played. The test pads an audio file past 8 MB."""
+    app, port = server
+    ck = login(app, port)
+    files = json.loads(req(port, "/api/files?root_id=1&path=", cookie=ck)[2])["files"]
+    mp3 = next(f for f in files if f["relpath"] == "Clean Album/01 - one.mp3")
+    p = library / "Clean Album/01 - one.mp3"
+    original = p.read_bytes()
+    try:
+        p.write_bytes(original + b"\0" * (12 * 1024 * 1024))
+        size = p.stat().st_size
+        st, hd, body = req(port, f"/api/audio/{mp3['id']}", cookie=ck, headers={"Range": f"bytes=0-{size - 1}"})
+        assert st == 206 and len(body) == size and hd["Content-Range"] == f"bytes 0-{size - 1}/{size}"
+        st, hd, body = req(port, f"/api/audio/{mp3['id']}", cookie=ck, headers={"Range": "bytes=0-"})
+        assert st == 206 and len(body) == size
+    finally:
+        p.write_bytes(original)
