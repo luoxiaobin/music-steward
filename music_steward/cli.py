@@ -278,6 +278,8 @@ def cmd_trial(a):
         for acc in c.get("accepted", [])[:3]:      # under which name, from where (singles: the first few tracks)
             year = f" ({acc['year']})" if acc["year"] else ""
             print(f"  {'':12}            → {acc['album'] or '?'} — {acc['artist'] or '?'}{year}   [{acc['source']}]")
+            if acc.get("check"):
+                print(f"  {'':12}              ⚠ {acc['check']}")
     if a.action == "pick":
         missing = [cat for cat, _, _ in trial.CATEGORIES if cat not in {c["category"] for c in chosen}]
         if missing:
