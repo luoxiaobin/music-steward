@@ -149,10 +149,11 @@ def test_show_says_under_which_name_and_from_where(accepted, con, tmp_path, monk
     trial.save(1, [{"category": "garbled", "unit_ids": [uid], "folder": "x", "label": "x", "n": 2}])
     row = trial.status(con)[0]
     assert row["state"] == "accepted"
-    assert row["accepted"] == [{"album": "夜航", "artist": "周海晴", "year": 2004, "source": "MusicBrainz"}]
+    assert row["accepted"] == [{"album": "夜航", "artist": "周海晴", "year": 2004, "source": "MusicBrainz",
+                               "check": None}]
     con.execute("UPDATE decision SET overrides_json=? WHERE unit_id=?", (json.dumps({"album": "夜航 (改)"}), uid))
     con.commit()
     assert trial.status(con)[0]["accepted"][0] == {"album": "夜航 (改)", "artist": "周海晴", "year": 2004,
-                                                  "source": "MusicBrainz, edited"}
+                                                  "source": "MusicBrainz, edited", "check": None}
     cli.main(["--db", con.execute("PRAGMA database_list").fetchone()[2], "trial", "show"])
     assert "→ 夜航 (改) — 周海晴 (2004)   [MusicBrainz, edited]" in capsys.readouterr().out

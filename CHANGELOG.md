@@ -20,6 +20,12 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   offers **Use own info** first and asks before **Accept anyway…**. A close match by another artist is *Needs
   review*, never *Likely*. A match the audio fingerprints confirm is still *Ready*, whatever the names say.
 - The album list shows where an accepted name came from (*Accepted · MusicBrainz*, *Accepted · own info*).
+- `trial show` says what the review's checks think of each accepted name (*⚠ different album: another artist,
+  another title*; *⚠ own info names another volume than the folder*), so a trial measures the checks against the
+  decisions already made.
+- In the review's artist check, a Latin-script artist name must be a whole word of the folder name, and format words (APE, FLAC, MP3, CD…) never
+  count: an opera in a folder called *Ape.Flac* agreed with a release by the band *Ape*. Chinese volume numbers
+  (*之五*, *第十集*) are read as numbers.
 
 ### Changed
 - `trial show` says under which name each album was accepted and where the name came from (MusicBrainz, Deezer,

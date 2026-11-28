@@ -185,4 +185,23 @@ def _accepted_as(con: sqlite3.Connection, u: dict) -> dict:
     c = dict(c) if c else {"album": None, "artist": None, "year": None, "source": None}
     source = {"Local": "own info", None: "?"}.get(c["source"], c["source"])
     return {"album": ov.get("album") or c["album"], "artist": ov.get("albumartist") or c["artist"],
-            "year": ov.get("year") or c["year"], "source": source + (", edited" if ov else "")}
+            "year": ov.get("year") or c["year"], "source": source + (", edited" if ov else ""),
+            "check": _check(con, u["id"], d["candidate_id"])}
+
+
+def _check(con: sqlite3.Connection, unit_id: int, candidate_id: int) -> str | None:
+    """What the review's checks say now about the accepted release: "different album: …", "other artist" or None --
+    so a trial can measure the checks against the decisions already made, without re-reviewing first."""
+    from .recognize import results
+    d = results.unit_detail(con, unit_id)
+    c = next((c for c in (d or {}).get("candidates", []) if c["id"] == candidate_id), None)
+    if not c:
+        return None
+    ev = c["evidence"]
+    if c.get("source") == "Local":            # own info from the tags, which may name another disc than the folder
+        return "own info names another volume than the folder" if ev["numbers_differ"] else None
+    why = [w for w, on in (("another volume", ev["numbers_differ"]), ("another artist", ev["artist"] == "differs"),
+                           ("another title", not ev["title_agrees"])) if on]
+    if ev["different_album"]:
+        return "different album: " + ", ".join(why)
+    return "other artist" if ev["artist"] == "differs" else None

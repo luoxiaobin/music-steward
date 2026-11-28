@@ -101,6 +101,8 @@ def _volume_numbers(t: str | None) -> set[str]:
         _NUMBERS = re.compile(r"(?:vol\.?|volume|第|cd|disc|disk|碟|之|集)\s*(\d{1,2})(?!\d)|(?<![\d])(\d{1,2})(?:\s*(?:集|辑|輯|部))|"
                               r"[^\d](\d)(?:ape|flac|mp3|wav)?$", re.I)
     out = set()
+    t = re.sub(r"(之|第)([一二三四五六七八九十])(?![一二三四五六七八九十])",
+               lambda m: m.group(1) + str("一二三四五六七八九十".index(m.group(2)) + 1), t or "")
     for m in _NUMBERS.finditer(_plain(t) if t else ""):
         out.update(g.lstrip("0") or "0" for g in m.groups() if g)
     return out
@@ -122,9 +124,27 @@ def ours(u: dict, file_tags: list[dict] | None) -> dict:
         for k in ("albumartist", "artist"):
             artists += _names(t.get(k))
     folder = (u.get("folder") or "").split("/")
-    text = _plain(" ".join(folder[-3:] + [u.get("label") or ""]))
+    raw = " ".join(folder[-3:] + [u.get("label") or ""])
+    text = _plain(raw)
     various = any(a in VARIOUS for a in artists) or any(v in text for v in ("群星", "variousartists", "va."))
-    return {"artists": sorted(set(a for a in artists if a not in VARIOUS)), "text": text, "various": various}
+    return {"artists": sorted(set(a for a in artists if a not in VARIOUS)), "text": text, "words": _words(raw),
+            "various": various}
+
+
+def _words(s: str | None, formats: bool = False) -> str:
+    """Latin words, space-separated and padded: " ape flac " -- a Latin name must match whole words. The first trial
+    accepted a Cantonese opera as an album by "Ape" because "ape" is inside the folder name "Ape.Flac"."""
+    import re
+    import unicodedata
+    from ..chinese import key
+    s = unicodedata.normalize("NFKD", key(s or ""))
+    s = "".join(ch for ch in s if not unicodedata.combining(ch)).casefold()
+    return " " + " ".join(w for w in re.findall(r"[a-z0-9]+", s) if formats or w not in FORMAT_WORDS) + " "
+
+
+# words in folder names that name a format, never an artist (a band called Ape is still found in the tags)
+FORMAT_WORDS = {"ape", "flac", "mp3", "wav", "wv", "cue", "dts", "dsd", "dsf", "aac", "m4a", "ogg", "lossless",
+                "hires", "320k", "128k", "kbps", "cd", "disc", "vol"}
 
 
 def artist_check(u: dict, top: dict) -> str:
@@ -138,7 +158,14 @@ def artist_check(u: dict, top: dict) -> str:
     if all(t in VARIOUS for t in theirs):
         return "agrees" if me["various"] or len(me["artists"]) >= 3 else "unknown"
     names = [t for t in theirs if t not in VARIOUS and len(t) >= 2]
-    if any(n in me["text"] or any(n in a or a in n for a in me["artists"]) for n in names):
+    latin = {_plain(p): _words(p, formats=True) for p in _NAME_SPLIT.split(top.get("artist") or "")}
+
+    def named(n: str) -> bool:
+        if n.isascii():                     # whole words in the folder; a whole name (or 4+ letters) in the tags
+            return latin.get(n, f" {n} ") in me.get("words", "") or any(
+                n == a or (len(n) >= 4 and len(a) >= 4 and (n in a or a in n)) for a in me["artists"])
+        return n in me["text"] or any(n in a or a in n for a in me["artists"])
+    if any(named(n) for n in names):
         return "agrees"
     if me["artists"] or me["various"]:      # the album names its artists (or says "various"), and these are not them
         return "differs"

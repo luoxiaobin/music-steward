@@ -129,3 +129,36 @@ def test_bulk_actions_leave_a_different_album_to_the_owner(music, app):
     r = app.bulk(music, {"root": "/music", "action": "accept_top", "unit_ids": [bad, good]})
     assert r["done"] == 1 and "different album" in r["failed"][0]
     assert {r[0] for r in music.execute("SELECT unit_id FROM decision")} == {good}
+
+
+def test_a_latin_name_must_be_a_whole_word_of_the_folder(music):
+    """The trial's opera was accepted as an album by "Ape": "ape" is inside the folder name "Ape.Flac"."""
+    uid = _album(music, "Ape.Flac/粤剧-选段", 4, artist="红线女", label="粤剧-选段")
+    _cand(music, uid, "Lontano da qui", "Ape")
+    assert _unit(music, uid)["evidence"]["different_album"]
+    for folder, tag in (("Rock/Ape - Live", ""), ("Ape.Flac/Live", "Ape")):
+        ok = _album(music, folder, 6, artist=tag)
+        _cand(music, ok, "Live in Town", "Ape")
+        assert _unit(music, ok)["evidence"]["artist"] == ("agrees" if tag else "unknown")   # a band called Ape
+    ok = _album(music, "Rock/Phil Collins - Hits", 6, artist="")
+    _cand(music, ok, "Hits", "Phil Collins")
+    assert _unit(music, ok)["evidence"]["artist"] == "agrees"
+    assert results._volume_numbers("舞台5CD之五") == {"5"} and results._volume_numbers("第十集") == {"10"}
+
+
+def test_trial_show_says_what_the_checks_think_of_each_decision(music, tmp_path, monkeypatch, capsys):
+    from music_steward import cli, trial
+    monkeypatch.setattr(trial, "path", lambda: tmp_path / "trial.json")
+    bad = _album(music, "戏曲/粤剧选段", 6, artist="红线女")
+    cid = _cand(music, bad, "Lontano da qui", "Ape")
+    vol = _album(music, "合辑/舞台5CD之五", 6, artist="歌手甲", label="舞台5CD之五")
+    lid = _cand(music, vol, "舞台5CD之二", "歌手甲", source="Local", rank=1)
+    for u, c in ((bad, cid), (vol, lid)):
+        music.execute("INSERT INTO decision(unit_id, action, candidate_id, decided_at) VALUES(?, 'accept', ?, 0)", (u, c))
+    music.commit()
+    trial.save(1, [{"category": "garbled", "unit_ids": [bad], "folder": "f", "label": "l", "n": 6},
+                   {"category": "surround", "unit_ids": [vol], "folder": "g", "label": "m", "n": 6}])
+    cli.main(["--db", music.execute("PRAGMA database_list").fetchone()[2], "trial", "show"])
+    out = capsys.readouterr().out
+    assert "⚠ different album: another artist, another title" in out
+    assert "⚠ own info names another volume than the folder" in out
