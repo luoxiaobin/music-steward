@@ -1090,6 +1090,47 @@ TABLE: list[tuple[str, str, str, str]] = [
      "{n} albums en attente sans vraie correspondance (Aucune correspondance ou Faible)",
      "{n} álbumes pendientes sin coincidencia real (Sin coincidencia o Débil)"),
     ("Trial set", "试用集", "Ensemble d'essai", "Conjunto de prueba"),
+    # ---- safer review: a candidate that is another album (results.evidence, the first trial's lesson)
+    ("Different album", "不同的专辑", "Autre album", "Otro álbum"),
+    ("different album", "不同的专辑", "autre album", "otro álbum"),
+    ("Accept anyway…", "仍然接受…", "Accepter quand même…", "Aceptar de todos modos…"),
+    ("Accept anyway", "仍然接受", "Accepter quand même", "Aceptar de todos modos"),
+    ("This looks like a different album.", "这看起来是另一张专辑。", "Cela ressemble à un autre album.",
+     "Parece otro álbum."),
+    ("Accepting it would name and tag your copies as that album. Use own info, or pick another candidate below.",
+     "接受它会让你的副本以那张专辑命名并写入标签。请使用自有信息，或在下方选择另一个候选。",
+     "L'accepter nommerait et étiquetterait vos copies comme cet album. Utilisez les infos de l'album, ou choisissez "
+     "un autre candidat ci-dessous.",
+     "Aceptarlo nombraría y etiquetaría sus copias como ese álbum. Use la información propia o elija otro candidato abajo."),
+    ("This release:", "此发行：", "Cette parution :", "Esta edición:"),
+    ("Your album:", "你的专辑：", "Votre album :", "Su álbum:"),
+    ("Your album", "你的专辑", "Votre album", "Su álbum"),
+    ("vs this release", "对比此发行", "contre cette parution", "frente a esta edición"),
+    ("The artist is not the one in your folder name or tags.", "艺术家与你的文件夹名或标签中的不同。",
+     "L'artiste n'est pas celui du nom de votre dossier ni de vos étiquettes.",
+     "El artista no es el del nombre de su carpeta ni de sus etiquetas."),
+    ("The artist is not the one in your folder name or tags either.", "艺术家也与你的文件夹名或标签中的不同。",
+     "L'artiste n'est pas non plus celui du nom de votre dossier ni de vos étiquettes.",
+     "El artista tampoco es el del nombre de su carpeta ni de sus etiquetas."),
+    ("The volume or disc number is different.", "卷号或碟号不同。", "Le numéro de volume ou de disque est différent.",
+     "El número de volumen o de disco es distinto."),
+    ("The title is different.", "标题不同。", "Le titre est différent.", "El título es distinto."),
+    ("Often a different album by the same artist — compare the track mapping below, pick another candidate, or use Own info.",
+     "通常是同一艺术家的另一张专辑——请比较下方的曲目对应，选择另一个候选，或使用自有信息。",
+     "Souvent un autre album du même artiste — comparez la correspondance des pistes ci-dessous, choisissez un autre "
+     "candidat ou utilisez les infos de l'album.",
+     "A menudo otro álbum del mismo artista: compare la correspondencia de pistas abajo, elija otro candidato o use la "
+     "información propia."),
+    ("This looks like a different album, not yours: its title and artist (or volume number) do not match your folder and tags.",
+     "这看起来是另一张专辑，而不是你的：它的标题和艺术家（或卷号）与你的文件夹和标签不符。",
+     "Cela ressemble à un autre album, pas au vôtre : son titre et son artiste (ou son numéro de volume) ne "
+     "correspondent pas à votre dossier ni à vos étiquettes.",
+     "Parece otro álbum, no el suyo: su título y su artista (o su número de volumen) no coinciden con su carpeta ni sus etiquetas."),
+    ("The copies would be named and tagged as that album. Own info is usually right here.",
+     "副本将以那张专辑命名并写入标签。这里通常应使用自有信息。",
+     "Les copies seraient nommées et étiquetées comme cet album. Les infos de l'album sont en général le bon choix ici.",
+     "Las copias se nombrarían y etiquetarían como ese álbum. La información propia suele ser lo correcto aquí."),
+    ("Accept it anyway?", "仍然接受吗？", "L'accepter quand même?", "¿Aceptarlo de todos modos?"),
 ]
 
 

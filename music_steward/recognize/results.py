@@ -63,6 +63,88 @@ def title_agrees(a: str | None, b: str | None) -> bool:
     return x in y or y in x or SequenceMatcher(None, x, y).ratio() >= TITLE_AGREES
 
 
+# Is this candidate the same album? The first trial on a real collection (2026-11-28) accepted 8 of 19 albums under
+# another album's name -- a Cantonese opera as "A domani" by an artist called Ape, Cultural Revolution songs as a
+# Japanese enka album -- and kept them through a second review, because the screen said nothing about the ARTIST and
+# little about the title. These checks compare the candidate with what the album itself says: its folder names, its
+# label and its files' artist tags (repaired when garbled), in one script (Simplified) and without accents.
+VARIOUS = {"variousartists", "various", "va", "群星", "众星", "合辑", "群星合辑", "不同艺术家", "multipleartists",
+           "群星演唱", "大合唱", "多位艺人"}
+_NAME_SPLIT = None
+_NUMBERS = None
+
+
+def _plain(s: str | None) -> str:
+    """Comparison form: Simplified, no accents, casefolded, no spaces or punctuation."""
+    import re
+    import unicodedata
+    from ..chinese import key
+    s = unicodedata.normalize("NFKD", key(s or ""))
+    s = "".join(ch for ch in s if not unicodedata.combining(ch)).casefold()
+    return re.sub(r"[\s\-_.·•:：,，/\\|()（）\[\]【】《》<>'\"“”‘’!！?？~～&＆;；、+]+", "", s)
+
+
+def _names(artist: str | None) -> list[str]:
+    """The people in an artist credit: "张也 & 阎维文", "A feat. B", "A, B / C" -> each name."""
+    import re
+    global _NAME_SPLIT
+    if _NAME_SPLIT is None:
+        _NAME_SPLIT = re.compile(r"\s*(?:&|＆|/|、|;|；|,|，|\bfeat\.?|\bft\.?|\bwith\b|\band\b|和|与|與)\s*", re.I)
+    return [p for p in (_plain(x) for x in _NAME_SPLIT.split(artist or "")) if p]
+
+
+def _volume_numbers(t: str | None) -> set[str]:
+    """Numbers in a title that name a volume or disc (真发烧5 vs 真发烧4; CD1 vs CD2), not years or track counts."""
+    import re
+    global _NUMBERS
+    if _NUMBERS is None:
+        _NUMBERS = re.compile(r"(?:vol\.?|volume|第|cd|disc|disk|碟|之|集)\s*(\d{1,2})(?!\d)|(?<![\d])(\d{1,2})(?:\s*(?:集|辑|輯|部))|"
+                              r"[^\d](\d)(?:ape|flac|mp3|wav)?$", re.I)
+    out = set()
+    for m in _NUMBERS.finditer(_plain(t) if t else ""):
+        out.update(g.lstrip("0") or "0" for g in m.groups() if g)
+    return out
+
+
+def readable_tags(tags_json: str | None, issues_json: str | None) -> dict:
+    """A file's tags as the app reads them: garbled GBK/Big5 fields replaced by their repaired proposal."""
+    t = json.loads(tags_json or "{}")
+    for i in json.loads(issues_json or "[]"):
+        if i.get("field") and i.get("proposal"):
+            t[i["field"]] = i["proposal"]
+    return t
+
+
+def ours(u: dict, file_tags: list[dict] | None) -> dict:
+    """What the album says about itself: {"artists": [names from tags], "text": folder + label, "various": bool}."""
+    artists = []
+    for t in file_tags or []:
+        for k in ("albumartist", "artist"):
+            artists += _names(t.get(k))
+    folder = (u.get("folder") or "").split("/")
+    text = _plain(" ".join(folder[-3:] + [u.get("label") or ""]))
+    various = any(a in VARIOUS for a in artists) or any(v in text for v in ("群星", "variousartists", "va."))
+    return {"artists": sorted(set(a for a in artists if a not in VARIOUS)), "text": text, "various": various}
+
+
+def artist_check(u: dict, top: dict) -> str:
+    """agrees | differs | unknown -- does the candidate's artist belong to this album?"""
+    me = u.get("_ours")
+    if not me:
+        return "unknown"
+    theirs = _names(top.get("artist"))
+    if not theirs:
+        return "unknown"
+    if all(t in VARIOUS for t in theirs):
+        return "agrees" if me["various"] or len(me["artists"]) >= 3 else "unknown"
+    names = [t for t in theirs if t not in VARIOUS and len(t) >= 2]
+    if any(n in me["text"] or any(n in a or a in n for a in me["artists"]) for n in names):
+        return "agrees"
+    if me["artists"] or me["various"]:      # the album names its artists (or says "various"), and these are not them
+        return "differs"
+    return "unknown"                         # nothing to compare with: neither agreement nor a warning
+
+
 def evidence(u: dict, top: dict) -> dict:
     """Facts the confidence rule uses, computed from the stored candidate."""
     n = u.get("n_tracks") or u["n_files"]
@@ -71,9 +153,17 @@ def evidence(u: dict, top: dict) -> dict:
         extra = json.loads(top.get("extra_tracks_json") or "[]")
     media = top.get("_mapped_media") or set()
     disc_of_set = bool((top.get("mediums") or 1) > 1 and len(media) == 1)
+    folder_leaf = (u.get("folder") or "").rsplit("/", 1)[-1]
+    agrees = title_agrees(u.get("label"), top.get("album")) or title_agrees(folder_leaf, top.get("album"))
+    mine_n = _volume_numbers(u.get("label")) | _volume_numbers(folder_leaf)
+    theirs_n = _volume_numbers(top.get("album"))
+    numbers_differ = bool(mine_n and theirs_n and not (mine_n & theirs_n))
+    artist = artist_check(u, top) if (top.get("source") or "") != "Local" else "agrees"
+    different = (top.get("source") or "") != "Local" and (numbers_differ or (not agrees and artist == "differs"))
     return {"n": n, "all_mapped": (top.get("n_mapped") or 0) >= n, "missing": len(extra),
             "disc_of_set": disc_of_set, "disc": next(iter(media)) if disc_of_set else None,
-            "title_agrees": title_agrees(u.get("label"), top.get("album"))}
+            "title_agrees": agrees and not numbers_differ, "artist": artist,
+            "numbers_differ": numbers_differ, "different_album": different}
 
 
 def confidence(u: dict, top: dict | None) -> str:
@@ -92,8 +182,12 @@ def confidence(u: dict, top: dict | None) -> str:
     share = (top["fingerprint_agrees"] or 0) / max(1, tried)
     if (top["distance"] < READY_DISTANCE and share >= READY_FP_SHARE) or \
             (top["distance"] < READY_DISTANCE_STRONG_FP and share >= STRONG_FP_SHARE):
-        return "ready"
+        return "ready"                         # the audio itself confirms it, whatever the names say
     ev = evidence(u, top)
+    if ev["different_album"]:
+        return "no_match"                      # its title and artist (or volume) are another album's: Own info
+    if ev["artist"] == "differs" and top["distance"] <= LIKELY_DISTANCE:
+        return "needs_review"                  # close on paper, but by someone else: never accepted in bulk
     if top["distance"] <= LIKELY_DISTANCE and ev["all_mapped"] and ev["missing"] == 0:
         return "likely"
     if top["distance"] > NO_MATCH_DISTANCE and not top["fingerprint_agrees"]:
@@ -135,6 +229,13 @@ def units(con: sqlite3.Connection, root_id: int, folder: str = "") -> list[dict]
             local.setdefault(c["unit_id"], {k: c[k] for k in ("id", "album", "artist", "year")})
         for d in con.execute(f"SELECT * FROM decision WHERE unit_id IN ({marks})", chunk):
             dec[d["unit_id"]] = dict(d)
+    first: dict[int, list[int]] = {u["id"]: json.loads(u["file_ids"])[:4] for u in rows}
+    fids = [f for v in first.values() for f in v]
+    tags_of: dict[int, dict] = {}
+    for chunk in (fids[i:i + 900] for i in range(0, len(fids), 900)):
+        for fid, tj, ij in con.execute(f"SELECT id, tags_json, tag_issues_json FROM file WHERE id IN "
+                                       f"({','.join('?' * len(chunk))})", chunk):
+            tags_of[fid] = readable_tags(tj, ij)
     media: dict[int, set] = {}
     for table, kinds in (("cand_track", lambda k: k != "cue"), ("cand_cue_track", lambda k: k == "cue")):
         cids = [tops[u["id"]]["id"] for u in rows if u["id"] in tops and kinds(u["kind"])]
@@ -147,6 +248,7 @@ def units(con: sqlite3.Connection, root_id: int, folder: str = "") -> list[dict]
         u["presence"] = gone.get(u["id"], "here")          # here | retired | not_found
         u["n_files"] = len(json.loads(u["file_ids"]))
         u["top"] = tops.get(u["id"])
+        u["_ours"] = ours(u, [tags_of[f] for f in first[u["id"]] if f in tags_of])
         if u["top"]:
             u["top"]["_mapped_media"] = media.get(u["top"]["id"], set())
         u["confidence"] = confidence(u, u["top"])
@@ -155,7 +257,15 @@ def units(con: sqlite3.Connection, root_id: int, folder: str = "") -> list[dict]
             u["top"].pop("_mapped_media")
         u["local"] = local.get(u["id"])
         u["decision"] = dec.get(u["id"])
+        u.pop("_ours")
         out.append(u)
+    # where each accepted name came from, so a name taken from the wrong release stands out in the list
+    acc = {d["candidate_id"]: d for d in dec.values() if d.get("candidate_id")}
+    cids = list(acc)
+    for chunk in (cids[i:i + 900] for i in range(0, len(cids), 900)):
+        for cid, src, album in con.execute(f"SELECT id, source, album FROM candidate WHERE id IN "
+                                           f"({','.join('?' * len(chunk))})", chunk):
+            acc[cid]["source"], acc[cid]["album"] = src, album
     return out
 
 
@@ -184,6 +294,7 @@ def unit_detail(con: sqlite3.Connection, unit_id: int) -> dict | None:
     files = {f["id"]: dict(f) for f in con.execute(
         f"SELECT id, relpath, tags_json, tag_issues_json, duration FROM file WHERE id IN "
         f"({','.join('?' * len(ids))})", ids)}
+    u["_ours"] = ours(u, [readable_tags(f["tags_json"], f["tag_issues_json"]) for f in files.values()])
     u["files"] = [{"id": i, "relpath": files[i]["relpath"], "duration": files[i]["duration"],
                    "tags": json.loads(files[i]["tags_json"] or "{}")} for i in ids if i in files]
     cands = []
@@ -214,6 +325,7 @@ def unit_detail(con: sqlite3.Connection, unit_id: int) -> dict | None:
     u["confidence"] = confidence(u, online[0] if online else None)
     for c in cands:
         c.pop("_mapped_media")
+    u.pop("_ours")
     d = con.execute("SELECT * FROM decision WHERE unit_id=?", (unit_id,)).fetchone()
     u["decision"] = dict(d) if d else None
     return u

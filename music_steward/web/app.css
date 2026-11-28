@@ -199,3 +199,5 @@ body.resizing{cursor:col-resize;user-select:none}
 .overview{list-style:none;margin:0 0 4px;padding:0;display:grid;gap:4px}
 .overview li{font-size:14px}
 .overview.next li::before{content:"→ ";color:var(--muted)}
+.errbanner{border-left:3px solid var(--conflict,#c0392b);background:rgba(192,57,43,.06)}
+.errbanner p{margin:0 0 6px}.errbanner ul{margin:0;padding-left:18px}

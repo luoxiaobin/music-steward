@@ -13,6 +13,13 @@ All notable changes to Music Steward (formerly MP3LibraryTool). The format follo
   audio, duets — and saves the set on this Mac (`~/.music-steward/trial.json`). `recognize --trial` and
   `plan --trial --dest …` work on exactly those albums, `trial show` says where each one stands, and the album list
   has a **Trial set** filter.
+- **Safer review.** A match whose artist is someone else and whose title is another album's — or whose volume number
+  differs (*Vol. 5* vs *Vol. 4*, *CD 2* vs *CD 1*) — is marked **Different album**: it is never *Likely* (it counts
+  as *No match*), bulk accept leaves it alone, and the album's screen says what this release is against what your
+  album says (folder, label, artists — compared in Simplified, without accents, each singer of a duet on their own),
+  offers **Use own info** first and asks before **Accept anyway…**. A close match by another artist is *Needs
+  review*, never *Likely*. A match the audio fingerprints confirm is still *Ready*, whatever the names say.
+- The album list shows where an accepted name came from (*Accepted · MusicBrainz*, *Accepted · own info*).
 
 ### Changed
 - `trial show` says under which name each album was accepted and where the name came from (MusicBrainz, Deezer,
