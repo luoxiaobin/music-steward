@@ -238,8 +238,11 @@ function unitBadge(u) {
   if (u.presence === "retired") return h("span", { class: "badge b-ready" }, "Originals set aside");
   if (u.presence === "not_found") return h("span", { class: "badge b-conflict" }, "Not found");
   if (u.decision) return u.decision.action === "accept"
-    ? h("span", { class: "badge b-ready" }, u.decision.release_key === "local" ? "Accepted · own info" : "Accepted")
+    ? h("span", { class: "badge b-ready" }, u.decision.release_key === "local" || u.decision.source === "Local" ? "Accepted · own info"
+        : u.decision.source ? `Accepted · ${u.decision.source}` : "Accepted")
                                                           : h("span", { class: "badge b-unid" }, "Skipped");
+  if (u.evidence && u.evidence.different_album)      // its top match is another album: Own info is the way
+    return h("span", { class: "badge b-conflict" }, "Different album");
   const [cls, txt] = CONF[u.confidence] || ["b-unid", u.confidence];
   return h("span", { class: `badge ${cls}` }, txt);
 }
@@ -393,7 +396,8 @@ async function renderUnits(where, stale = () => false) {
         u.decision && u.decision.stale_reason ? h("div", { class: "warn small strong" }, "Audio changed · decide again") : null),
       h("td", {}, u.kind === "track" ? "track" : u.kind === "cue" ? `${u.n_tracks || "?"} (cue)` : u.n_files),
       h("td", {}, t ? [h("div", {}, `${t.album || t.artist} · ${yearText(t)}${t.country ? " · " + t.country : ""}`,
-                         u.evidence && u.evidence.title_agrees ? h("span", { class: "ok small" }, "  title ✓")
+                         u.evidence && u.evidence.different_album ? h("span", { class: "err small strong" }, "  different album")
+                           : u.evidence && u.evidence.title_agrees ? h("span", { class: "ok small" }, "  title ✓")
                            : titleDiffers(u) ? h("span", { class: "warn small strong" }, "  title differs") : null),
                        h("div", { class: "sub" }, `${t.artist} · distance ${t.distance.toFixed(2)} · fingerprints ${t.fingerprint_agrees}/${u.n_tracks || u.n_files}` +
                          (u.evidence && u.evidence.disc_of_set ? ` · disc ${u.evidence.disc} of ${t.mediums}` : ""))]
@@ -640,8 +644,16 @@ function renderUnitDetail(d) {
       const r = await post2("/api/bulk", { root: S.root.path, path: S.path, action: "own_info", unit_ids: [d.id] });
       if (r.error || r.n_failed) return tell(r.error || r.failed.join("\n"));
     } else {
-      await api("/api/decision", { method: "POST", headers: { "Content-Type": "application/json", "X-MLT": "1" },
-        body: JSON.stringify({ unit_id: d.id, action, candidate_id: action === "accept" ? chosen.id : null }) });
+      const send = extra => api("/api/decision", { method: "POST", headers: { "Content-Type": "application/json", "X-MLT": "1" },
+        body: JSON.stringify({ unit_id: d.id, action, candidate_id: action === "accept" ? chosen.id : null, ...extra }) });
+      let r = await send({});
+      if (r.confirm === "different_album") {        // the trial's lesson: a wrong release is never one key press away
+        if (!await ask("This looks like a different album, not yours: its title and artist (or volume number) " +
+                       "do not match your folder and tags.\n\nThe copies would be named and tagged as that album. " +
+                       "Own info is usually right here.\n\nAccept it anyway?", "Accept anyway")) return;
+        r = await send({ confirm_different: true });
+      }
+      if (r.error) return tell(r.error);
     }
     await refreshCenter();
     await gotoUnit(next ?? d.id);
@@ -649,16 +661,31 @@ function renderUnitDetail(d) {
   S.detailActions = { accept: () => decide("accept"), own: () => decide("own_info"), skip: () => decide("skip"),
                       undo: () => decide("clear", false) };
   const acceptedNow = d.decision?.action === "accept" && d.decision.candidate_id === chosen?.id;
+  const otherAlbum = !!(chosen && chosen.source !== "Local" && chosen.evidence && chosen.evidence.different_album);
   const bar = h("div", { class: "detailbar" },
-    h("button", { type: "button", class: "btn btn-primary", disabled: !chosen, onclick: S.detailActions.accept },
-      acceptedNow ? "Accepted ✓" : chosen?.source === "Local" ? "Accept own info" : "Accept release", h("span", { class: "kbd" }, "A")),
-    h("button", { type: "button", class: "btn", disabled: d.status !== "done", onclick: S.detailActions.own }, "Own info", h("span", { class: "kbd" }, "O")),
+    h("button", { type: "button", class: otherAlbum ? "btn" : "btn btn-primary", disabled: !chosen, onclick: S.detailActions.accept },
+      acceptedNow ? "Accepted ✓" : chosen?.source === "Local" ? "Accept own info" : otherAlbum ? "Accept anyway…" : "Accept release",
+      h("span", { class: "kbd" }, "A")),
+    h("button", { type: "button", class: otherAlbum ? "btn btn-primary" : "btn", disabled: d.status !== "done", onclick: S.detailActions.own },
+      otherAlbum ? "Use own info" : "Own info", h("span", { class: "kbd" }, "O")),
     h("button", { type: "button", class: "btn", onclick: S.detailActions.skip }, "Skip", h("span", { class: "kbd" }, "S")),
     d.decision ? h("button", { type: "button", class: "btn", onclick: S.detailActions.undo }, "Undo", h("span", { class: "kbd" }, "U")) : null);
   const differs = chosen && chosen.source !== "Local" && chosen.evidence && !chosen.evidence.title_agrees;
-  if (differs) parts.splice(1, 0, h("div", { class: "banner warnbanner" }, h("strong", {}, "The album title differs. "),
-    `Your album “${d.label}” vs this release “${chosen.album}”. Often a different album by the same artist — ` +
-    "compare the track mapping below, pick another candidate, or use Own info."));
+  const ev = chosen && chosen.evidence || {};
+  const data = t => h("span", { class: "strong", "data-no-translate": "" }, t || "?");
+  if (otherAlbum) parts.splice(1, 0, h("div", { class: "banner errbanner" },
+    h("p", {}, h("strong", {}, "This looks like a different album. "),
+      "Accepting it would name and tag your copies as that album. Use own info, or pick another candidate below."),
+    h("ul", { class: "small" },
+      h("li", {}, h("span", {}, "This release:"), " ", data(chosen.album), " — ", data(chosen.artist)),
+      h("li", {}, h("span", {}, "Your album:"), " ", h("span", { class: "strong", "data-no-translate": "" }, d.label), " ", h("span", { class: "mono xsmall", "data-no-translate": "" }, d.folder)),
+      ev.artist === "differs" ? h("li", {}, "The artist is not the one in your folder name or tags.") : null,
+      ev.numbers_differ ? h("li", {}, "The volume or disc number is different.") : null,
+      !ev.title_agrees && !ev.numbers_differ ? h("li", {}, "The title is different.") : null)));
+  else if (differs) parts.splice(1, 0, h("div", { class: "banner warnbanner" }, h("strong", {}, "The album title differs. "),
+    h("span", {}, "Your album"), " ", h("span", { class: "strong", "data-no-translate": "" }, d.label), " ", h("span", {}, "vs this release"), " ", data(chosen.album), ". ",
+    h("span", {}, "Often a different album by the same artist — compare the track mapping below, pick another candidate, or use Own info."),
+    ev.artist === "differs" ? h("div", { class: "small" }, "The artist is not the one in your folder name or tags either.") : null));
   if (onl.length > nOnl) list.append(h("button", { type: "button", class: "linkbtn",
     onclick: () => { S.allCands = d.id; renderUnitDetail(d); } }, `Show ${onl.length - nOnl} more candidates`));
   parts.unshift(bar);

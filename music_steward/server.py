@@ -603,6 +603,9 @@ class App:
                     if not u["top"]:
                         failed.append(f"{u['label']}: no online candidate")
                         continue
+                    if (u.get("evidence") or {}).get("different_album"):
+                        failed.append(f"{u['label']}: the top match looks like a different album; open it to decide")
+                        continue
                     con.execute("INSERT OR REPLACE INTO decision(unit_id, action, candidate_id, decided_at, release_key) "
                                 "VALUES(?, 'accept', ?, ?, ?)", (u["id"], u["top"]["id"], now, release_key(con, u["top"]["id"])))
                 elif action == "own_info":
@@ -663,6 +666,10 @@ class App:
             if action == "accept" and not con.execute(
                     "SELECT 1 FROM candidate WHERE id=? AND unit_id=?", (cid, uid)).fetchone():
                 return {"error": "candidate does not belong to this album"}
+            if action == "accept" and body.get("confirm_different") is not True:
+                why = self._different_album(con, uid, cid)
+                if why:     # the trial's lesson: never accepted with one key press; the window asks, then sends it again
+                    return {"error": "this looks like a different album", "confirm": "different_album", "why": why}
             from .recognize.results import release_key
             key = release_key(con, cid) if action == "accept" else None
             prev = con.execute("SELECT candidate_id, overrides_json FROM decision WHERE unit_id=?", (uid,)).fetchone()
@@ -672,6 +679,16 @@ class App:
             con.execute("UPDATE unit SET notice=NULL WHERE id=?", (uid,))
         con.commit()
         return {"ok": True}
+
+    def _different_album(self, con, uid: int, cid: int) -> dict | None:
+        """Why this candidate looks like another album, or None. Own info is never "different"."""
+        from .recognize import results
+        d = results.unit_detail(con, uid)
+        c = next((c for c in (d or {}).get("candidates", []) if c["id"] == cid), None)
+        if not c or c.get("source") == "Local" or not c["evidence"]["different_album"]:
+            return None
+        return {"album": c.get("album"), "artist": c.get("artist"), "label": d["label"], "folder": d["folder"],
+                "artist_check": c["evidence"]["artist"], "numbers_differ": c["evidence"]["numbers_differ"]}
 
     def start_scan(self, root: str, path: str = "") -> dict:  # kept for callers/tests
         return self.start_job("scan", root, path)
