@@ -187,3 +187,13 @@ def test_the_album_screen_warns_about_another_artist():
     js = (Path(__file__).resolve().parents[1] / "music_steward/web/app.js").read_text(encoding="utf-8")
     assert 'ev.artist === "differs") parts.splice(1, 0, h("div", { class: "banner warnbanner" }' in js
     assert 'data(ev.our_artists.join(", "))' in js
+
+
+def test_a_track_that_will_not_play_falls_back_to_the_mp3_preview():
+    """The desktop window played nothing for a FLAC track and said nothing (checked in Chromium: a refused file and a
+    file that never answers both end up playing the converted MP3)."""
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "music_steward/web/app.js").read_text(encoding="utf-8")
+    body = js[js.index("const failed = (why, src)"):js.index("const rows = chosen.tracks.map")]
+    assert 'src.replace("/api/audio/", "/api/preview/")' in body and "player.readyState < 3" in body
+    assert ".catch(() => {})" not in body                      # a refusal is never swallowed silently

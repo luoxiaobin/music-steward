@@ -517,7 +517,24 @@ function renderUnitDetail(d) {
   if (chosen && chosen.tracks.length) {
     const player = h("audio", { id: "unitPlayer", controls: true, preload: "none", style: "width:100%" });
     const nowPlaying = h("div", { class: "muted small", id: "nowPlaying" }, "Press ▶ to listen to a track.");
-    player.addEventListener("error", () => { nowPlaying.textContent = "This track could not be played (preview failed)."; });
+    // the desktop window (WebKit) played nothing for a FLAC file and said nothing (owner, 2026-11-28): when a file sent
+    // as it is fails, try once more with the converted MP3 preview, and always say what happened
+    let current = null;
+    const failed = (why, src) => {
+      if (!current || src !== current.active) return;      // a late error from an earlier try or another track
+      if (current.direct && current.fallback) {
+        const c = current;
+        current = { ...c, direct: false, active: c.fallback };
+        nowPlaying.textContent = `Converting ${c.label} for playback (first time takes a few seconds)…`;
+        player.src = c.fallback;
+        player.play().then(() => { nowPlaying.textContent = `Playing ${c.label}`; }).catch(e => {
+          if (e && e.name !== "AbortError") failed(e.name, c.fallback); });
+        return;
+      }
+      nowPlaying.textContent = `This track could not be played (${why || "preview failed"}).`;
+    };
+    player.addEventListener("error", () => failed(player.error ? `media error ${player.error.code}` : "",
+      current && player.currentSrc.endsWith(current.active) ? current.active : null));
     const srcFor = t => {
       if (d.kind === "cue") {
         const sl = (d.cue_slices || {})[String(t.cue_track)];
@@ -531,9 +548,17 @@ function renderUnitDetail(d) {
     const play = (t, label) => {
       const src = srcFor(t);
       if (!src) return;
+      const direct = src.startsWith("/api/audio/");
+      current = { label, direct, active: src, fallback: direct ? src.replace("/api/audio/", "/api/preview/") : null };
       nowPlaying.textContent = `Preparing ${label}…`;
       player.src = src;
-      player.play().then(() => { nowPlaying.textContent = `Playing ${label}`; }).catch(() => {});
+      const mine = current;
+      player.play().then(() => { nowPlaying.textContent = `Playing ${label}`; }).catch(e => {
+        if (e && e.name === "AbortError") return;           // another track was chosen meanwhile
+        failed(e && e.name, src);
+      });
+      // a player that neither plays nor reports an error (seen in the desktop window) gets the MP3 after 8 s
+      setTimeout(() => { if (current === mine && player.readyState < 3 && player.currentTime === 0) failed("no answer", src); }, 8000);
     };
     const rows = chosen.tracks.map(t => h("tr", {},
       h("td", { class: "playcol" }, srcFor(t) ? h("button", { type: "button", class: "playbtn", "aria-label": "Play",
