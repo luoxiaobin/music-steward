@@ -982,7 +982,9 @@ def make_handler(app: App, port_ref: dict):
                     end = int(m.group(2)) if m.group(2) else size - 1
                 else:
                     start = max(0, size - int(m.group(2)))
-                end = min(end, size - 1, start + 8 * 1024 * 1024 - 1)
+                # exactly the bytes asked for: Apple's media engine (the Mac window) asks for a whole 25 MB FLAC at
+                # once and stalled silently when it got an 8 MB piece; it is sent in 64 KB chunks either way
+                end = min(end, size - 1)
                 if start > end:
                     return self._send(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE, b"")
                 code = 206
